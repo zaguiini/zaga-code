@@ -5,19 +5,23 @@ import { fileWriteTool } from "./tools/file-write";
 import { shellTool } from "./tools/shell";
 import { grepTool } from "./tools/grep";
 import { globTool } from "./tools/glob";
+import { fuzzyFileSearchTool } from "./tools/fuzzy-file-search";
+import { glob } from "glob";
+import { resolve } from "path";
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
  */
-const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
+function getSystemPrompt({ projectPath }: { projectPath: string }) {
+  return `You are an AI developer assistant that helps users with coding tasks. The project path is ${projectPath}.
 
 **When given a task:**
 - You MUST use the appropriate tools to gather information - never guess, make up information, or say you can't use a tool
 - Go ahead and use the tools to complete the task instead of asking the user or saying you can't do it
-- Always ensure file paths are relative to the project root. Be careful with destructive operations and provide clear explanations of what you're doing.
+- Always ensure file paths are relative to the project root (e.g., "src/agent/tools/file-read.ts", NOT absolute paths like "/Users/..."). Be careful with destructive operations and provide clear explanations of what you're doing.
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
-- When the user passes a file name, do not assume it's in the current directory. Use the glob tool to find the file.
+- When the user passes a file name, do not assume it's in the current directory. Use the fuzzy_file_search tool to find the file.
 
 **Tools:**
 - file_read: Read the contents of a file within the project directory.
@@ -25,7 +29,9 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
 - shell: Execute a shell command in the project directory.
 - grep: Search for text patterns in files within the project directory.
 - glob: Find files matching a glob pattern within the project directory.
+- fuzzy_file_search: Perform fuzzy search on project file paths. Use this FIRST when you only have a filename (e.g., "file-read.ts") to find the correct relative path.
 `;
+}
 
 /**
  * Creates a LangGraph ReAct agent with a given model and development tools.
@@ -35,13 +41,21 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
  * @param model - The model to use
  * @returns A configured LangGraph agent ready to use
  */
-export function createAgent({ projectPath, model }: { projectPath: string, model: string }) {
+export async function createAgent({ projectPath, model }: { projectPath: string, model: string }) {
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
     model,
     temperature: 0.7,
     // Ensure tool calling is enabled
     format: undefined, // Don't force JSON format, let model handle tool calling
+  });
+
+  // Get all project files for the fuzzy search index
+  const resolvedProjectPath = resolve(projectPath);
+  const projectFiles = await glob("**/*", {
+    cwd: resolvedProjectPath,
+    absolute: false, // Return relative paths
+    ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '.next/**'], // Ignore common directories
   });
 
   // Create the tools with the project path
@@ -51,6 +65,7 @@ export function createAgent({ projectPath, model }: { projectPath: string, model
     shellTool(projectPath),
     grepTool(projectPath),
     globTool(projectPath),
+    fuzzyFileSearchTool(projectFiles),
   ];
 
   // Explicitly bind tools to the LLM to ensure proper tool calling format
@@ -61,7 +76,7 @@ export function createAgent({ projectPath, model }: { projectPath: string, model
   const agent = createReactAgent({
     llm: llmWithTools,
     tools,
-    prompt: SYSTEM_PROMPT,
+    prompt: getSystemPrompt({ projectPath }),
   });
 
   return agent;

@@ -40,7 +40,7 @@ async function runTest() {
 
   const projectPath = process.cwd();
   const model = "qwen3:1.7b";
-  const agent = createAgent({ projectPath, model });
+  const agent = await createAgent({ projectPath, model });
 
   console.log("🤖 Testing LangGraph Agent with model:", model);
   console.log("📁 Project path:", projectPath);
