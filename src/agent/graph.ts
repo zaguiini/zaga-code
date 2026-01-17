@@ -41,6 +41,7 @@ export async function createAgent({ projectPath, model }: { projectPath: string;
     temperature: 0.3,
     // Ensure tool calling is enabled
     format: undefined, // Don't force JSON format, let model handle tool calling
+    streaming: true, // Enable streaming for token-by-token responses
   })
 
   // Get all project files for the fuzzy search index

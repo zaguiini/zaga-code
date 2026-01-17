@@ -4,7 +4,7 @@ import { fetchHttpStream, useChat } from '@tanstack/ai-react'
 import './Chat.css'
 
 interface ChatProps {
-  projectPath?: string
+  projectPath: string
 }
 
 export default function Chat({ projectPath }: ChatProps) {
@@ -12,7 +12,7 @@ export default function Chat({ projectPath }: ChatProps) {
 
   const { messages, sendMessage, isLoading, error } = useChat({
     connection: fetchHttpStream('/api/chat'),
-    body: projectPath ? { projectPath } : undefined,
+    body: { projectPath },
   })
 
   const handleSubmit = (e: React.FormEvent) => {

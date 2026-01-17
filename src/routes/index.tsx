@@ -1,33 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useCallback, useState } from 'react'
+import Chat from '../components/Chat'
+import ProjectPathInput from '../components/ProjectPathInput'
 import '../App.css'
 
 export const Route = createFileRoute('/')({ component: App })
 
 function App() {
+  const [projectPath, setProjectPath] = useState<string>('')
+
+  const handleProjectPathChange = useCallback((path: string) => {
+    setProjectPath(path)
+  }, [])
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src="/tanstack-circle-logo.png" className="App-logo" alt="TanStack Logo" />
-        <p>
-          Edit <code>src/routes/index.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <a
-          className="App-link"
-          href="https://tanstack.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn TanStack
-        </a>
-      </header>
+      <div className="app-container">
+        <h1>Agent Chat Interface</h1>
+        <ProjectPathInput value={projectPath} onChange={handleProjectPathChange} />
+        {projectPath && <Chat projectPath={projectPath} />}
+      </div>
     </div>
   )
 }

@@ -1,0 +1,73 @@
+.project-path-input {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 0.5rem;
+  border: 1px solid #e0e0e0;
+}
+
+.project-path-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.project-path-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.project-path-field {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: monospace;
+}
+
+.project-path-field:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.project-path-field.invalid {
+  border-color: #c62828;
+  background-color: #ffebee;
+}
+
+.project-path-button {
+  padding: 0.75rem 1rem;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.project-path-button:hover {
+  background-color: #1565c0;
+}
+
+.project-path-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.project-path-hint {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+  font-family: monospace;
+}
