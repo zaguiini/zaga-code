@@ -1,13 +1,13 @@
-import { createAgent as createLangChainAgent } from "langchain";
-import { ChatOllama } from "@langchain/ollama";
-import { fileReadTool } from "./tools/file-read";
-import { fileWriteTool } from "./tools/file-write";
-import { shellTool } from "./tools/shell";
-import { grepTool } from "./tools/grep";
-import { globTool } from "./tools/glob";
-import { fuzzyFileSearchTool } from "./tools/fuzzy-file-search";
-import { glob } from "glob";
-import { resolve } from "path";
+import { resolve } from 'node:path'
+import { createAgent as createLangChainAgent } from 'langchain'
+import { ChatOllama } from '@langchain/ollama'
+import { glob } from 'glob'
+import { fileReadTool } from './tools/file-read'
+import { fileWriteTool } from './tools/file-write'
+import { shellTool } from './tools/shell'
+import { grepTool } from './tools/grep'
+import { globTool } from './tools/glob'
+import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -22,34 +22,34 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
 - When the user passes a file name, do not assume it's in the current directory. Use the fuzzy_file_search tool to find the file.
-`;
+`
 }
 
 /**
  * Creates a LangChain agent with a given model and development tools.
  * Uses the latest LangChain API (createAgent) which is built on top of LangGraph.
  * Note: The model must support tool calling and reasoning
- * 
+ *
  * @param projectPath - The root path of the project directory
  * @param model - The model to use
  * @returns A configured LangChain agent ready to use
  */
-export async function createAgent({ projectPath, model }: { projectPath: string, model: string }) {
+export async function createAgent({ projectPath, model }: { projectPath: string; model: string }) {
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
     model,
     temperature: 0.3,
     // Ensure tool calling is enabled
     format: undefined, // Don't force JSON format, let model handle tool calling
-  });
+  })
 
   // Get all project files for the fuzzy search index
-  const resolvedProjectPath = resolve(projectPath);
-  const projectFiles = await glob("**/*", {
+  const resolvedProjectPath = resolve(projectPath)
+  const projectFiles = await glob('**/*', {
     cwd: resolvedProjectPath,
     absolute: false, // Return relative paths
     ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '.next/**'], // Ignore common directories
-  });
+  })
 
   // Create the tools with the project path
   const tools = [
@@ -59,7 +59,7 @@ export async function createAgent({ projectPath, model }: { projectPath: string,
     grepTool(projectPath),
     globTool(projectPath),
     fuzzyFileSearchTool(projectFiles),
-  ];
+  ]
 
   // Create the agent using the latest LangChain API
   // The agent automatically handles tool binding and calling
@@ -67,7 +67,7 @@ export async function createAgent({ projectPath, model }: { projectPath: string,
     model: llm,
     tools,
     systemPrompt: getSystemPrompt({ projectPath }),
-  });
+  })
 
-  return agent;
+  return agent
 }

@@ -4,7 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import './start.css'
 
 function getNames() {
-  return fetch('/demo/api/names').then((res) => res.json() as Promise<string[]>)
+  return fetch('/demo/api/names').then(res => res.json() as Promise<Array<string>>)
 }
 
 export const Route = createFileRoute('/demo/start/api-request')({
@@ -23,7 +23,7 @@ function Home() {
       <div className="content">
         <h1>Start API Request Demo - Names List</h1>
         <ul>
-          {names.map((name) => (
+          {names.map(name => (
             <li key={name}>{name}</li>
           ))}
         </ul>

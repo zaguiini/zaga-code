@@ -7,11 +7,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <img
-          src="/tanstack-circle-logo.png"
-          className="App-logo"
-          alt="TanStack Logo"
-        />
+        <img src="/tanstack-circle-logo.png" className="App-logo" alt="TanStack Logo" />
         <p>
           Edit <code>src/routes/index.tsx</code> and save to reload.
         </p>

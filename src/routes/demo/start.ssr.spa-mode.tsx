@@ -8,9 +8,7 @@ export const Route = createFileRoute('/demo/start/ssr/spa-mode')({
 })
 
 function RouteComponent() {
-  const [punkSongs, setPunkSongs] = useState<
-    Awaited<ReturnType<typeof getPunkSongs>>
-  >([])
+  const [punkSongs, setPunkSongs] = useState<Awaited<ReturnType<typeof getPunkSongs>>>([])
 
   useEffect(() => {
     getPunkSongs().then(setPunkSongs)
@@ -20,7 +18,7 @@ function RouteComponent() {
     <div>
       <h1>SPA Mode - Punk Songs</h1>
       <ul>
-        {punkSongs.map((song) => (
+        {punkSongs.map(song => (
           <li key={song.id}>
             {song.name} - {song.artist}
           </li>

@@ -27,9 +27,9 @@ async function readTodos() {
           { id: 2, name: 'Buy a new phone' },
         ],
         null,
-        2,
-      ),
-    ),
+        2
+      )
+    )
   )
 }
 
@@ -67,7 +67,7 @@ function Home() {
     <div>
       <h1>Start Server Functions - Todo Example</h1>
       <ul>
-        {todos?.map((t) => (
+        {todos?.map(t => (
           <li key={t.id}>{t.name}</li>
         ))}
       </ul>
@@ -75,8 +75,8 @@ function Home() {
         <input
           type="text"
           value={todo}
-          onChange={(e) => setTodo(e.target.value)}
-          onKeyDown={(e) => {
+          onChange={e => setTodo(e.target.value)}
+          onKeyDown={e => {
             if (e.key === 'Enter') {
               submitTodo()
             }

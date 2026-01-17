@@ -14,7 +14,7 @@ function RouteComponent() {
     <div>
       <h1>Data Only SSR - Punk Songs</h1>
       <ul>
-        {punkSongs.map((song) => (
+        {punkSongs.map(song => (
           <li key={song.id}>
             {song.name} - {song.artist}
           </li>
