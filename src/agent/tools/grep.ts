@@ -187,7 +187,7 @@ export function grepTool(projectPath: string) {
         },
         {
             name: "grep",
-            description: "Searches for text patterns in files within the project directory. Supports regex patterns and file glob patterns. Returns matching lines with file paths and line numbers.",
+            description: "Search for text patterns in files within the project directory. Supports regex patterns and file glob patterns. Returns matching lines with file paths and line numbers.",
             schema: grepSchema,
         }
     );

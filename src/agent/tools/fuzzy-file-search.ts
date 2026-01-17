@@ -65,7 +65,7 @@ export function fuzzyFileSearchTool(projectFiles: string[]) {
         },
         {
             name: "fuzzy_file_search",
-            description: "Performs fuzzy search on project file paths. Useful when the user mentions a file loosely or with partial/incorrect names. Returns a list of matching file paths with relevance scores.",
+            description: "Perform fuzzy search on project file paths. Use this FIRST when you only have a filename (e.g., 'file-read.ts') to find the correct relative path. Useful when the user mentions a file loosely or with partial/incorrect names. Returns a list of matching file paths with relevance scores.",
             schema: fuzzySearchSchema,
         }
     );

@@ -64,7 +64,7 @@ export function fileWriteTool(projectPath: string) {
     },
     {
       name: "file_write",
-      description: "Writes or creates a file within the project directory. Automatically creates parent directories if needed. The path must be relative to the project root.",
+      description: "Write or create a file within the project directory. Automatically creates parent directories if needed. The path must be relative to the project root.",
       schema: fileWriteSchema,
     }
   );

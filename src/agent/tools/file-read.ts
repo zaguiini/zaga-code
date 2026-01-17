@@ -57,7 +57,7 @@ export function fileReadTool(projectPath: string) {
     },
     {
       name: "file_read",
-      description: "Reads the contents of a file within the project directory. The path must be relative to the project root.",
+      description: "Read the contents of a file within the project directory. The path must be relative to the project root.",
       schema: fileReadSchema,
     }
   );

@@ -1,4 +1,4 @@
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { createAgent as createLangChainAgent } from "langchain";
 import { ChatOllama } from "@langchain/ollama";
 import { fileReadTool } from "./tools/file-read";
 import { fileWriteTool } from "./tools/file-write";
@@ -22,30 +22,23 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
 - When the user passes a file name, do not assume it's in the current directory. Use the fuzzy_file_search tool to find the file.
-
-**Tools:**
-- file_read: Read the contents of a file within the project directory.
-- file_write: Write or create a file within the project directory.
-- shell: Execute a shell command in the project directory.
-- grep: Search for text patterns in files within the project directory.
-- glob: Find files matching a glob pattern within the project directory.
-- fuzzy_file_search: Perform fuzzy search on project file paths. Use this FIRST when you only have a filename (e.g., "file-read.ts") to find the correct relative path.
 `;
 }
 
 /**
- * Creates a LangGraph ReAct agent with a given model and development tools.
+ * Creates a LangChain agent with a given model and development tools.
+ * Uses the latest LangChain API (createAgent) which is built on top of LangGraph.
  * Note: The model must support tool calling and reasoning
  * 
  * @param projectPath - The root path of the project directory
  * @param model - The model to use
- * @returns A configured LangGraph agent ready to use
+ * @returns A configured LangChain agent ready to use
  */
 export async function createAgent({ projectPath, model }: { projectPath: string, model: string }) {
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
     model,
-    temperature: 0.7,
+    temperature: 0.3,
     // Ensure tool calling is enabled
     format: undefined, // Don't force JSON format, let model handle tool calling
   });
@@ -68,15 +61,12 @@ export async function createAgent({ projectPath, model }: { projectPath: string,
     fuzzyFileSearchTool(projectFiles),
   ];
 
-  // Explicitly bind tools to the LLM to ensure proper tool calling format
-  // This helps Ollama models properly format tool calls
-  const llmWithTools = llm.bindTools(tools);
-
-  // Create the ReAct agent
-  const agent = createReactAgent({
-    llm: llmWithTools,
+  // Create the agent using the latest LangChain API
+  // The agent automatically handles tool binding and calling
+  const agent = createLangChainAgent({
+    model: llm,
     tools,
-    prompt: getSystemPrompt({ projectPath }),
+    systemPrompt: getSystemPrompt({ projectPath }),
   });
 
   return agent;

@@ -51,7 +51,7 @@ export function shellTool(projectPath: string) {
     },
     {
       name: "shell",
-      description: "Executes a shell command in the project directory. Captures both stdout and stderr. No command restrictions for MVP.",
+      description: "Execute a shell command in the project directory. Captures both stdout and stderr. No command restrictions for MVP.",
       schema: shellSchema,
     }
   );

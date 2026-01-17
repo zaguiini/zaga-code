@@ -55,7 +55,7 @@ export function globTool(projectPath: string) {
         },
         {
             name: "glob",
-            description: "Finds files matching a glob pattern within the project directory. Supports patterns like *.ts, **/*.ts, src/**/*.tsx, or specific file paths. Returns a list of matching file paths relative to the project root.",
+            description: "Find files matching a glob pattern within the project directory. Supports patterns like *.ts, **/*.ts, src/**/*.tsx, or specific file paths. Returns a list of matching file paths relative to the project root.",
             schema: globSchema,
         }
     );
