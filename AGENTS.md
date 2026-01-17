@@ -1,5 +1,11 @@
 # Agent Instructions
 
+## Environment instructions
+
+- This is a Bun-powered project, so always use `bun` commands and tools instead of `npm` or `yarn`.
+
+## Issue tracking
+
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
 ## Quick Reference
@@ -12,7 +18,7 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
-## Landing the Plane (Session Completion)
+### Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 

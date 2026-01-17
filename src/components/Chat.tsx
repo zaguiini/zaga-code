@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fetchServerSentEvents, useChat } from '@tanstack/ai-react'
+import { fetchHttpStream, useChat } from '@tanstack/ai-react'
 
 import './Chat.css'
 
@@ -11,7 +11,7 @@ export default function Chat({ projectPath }: ChatProps) {
   const [input, setInput] = useState('')
 
   const { messages, sendMessage, isLoading, error } = useChat({
-    connection: fetchServerSentEvents('/api/chat'),
+    connection: fetchHttpStream('/api/chat'),
     body: projectPath ? { projectPath } : undefined,
   })
 
