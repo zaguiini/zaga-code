@@ -9,6 +9,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.15",
+    "@langchain/langgraph": "^1.1.0",
+    "@tanstack/ai": "^0.2.2",
+    "@tanstack/ai-react": "^0.2.2",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-router": "^1.132.0",
     "@tanstack/react-router-devtools": "^1.132.0",
@@ -17,6 +21,7 @@
     "@tanstack/router-plugin": "^1.132.0",
     "lucide-react": "^0.561.0",
     "nitro": "npm:nitro-nightly@latest",
+    "ollama": "^0.6.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "vite-tsconfig-paths": "^6.0.2"
