@@ -9,14 +9,14 @@
  * 3. Pull a model that supports tool calling: `ollama pull <model>`
  *
  * To run this test:
- * - Using bun (recommended):
- *   `bun run src/agent/test.ts`
+ * - Using npm (recommended):
+ *   `npm run src/agent/test.ts`
  *
  * - With a custom query:
- *   `bun run src/agent/test.ts "Your custom query here"`
+ *   `npm run src/agent/test.ts "Your custom query here"`
  *
  * - Or use the npm script:
- *   `bun run test-agent`
+ *   `npm run test-agent`
  */
 
 import { createAgent } from './graph.js'
@@ -27,10 +27,10 @@ import { createAgent } from './graph.js'
  * Usage:
  * 1. Make sure Ollama is running: `ollama serve`
  * 2. Pull a model that supports tool calling: `ollama pull <model>`
- * 3. Run this file with: `bun run src/agent/test.ts`
+ * 3. Run this file with: `npm run src/agent/test.ts`
  *
  * Or use the npm script:
- * `bun run test-agent`
+ * `npm run test-agent`
  */
 async function runTest() {
   // You can customize the test query here

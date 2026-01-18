@@ -8,6 +8,7 @@ import { shellTool } from './tools/shell'
 import { grepTool } from './tools/grep'
 import { globTool } from './tools/glob'
 import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
+import { getCheckpointer } from './chekpointer'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -34,7 +35,10 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
  * @param model - The model to use
  * @returns A configured LangChain agent ready to use
  */
-export async function createAgent({ projectPath, model }: { projectPath: string; model: string }) {
+export async function createAgent() {
+  const model = 'qwen3:1.7b'
+  const projectPath = process.cwd()
+
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
     model,
@@ -68,6 +72,7 @@ export async function createAgent({ projectPath, model }: { projectPath: string;
     model: llm,
     tools,
     systemPrompt: getSystemPrompt({ projectPath }),
+    checkpointer: getCheckpointer(),
   })
 
   return agent

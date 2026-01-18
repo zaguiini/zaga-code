@@ -1,9 +1,5 @@
 # Agent Instructions
 
-## Environment instructions
-
-- This is a Bun-powered project, so always use `bun` commands and tools instead of `npm` or `yarn`.
-
 ## Issue tracking
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
