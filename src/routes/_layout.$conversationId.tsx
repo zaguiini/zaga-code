@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Message } from '@/components/ui/chat-message'
+import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 
@@ -33,31 +33,101 @@ function RouteComponent() {
 
     const resumeRunId = window.sessionStorage.getItem(`resume:${conversationId}`)
     if (resumeRunId && joinedThreadId.current !== conversationId) {
-      stream.joinStream(resumeRunId)
+      stream.joinStream(resumeRunId, undefined, {
+        streamMode: ['messages', 'values'],
+      })
       joinedThreadId.current = conversationId
     }
   }, [conversationId, stream])
 
-  console.log(stream.messages)
-
-  // You know what to do.
-  // https://docs.langchain.com/oss/python/langchain/streaming/frontend#rendering-tool-calls
-  // https://docs.langchain.com/oss/python/langchain/streaming/frontend#reasoning-models
   const messages = useMemo(
     () =>
       stream.messages
-        .filter(message => typeof message.content === 'string' && message.content !== '')
-        .map((message): Message => {
-          const baseMessage = {
-            id: message.id!,
-            role: message.type === 'human' ? 'user' : 'assistant',
+        .filter(message => message.type !== 'tool')
+        .map((message): Message | Array<Message> => {
+          if (
+            message.type === 'human' ||
+            message.type === 'system' ||
+            message.type === 'function' ||
+            message.type === 'remove'
+          ) {
+            return {
+              id: message.id!,
+              role: message.type === 'human' ? 'user' : 'assistant',
+              content: message.content as string,
+            }
           }
 
-          return {
-            ...baseMessage,
-            content: message.content as string,
+          const result: Array<Message> = []
+
+          const reasoningContent = message.additional_kwargs?.reasoning_content as
+            | string
+            | undefined
+
+          if (reasoningContent) {
+            result.push({
+              id: message.id!,
+              role: 'assistant',
+              content: reasoningContent,
+              parts: [
+                {
+                  type: 'reasoning',
+                  reasoning: reasoningContent,
+                },
+              ],
+            })
           }
-        }),
+
+          if (message.content) {
+            result.push({
+              id: message.id!,
+              role: 'assistant',
+              content: message.content as string,
+              parts: [{ type: 'text', text: message.content as string }],
+            })
+          }
+
+          const toolCalls = stream.getToolCalls(message)
+
+          if (toolCalls.length > 0) {
+            result.push(
+              ...toolCalls.map(toolCall => {
+                const parts: Array<ToolInvocationPart> = []
+
+                if (toolCall.state === 'pending') {
+                  parts.push({
+                    type: 'tool-invocation',
+                    toolInvocation: {
+                      toolName: toolCall.call.name,
+                      state: 'call',
+                    },
+                  })
+                }
+
+                if (toolCall.state === 'completed') {
+                  parts.push({
+                    type: 'tool-invocation',
+                    toolInvocation: {
+                      toolName: toolCall.call.name,
+                      state: 'result',
+                      result: toolCall.result?.content.toString() ?? 'No result',
+                    },
+                  })
+                }
+
+                return {
+                  id: toolCall.id,
+                  role: 'assistant',
+                  content: '',
+                  parts,
+                }
+              })
+            )
+          }
+
+          return result
+        })
+        .flat(),
     [stream.messages]
   )
 
@@ -71,7 +141,10 @@ function RouteComponent() {
       <form
         onSubmit={e => {
           e.preventDefault()
-          stream.submit({ messages: [{ type: 'human', content: input }] })
+          stream.submit(
+            { messages: [{ type: 'human', content: input }] },
+            { streamMode: ['messages', 'values'] }
+          )
           setInput('')
         }}
         className="shrink-0 w-full"

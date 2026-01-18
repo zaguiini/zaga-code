@@ -70,10 +70,11 @@ interface ToolCall {
 interface ToolResult {
   state: 'result'
   toolName: string
-  result: {
-    __cancelled?: boolean
-    [key: string]: any
-  }
+  result: string
+  // result: {
+  //   __cancelled?: boolean
+  //   [key: string]: any
+  // }
 }
 
 type ToolInvocation = PartialToolCall | ToolCall | ToolResult
@@ -83,7 +84,7 @@ interface ReasoningPart {
   reasoning: string
 }
 
-interface ToolInvocationPart {
+export interface ToolInvocationPart {
   type: 'tool-invocation'
   toolInvocation: ToolInvocation
 }
@@ -123,7 +124,6 @@ export interface Message {
   content: string
   createdAt?: Date
   experimental_attachments?: Array<Attachment>
-  toolInvocations?: Array<ToolInvocation>
   parts?: Array<MessagePart>
 }
 
@@ -141,7 +141,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   animation = 'scale',
   actions,
   experimental_attachments,
-  toolInvocations,
   parts,
 }) => {
   const files = useMemo(() => {
@@ -191,70 +190,41 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     )
   }
 
-  if (parts && parts.length > 0) {
-    return parts.map((part, index) => {
-      if (part.type === 'text') {
-        return (
-          <div className="flex flex-col items-end" key={`text-${index}`}>
-            <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-              <MarkdownRenderer>{part.text}</MarkdownRenderer>
-              {actions ? (
-                <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-                  {actions}
-                </div>
-              ) : null}
-            </div>
+  if (!parts) return null
 
-            {showTimeStamp && createdAt ? (
-              <time
-                dateTime={createdAt.toISOString()}
-                className={cn(
-                  'mt-1 block px-1 text-xs opacity-50',
-                  animation !== 'none' && 'duration-500 animate-in fade-in-0'
-                )}
-              >
-                {formattedTime}
-              </time>
+  return parts.map((part, index) => {
+    if (part.type === 'text') {
+      return (
+        <div className="flex flex-col items-start" key={`text-${index}`}>
+          <div className={cn(chatBubbleVariants({ isUser, animation }))}>
+            <MarkdownRenderer>{part.text}</MarkdownRenderer>
+            {actions ? (
+              <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                {actions}
+              </div>
             ) : null}
           </div>
-        )
-      } else if (part.type === 'reasoning') {
-        return <ReasoningBlock key={`reasoning-${index}`} part={part} />
-      } else if (part.type === 'tool-invocation') {
-        return <ToolCall key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
-      }
-      return null
-    })
-  }
 
-  if (toolInvocations && toolInvocations.length > 0) {
-    return <ToolCall toolInvocations={toolInvocations} />
-  }
-
-  return (
-    <div className="flex flex-col items-start">
-      <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-        <MarkdownRenderer>{content}</MarkdownRenderer>
-        {actions ? (
-          <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
-            {actions}
-          </div>
-        ) : null}
-      </div>
-
-      {showTimeStamp && createdAt ? (
-        <time
-          dateTime={createdAt.toISOString()}
-          className={cn(
-            'mt-1 block px-1 text-xs opacity-50',
-            animation !== 'none' && 'duration-500 animate-in fade-in-0'
-          )}
-        >
-          {formattedTime}
-        </time>
-      ) : null}
-    </div>
-  )
+          {showTimeStamp && createdAt ? (
+            <time
+              dateTime={createdAt.toISOString()}
+              className={cn(
+                'mt-1 block px-1 text-xs opacity-50',
+                animation !== 'none' && 'duration-500 animate-in fade-in-0'
+              )}
+            >
+              {formattedTime}
+            </time>
+          ) : null}
+        </div>
+      )
+    } else if (part.type === 'reasoning') {
+      return <ReasoningBlock key={`reasoning-${index}`} part={part} />
+    } else if (part.type === 'tool-invocation') {
+      return <ToolCall key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
+    }
+    return null
+  })
 }
 
 function dataUrlToUint8Array(data: string) {
@@ -263,11 +233,23 @@ function dataUrlToUint8Array(data: string) {
   return new Uint8Array(buf)
 }
 
-const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
+const CollapsibleBlock = ({
+  icon,
+  title,
+  children,
+}: {
+  icon?: React.ReactNode
+  title: React.ReactNode
+  children: React.ReactNode
+}) => {
   const [isOpen, setIsOpen] = useState(false)
 
+  const rightChevron = (
+    <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+  )
+
   return (
-    <div className="mb-2 flex flex-col items-start sm:max-w-[70%]">
+    <div className="flex flex-col items-start sm:max-w-[70%]">
       <Collapsible
         open={isOpen}
         onOpenChange={setIsOpen}
@@ -275,9 +257,9 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
       >
         <div className="flex items-center p-2">
           <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
-              <span>Thinking</span>
+            <button className="flex w-full cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+              {isOpen ? rightChevron : (icon ?? rightChevron)}
+              <span>{title}</span>
             </button>
           </CollapsibleTrigger>
         </div>
@@ -293,7 +275,7 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
             className="border-t"
           >
             <div className="p-2">
-              <div className="whitespace-pre-wrap text-xs">{part.reasoning}</div>
+              <div className="whitespace-pre-wrap text-xs">{children}</div>
             </div>
           </motion.div>
         </CollapsibleContent>
@@ -302,32 +284,36 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   )
 }
 
-function ToolCall({ toolInvocations }: Pick<ChatMessageProps, 'toolInvocations'>) {
+const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
+  return <CollapsibleBlock title="Thinking">{part.reasoning}</CollapsibleBlock>
+}
+
+function ToolCall({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
   if (!toolInvocations?.length) return null
 
   return (
     <div className="flex flex-col items-start gap-2">
       {toolInvocations.map((invocation, index) => {
-        const isCancelled = invocation.state === 'result' && invocation.result.__cancelled === true
+        // const isCancelled = invocation.state === 'result' && invocation.result.__cancelled === true
 
-        if (isCancelled) {
-          return (
-            <div
-              key={index}
-              className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
-            >
-              <Ban className="h-4 w-4" />
-              <span>
-                Cancelled{' '}
-                <span className="font-mono">
-                  {'`'}
-                  {invocation.toolName}
-                  {'`'}
-                </span>
-              </span>
-            </div>
-          )
-        }
+        // if (isCancelled) {
+        //   return (
+        //     <div
+        //       key={index}
+        //       className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+        //     >
+        //       <Ban className="h-4 w-4" />
+        //       <span>
+        //         Cancelled{' '}
+        //         <span className="font-mono">
+        //           {'`'}
+        //           {invocation.toolName}
+        //           {'`'}
+        //         </span>
+        //       </span>
+        //     </div>
+        //   )
+        // }
 
         switch (invocation.state) {
           case 'partial-call':
@@ -340,7 +326,7 @@ function ToolCall({ toolInvocations }: Pick<ChatMessageProps, 'toolInvocations'>
                 <Terminal className="h-4 w-4" />
                 <span>
                   Calling{' '}
-                  <span className="font-mono">
+                  <span className="font-mono text-xs">
                     {'`'}
                     {invocation.toolName}
                     {'`'}
@@ -352,25 +338,22 @@ function ToolCall({ toolInvocations }: Pick<ChatMessageProps, 'toolInvocations'>
             )
           case 'result':
             return (
-              <div
+              <CollapsibleBlock
                 key={index}
-                className="flex flex-col gap-1.5 rounded-lg border bg-muted/50 px-3 py-2 text-sm"
-              >
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Code2 className="h-4 w-4" />
+                icon={<Code2 className="h-4 w-4" />}
+                title={
                   <span>
                     Result from{' '}
-                    <span className="font-mono">
+                    <span className="font-mono text-xs">
                       {'`'}
                       {invocation.toolName}
                       {'`'}
                     </span>
                   </span>
-                </div>
-                <pre className="overflow-x-auto whitespace-pre-wrap text-foreground">
-                  {JSON.stringify(invocation.result, null, 2)}
-                </pre>
-              </div>
+                }
+              >
+                {invocation.result}
+              </CollapsibleBlock>
             )
           default:
             return null
