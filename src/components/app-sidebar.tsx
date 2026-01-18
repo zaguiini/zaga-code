@@ -11,11 +11,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils'
 
 export function AppSidebar({
   conversations,
 }: {
-  conversations: Array<{ id: string; title?: string; preview?: string }>
+  conversations: Array<{ id: string; title?: string; preview?: string; isActive?: boolean }>
 }) {
   return (
     <Sidebar>
@@ -33,10 +34,15 @@ export function AppSidebar({
               {conversations.map(item => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton asChild>
-                    <Link to="/$conversationId" params={{ conversationId: item.id }}>
-                      <span className={item.title ? '' : 'text-muted-foreground italic'}>
-                        {item.title || item.preview || item.id}
-                      </span>
+                    <Link
+                      to="/$conversationId"
+                      params={{ conversationId: item.id }}
+                      className={cn(
+                        item.isActive && 'bg-sidebar-accent',
+                        !item.title && 'text-muted-foreground italic'
+                      )}
+                    >
+                      <span>{item.title || item.preview || item.id}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -1,4 +1,4 @@
-import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { Outlet, createFileRoute, useMatchRoute } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
@@ -10,20 +10,22 @@ export const Route = createFileRoute('/_layout')({
 })
 
 function RouteComponent() {
+  const routerState = useMatchRoute()
+
+  const conversationRouteParams = routerState({ to: '/$conversationId' })
+
   const conversations = useSuspenseQuery({
     ...threadsSearchQuery(),
     refetchInterval: query => {
-      if (!query.state.data) {
+      if (!query.state.data || !conversationRouteParams) {
         return false
       }
 
       // Check if the most recent thread (first in list) doesn't have a title yet
       const mostRecentThread = query.state.data[0]
 
-      const needsTitle = mostRecentThread && !mostRecentThread.metadata?.title
-
       // Poll every 2 seconds if the most recent thread needs a title
-      return needsTitle ? 2_000 : false
+      return !mostRecentThread.metadata?.title ? 2_000 : false
     },
   })
 
@@ -34,6 +36,9 @@ function RouteComponent() {
           id: conversation.thread_id,
           title: conversation.metadata?.title as string | undefined,
           preview: conversation.thread_id,
+          isActive: conversationRouteParams
+            ? conversation.thread_id === conversationRouteParams.conversationId
+            : false,
         }))}
       />
       <main className="w-full h-screen relative p-4">
