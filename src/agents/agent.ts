@@ -10,7 +10,7 @@ import { shellTool } from './tools/shell'
 import { grepTool } from './tools/grep'
 import { globTool } from './tools/glob'
 import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
-import { createRAGFileSearchTool } from './tools/rag-file-search'
+import { createRAGFileSearchToolSQLite } from './tools/rag-file-search-sqlite'
 import { getCheckpointer } from './chekpointer'
 import { generateAndUpdateThreadTitle } from './title-generator'
 
@@ -53,7 +53,7 @@ export async function createAgent() {
     streaming: true, // Enable streaming for token-by-token responses
   })
 
-  // Get all project files for the fuzzy search index and RAG
+  // Get all project files for the fuzzy search index
   const projectFiles = await glob('**/*', {
     cwd: projectPath,
     absolute: false, // Return relative paths
@@ -61,8 +61,8 @@ export async function createAgent() {
   })
 
   // Create the tools with the project path
-  // Note: RAG tool is async and needs to be awaited
-  const ragTool = await createRAGFileSearchTool(projectPath, projectFiles)
+  // Note: RAG tool reads from SQLite database instead of memory
+  const ragTool = await createRAGFileSearchToolSQLite(projectPath)
 
   const tools = [
     fileReadTool(projectPath),
@@ -127,7 +127,6 @@ export async function createAgent() {
     systemPrompt: getSystemPrompt({ projectPath }),
     checkpointer: getCheckpointer(),
     middleware: [titleGeneratorMiddleware],
-    contextSchema,
   })
 
   return agent

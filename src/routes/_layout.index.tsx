@@ -1,13 +1,14 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useStream } from '@langchain/langgraph-sdk/react'
 import { z } from 'zod'
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useStream } from '@langchain/langgraph-sdk/react'
+import { client } from '@/lib/ai-client'
 import { MessageInput } from '@/components/ui/message-input'
 import { Input } from '@/components/ui/input'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { threadsSearchQuery } from '@/queries/threads'
 
 const createConversationInputValidator = z.object({
@@ -59,14 +60,33 @@ function NewChat() {
     resolver: zodResolver(createConversationInputValidator),
   })
 
+  const projectPath = watch('projectPath')
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => {
+      return client.runs.create(null, 'project-setup', {
+        input: {
+          projectPath: projectPath,
+          status: 'indexing',
+          filesIndexed: 0,
+          chunksIndexed: 0,
+        },
+      })
+    },
+  })
+
+  const saveToLocalStorage = useEffectEvent(({ values }: { values: { projectPath: string } }) => {
+    const currentProjectPath = localStorage.getItem(STORAGE_KEY)
+    if (currentProjectPath === values.projectPath) return
+    localStorage.setItem(STORAGE_KEY, values.projectPath)
+  })
+
   useEffect(() => {
     subscribe({
       formState: {
         values: true,
       },
-      callback: data => {
-        localStorage.setItem(STORAGE_KEY, data.values.projectPath)
-      },
+      callback: saveToLocalStorage,
     })
   }, [])
 
@@ -101,14 +121,20 @@ function NewChat() {
               id="projectPath"
               type="text"
               placeholder="Project Path"
-              {...register('projectPath')}
+              {...register('projectPath', {
+                onBlur: () => {
+                  mutate()
+                },
+              })}
             />
+            {isPending && <FieldDescription>Indexing project, please wait...</FieldDescription>}
             {errors.projectPath?.message && <FieldError>{errors.projectPath.message}</FieldError>}
           </Field>
         </FieldGroup>
         <MessageInput
           placeholder="Ask Zaga Code"
           isGenerating={false}
+          disabled={isPending}
           value={watch('initialPrompt')}
           {...register('initialPrompt')}
         />

@@ -19,7 +19,7 @@
  *   `npm run test-agent`
  */
 
-import { createAgent } from './graph.js'
+import { createProjectSetupGraph } from './project-setup.js'
 
 /**
  * Test function to run the agent locally.
@@ -38,9 +38,9 @@ async function runTest() {
     ? process.argv.slice(2).join(' ')
     : 'Read the package.json file and tell me what the project name is.'
 
-  const projectPath = process.cwd()
+  const projectPath = '/Users/zaguini/Development/zaga-code/src'
   const model = 'qwen3:1.7b'
-  const agent = await createAgent({ projectPath, model })
+  const agent = createProjectSetupGraph()
 
   console.log('🤖 Testing LangGraph Agent with model:', model)
   console.log('📁 Project path:', projectPath)
@@ -50,14 +50,11 @@ async function runTest() {
   try {
     const stream = await agent.stream(
       {
-        messages: [
-          {
-            role: 'user',
-            content: testQuery,
-          },
-        ],
+        projectPath,
       },
-      { streamMode: 'updates' }
+      {
+        streamMode: 'updates',
+      }
     )
 
     for await (const chunk of stream) {
