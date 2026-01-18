@@ -10,6 +10,7 @@ import { shellTool } from './tools/shell'
 import { grepTool } from './tools/grep'
 import { globTool } from './tools/glob'
 import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
+import { createRAGFileSearchTool } from './tools/rag-file-search'
 import { getCheckpointer } from './chekpointer'
 import { generateAndUpdateThreadTitle } from './title-generator'
 
@@ -26,6 +27,7 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
 - When the user passes a file name, do not assume it's in the current directory. Use the fuzzy_file_search tool to find the file.
+- For semantic searches (e.g., "where is the authentication code?", "find database setup"), ALWAYS use the rag_file_search tool FIRST instead of fuzzy_file_search. Use fuzzy_file_search only when you have a specific filename to locate.
 `
 }
 
@@ -40,7 +42,7 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
  */
 export async function createAgent() {
   const model = 'qwen3:1.7b'
-  const projectPath = process.cwd()
+  const projectPath = resolve(process.cwd(), 'src')
 
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
@@ -51,15 +53,17 @@ export async function createAgent() {
     streaming: true, // Enable streaming for token-by-token responses
   })
 
-  // Get all project files for the fuzzy search index
-  const resolvedProjectPath = resolve(projectPath)
+  // Get all project files for the fuzzy search index and RAG
   const projectFiles = await glob('**/*', {
-    cwd: resolvedProjectPath,
+    cwd: projectPath,
     absolute: false, // Return relative paths
     ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '.next/**'], // Ignore common directories
   })
 
   // Create the tools with the project path
+  // Note: RAG tool is async and needs to be awaited
+  const ragTool = await createRAGFileSearchTool(projectPath, projectFiles)
+
   const tools = [
     fileReadTool(projectPath),
     fileWriteTool(projectPath),
@@ -67,15 +71,18 @@ export async function createAgent() {
     grepTool(projectPath),
     globTool(projectPath),
     fuzzyFileSearchTool(projectFiles),
+    ragTool,
   ]
 
   /**
-   * State schema that includes thread_id for title generation.
-   * The thread_id is captured in beforeAgent and stored in state,
-   * making it available to all middleware hooks.
+   * Context schema for runtime configuration values.
+   * Context is used for values that don't change during execution
+   * but need to be accessible (e.g., projectPath for future extensibility).
+   * Note: Tools currently use closures to access projectPath, but context
+   * could be used for other runtime dependencies.
    */
-  const stateSchema = z.object({
-    thread_id: z.string().optional(),
+  const contextSchema = z.object({
+    projectPath: z.string().optional(),
   })
 
   /**
@@ -85,7 +92,6 @@ export async function createAgent() {
    */
   const titleGeneratorMiddleware = createMiddleware({
     name: 'TitleGenerator',
-    stateSchema,
     beforeAgent: state => {
       if (state.messages.length > 1) {
         return
@@ -120,8 +126,8 @@ export async function createAgent() {
     tools,
     systemPrompt: getSystemPrompt({ projectPath }),
     checkpointer: getCheckpointer(),
-    stateSchema,
     middleware: [titleGeneratorMiddleware],
+    contextSchema,
   })
 
   return agent
