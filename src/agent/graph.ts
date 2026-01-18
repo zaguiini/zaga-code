@@ -1,7 +1,9 @@
 import { resolve } from 'node:path'
-import { createAgent as createLangChainAgent } from 'langchain'
+import { HumanMessage, createAgent as createLangChainAgent, createMiddleware } from 'langchain'
 import { ChatOllama } from '@langchain/ollama'
 import { glob } from 'glob'
+import { Client } from '@langchain/langgraph-sdk'
+import { z } from 'zod'
 import { fileReadTool } from './tools/file-read'
 import { fileWriteTool } from './tools/file-write'
 import { shellTool } from './tools/shell'
@@ -9,6 +11,7 @@ import { grepTool } from './tools/grep'
 import { globTool } from './tools/glob'
 import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
 import { getCheckpointer } from './chekpointer'
+import { generateAndUpdateThreadTitle } from './title-generator'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -66,6 +69,50 @@ export async function createAgent() {
     fuzzyFileSearchTool(projectFiles),
   ]
 
+  /**
+   * State schema that includes thread_id for title generation.
+   * The thread_id is captured in beforeAgent and stored in state,
+   * making it available to all middleware hooks.
+   */
+  const stateSchema = z.object({
+    thread_id: z.string().optional(),
+  })
+
+  /**
+   * Middleware that triggers the background title generation job after the first message.
+   * This follows the pattern from LangChain's open-canvas project where a separate
+   * subgraph handles title generation asynchronously.
+   */
+  const titleGeneratorMiddleware = createMiddleware({
+    name: 'TitleGenerator',
+    stateSchema,
+    beforeAgent: state => {
+      if (state.messages.length > 1) {
+        return
+      }
+
+      const [firstMessage] = state.messages
+
+      if (!HumanMessage.isInstance(firstMessage)) {
+        return
+      }
+
+      const threadId = firstMessage.additional_kwargs.threadId as string | undefined
+
+      if (!threadId) {
+        return
+      }
+
+      const langGraphClient = new Client({
+        apiUrl: process.env.LANGGRAPH_API_URL || 'http://localhost:2024',
+      })
+
+      generateAndUpdateThreadTitle(langGraphClient, threadId, firstMessage.content as string)
+
+      return
+    },
+  })
+
   // Create the agent using the latest LangChain API
   // The agent automatically handles tool binding and calling
   const agent = createLangChainAgent({
@@ -73,6 +120,8 @@ export async function createAgent() {
     tools,
     systemPrompt: getSystemPrompt({ projectPath }),
     checkpointer: getCheckpointer(),
+    stateSchema,
+    middleware: [titleGeneratorMiddleware],
   })
 
   return agent

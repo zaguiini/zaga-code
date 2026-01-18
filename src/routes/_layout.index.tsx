@@ -76,9 +76,20 @@ function NewChat() {
 
       <form
         onSubmit={handleSubmit(data => {
+          const threadId = crypto.randomUUID()
+
           stream.submit(
-            { messages: [{ type: 'human', content: data.initialPrompt }] },
-            { threadId: crypto.randomUUID(), streamResumable: true }
+            {
+              messages: [
+                { type: 'human', content: data.initialPrompt, additional_kwargs: { threadId } },
+              ],
+            },
+            {
+              threadId,
+              streamResumable: true,
+              context: { threadId },
+              config: { configurable: { threadId } },
+            }
           )
         })}
         className="w-full max-w-xl flex flex-col gap-10"
