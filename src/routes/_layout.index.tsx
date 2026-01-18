@@ -4,9 +4,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { z } from 'zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { MessageInput } from '@/components/ui/message-input'
 import { Input } from '@/components/ui/input'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { threadsSearchQuery } from '@/queries/threads'
 
 const createConversationInputValidator = z.object({
   projectPath: z.string(),
@@ -22,12 +24,15 @@ const STORAGE_KEY = 'agent-project-path'
 
 function NewChat() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const stream = useStream({
     apiUrl: 'http://localhost:2024',
     assistantId: 'agent',
     onCreated: run => {
       window.sessionStorage.setItem(`resume:${run.thread_id}`, run.run_id)
+
+      queryClient.invalidateQueries(threadsSearchQuery())
 
       navigate({
         to: '/$conversationId',

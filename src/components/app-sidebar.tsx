@@ -15,7 +15,7 @@ import {
 export function AppSidebar({
   conversations,
 }: {
-  conversations: Array<{ id: string; preview?: string }>
+  conversations: Array<{ id: string; title?: string; preview?: string }>
 }) {
   return (
     <Sidebar>
@@ -34,7 +34,9 @@ export function AppSidebar({
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton asChild>
                     <Link to="/$conversationId" params={{ conversationId: item.id }}>
-                      <span>{item.preview ?? item.id}</span>
+                      <span className={item.title ? '' : 'text-muted-foreground italic'}>
+                        {item.title || item.preview || item.id}
+                      </span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
