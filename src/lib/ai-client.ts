@@ -1,5 +1,6 @@
 import { Client } from '@langchain/langgraph-sdk'
+import { env } from '@/env'
 
 export const client = new Client({
-  apiUrl: 'http://localhost:2024',
+  apiUrl: env.VITE_LANGGRAPH_API_URL,
 })

@@ -10,6 +10,7 @@ import { MessageInput } from '@/components/ui/message-input'
 import { Input } from '@/components/ui/input'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { threadsSearchQuery } from '@/queries/threads'
+import { env } from '@/env'
 
 const createConversationInputValidator = z.object({
   projectPath: z.string(),
@@ -28,7 +29,7 @@ function NewChat() {
   const queryClient = useQueryClient()
 
   const stream = useStream({
-    apiUrl: 'http://localhost:2024',
+    apiUrl: env.VITE_LANGGRAPH_API_URL,
     assistantId: 'agent',
     onCreated: run => {
       window.sessionStorage.setItem(`resume:${run.thread_id}`, run.run_id)

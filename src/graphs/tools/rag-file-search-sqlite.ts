@@ -2,9 +2,25 @@ import { tool } from '@langchain/core/tools'
 import { OllamaEmbeddings } from '@langchain/ollama'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { eq, inArray } from 'drizzle-orm'
-import { getVecDatabase, getVecDatabaseName } from '@/db/vec-init'
-import { projectEmbeddingsTable } from '@/db/schema'
+import { and, eq, inArray } from 'drizzle-orm'
+import { getVecDatabase, getVecDatabaseName } from '@/graphs/db/vec-init'
+import { projectEmbeddingsTable } from '@/graphs/db/schema'
+import { env } from '@/graphs/env'
+
+const ragSearchSchema = z.object({
+  query: z
+    .string()
+    .describe(
+      'Semantic search query describing what you are looking for. Examples: "authentication logic", "database connection setup", "API route handlers", "React component for user profile". This searches file CONTENTS, not just filenames.'
+    ),
+  limit: z
+    .number()
+    .optional()
+    .default(5)
+    .describe('Maximum number of results to return (default: 5)'),
+})
+
+type RAGSearchInput = z.infer<typeof ragSearchSchema>
 
 /**
  * Creates a LangGraph tool for semantic file search using RAG with SQLite storage.
@@ -20,24 +36,9 @@ export function createRAGFileSearchToolSQLite(projectPath: string) {
 
   // Initialize embeddings using Ollama (same model as used for indexing)
   const embeddings = new OllamaEmbeddings({
-    model: 'nomic-embed-text',
-    baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+    model: env.RAG_MODEL,
+    baseUrl: env.OLLAMA_API_URL,
   })
-
-  const ragSearchSchema = z.object({
-    query: z
-      .string()
-      .describe(
-        'Semantic search query describing what you are looking for. Examples: "authentication logic", "database connection setup", "API route handlers", "React component for user profile". This searches file CONTENTS, not just filenames.'
-      ),
-    limit: z
-      .number()
-      .optional()
-      .default(5)
-      .describe('Maximum number of results to return (default: 5)'),
-  })
-
-  type RAGSearchInput = z.infer<typeof ragSearchSchema>
 
   return tool(
     async (input: RAGSearchInput) => {
@@ -92,8 +93,12 @@ export function createRAGFileSearchToolSQLite(projectPath: string) {
         const allEmbeddingsData = await drizzleDb
           .select()
           .from(projectEmbeddingsTable)
-          .where(eq(projectEmbeddingsTable.projectPath, projectPath))
-          .where(inArray(projectEmbeddingsTable.vecRowid, rowids))
+          .where(
+            and(
+              eq(projectEmbeddingsTable.projectPath, projectPath),
+              inArray(projectEmbeddingsTable.vecRowid, rowids)
+            )
+          )
 
         // Combine with distances and sort by distance
         const allEmbeddings = allEmbeddingsData

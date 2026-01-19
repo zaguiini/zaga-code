@@ -9,8 +9,9 @@ import { z } from 'zod'
 import { glob } from 'glob'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm'
-import { getVecDatabase, initVectorTable } from '@/db/vec-init'
-import { projectEmbeddingsTable } from '@/db/schema'
+import { getVecDatabase, initVectorTable } from '@/graphs/db/vec-init'
+import { projectEmbeddingsTable } from '@/graphs/db/schema'
+import { env } from '@/graphs/env'
 
 /**
  * State schema for the project-setup graph
@@ -96,8 +97,8 @@ async function indexProject(state: ProjectSetupState): Promise<Partial<ProjectSe
 
     // Initialize embeddings using Ollama
     const embeddings = new OllamaEmbeddings({
-      model: 'nomic-embed-text',
-      baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+      model: env.RAG_MODEL,
+      baseUrl: env.OLLAMA_API_URL,
     })
 
     // Initialize text splitter

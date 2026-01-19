@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
+import { env } from '@/env'
 
 export const Route = createFileRoute('/_layout/$conversationId')({
   component: RouteComponent,
@@ -14,7 +15,7 @@ function RouteComponent() {
 
   const stream = useStream({
     assistantId: 'agent',
-    apiUrl: 'http://localhost:2024',
+    apiUrl: env.VITE_LANGGRAPH_API_URL,
     threadId: conversationId,
     reconnectOnMount: true,
     onCreated: created => {

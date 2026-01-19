@@ -12,9 +12,9 @@ count.txt
 .vinxi
 todos.json
 .playwright-mcp
-checkpoints.db
-checkpoints.db-shm
-checkpoints.db-wal
+zaga-code.db
+zaga-code.db-shm
+zaga-code.db-wal
 
 # LangGraph API
 .langgraph_api

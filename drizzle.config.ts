@@ -1,9 +1,10 @@
 import { defineConfig } from 'drizzle-kit'
+import { env } from '@/graphs/env'
 
 export default defineConfig({
-  schema: './src/db/schema.ts',
+  schema: './src/graphs/db/schema.ts',
   dialect: 'sqlite',
   dbCredentials: {
-    url: './checkpoints.db',
+    url: `./${env.DB_NAME}.db`,
   },
 })

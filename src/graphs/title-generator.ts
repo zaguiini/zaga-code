@@ -1,5 +1,6 @@
 import { ChatOllama } from '@langchain/ollama'
 import type { Client } from '@langchain/langgraph-sdk'
+import { env } from '@/graphs/env'
 
 /**
  * Generates a concise title (4-8 words) from a user message using the LLM.
@@ -9,7 +10,7 @@ export async function generateThreadTitle(messageContent: string): Promise<strin
   try {
     // Use the same model as the main agent for consistency
     const llm = new ChatOllama({
-      model: 'qwen3:1.7b',
+      model: env.AGENT_MODEL,
       temperature: 0.5, // Slightly higher temp for more creative titles
     })
 

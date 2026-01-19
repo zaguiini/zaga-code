@@ -1,4 +1,3 @@
-import { resolve } from 'node:path'
 import { HumanMessage, createAgent as createLangChainAgent, createMiddleware } from 'langchain'
 import { ChatOllama } from '@langchain/ollama'
 import { glob } from 'glob'
@@ -13,6 +12,7 @@ import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
 import { createRAGFileSearchToolSQLite } from './tools/rag-file-search-sqlite'
 import { getCheckpointer } from './chekpointer'
 import { generateAndUpdateThreadTitle } from './title-generator'
+import { env } from '@/graphs/env'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -41,12 +41,11 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
  * @returns A configured LangChain agent ready to use
  */
 export async function createAgent() {
-  const model = 'qwen3:1.7b'
-  const projectPath = resolve(process.cwd(), 'src')
+  const projectPath = '/Users/zaguini/Development/zaga-code/src'
 
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
-    model,
+    model: env.AGENT_MODEL,
     temperature: 0.3,
     // Ensure tool calling is enabled
     format: undefined, // Don't force JSON format, let model handle tool calling
@@ -62,7 +61,7 @@ export async function createAgent() {
 
   // Create the tools with the project path
   // Note: RAG tool reads from SQLite database instead of memory
-  const ragTool = await createRAGFileSearchToolSQLite(projectPath)
+  const ragTool = createRAGFileSearchToolSQLite(projectPath)
 
   const tools = [
     fileReadTool(projectPath),
@@ -110,7 +109,7 @@ export async function createAgent() {
       }
 
       const langGraphClient = new Client({
-        apiUrl: process.env.LANGGRAPH_API_URL || 'http://localhost:2024',
+        apiUrl: env.LANGGRAPH_API_URL,
       })
 
       generateAndUpdateThreadTitle(langGraphClient, threadId, firstMessage.content as string)
