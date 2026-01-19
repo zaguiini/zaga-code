@@ -20,8 +20,7 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
 - Always ensure file paths are relative to the project root (e.g., "src/agent/tools/file-read.ts", NOT absolute paths like "/Users/..."). Be careful with destructive operations and provide clear explanations of what you're doing.
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
-- When the user passes a file name, do not assume it's in the current directory. Use the fuzzy_file_search tool to find the file.
-- For semantic searches (e.g., "where is the authentication code?", "find database setup"), ALWAYS use the rag_file_search tool FIRST instead of fuzzy_file_search. Use fuzzy_file_search only when you have a specific filename to locate.
+- For semantic searches (e.g., "where is the authentication code?", "find database setup", "find a file"), ALWAYS use the rag_file_search tool.
 `
 
 /**

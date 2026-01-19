@@ -68,7 +68,7 @@ export const ragSearchTool = tool(
         .limit(limit)
 
       if (results.length === 0) {
-        return `No relevant files found for query: "${query}". Try rephrasing your search or using fuzzy_file_search for filename-based search.`
+        return `No relevant files found for query: "${query}". Try rephrasing your search.`
       }
 
       // Format results with file paths and content snippets
@@ -98,7 +98,7 @@ export const ragSearchTool = tool(
   {
     name: 'rag_file_search',
     description:
-      'Semantic search through file CONTENTS using RAG (Retrieval-Augmented Generation). Use this when you need to find files based on what they contain, not just their names. Examples: "where is the authentication code?", "find database connection logic", "search for API endpoints". This is more powerful than fuzzy_file_search which only searches filenames.',
+      'Semantic search through file CONTENTS using RAG (Retrieval-Augmented Generation). Use this when you need to find files based on what they contain, not just their names. Examples: "where is the authentication code?", "find database connection logic", "search for API endpoints".',
     schema: ragSearchSchema,
   }
 )
