@@ -1,5 +1,5 @@
 import postgres from 'postgres'
-import { env } from '../env'
+import { env } from '@/env'
 
 // Create Postgres connection pool
 export const DB_CONNECTION = postgres(env.DATABASE_URL, {

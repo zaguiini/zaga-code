@@ -2,10 +2,11 @@ import { createAgent as createLangChainAgent } from 'langchain'
 import { ChatOllama } from '@langchain/ollama'
 import { z } from 'zod'
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
-import { fileReadTool } from '../tools/file-read'
-import { fileWriteTool } from '../tools/file-write'
-import { shellTool } from '../tools/shell'
-import { ragSearchTool } from '../tools/rag-search'
+import { fileWriteTool } from '@/tools/file-write'
+import { shellTool } from '@/tools/shell'
+import { ragSearchTool } from '@/tools/rag-search'
+import { fileSearchTool } from '@/tools/file-search'
+import { fileReadTool } from '@/tools/file-read'
 import { titleGeneratorMiddleware } from '@/middlewares/title-generator'
 import { env } from '@/env'
 
@@ -20,7 +21,8 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
 - Always ensure file paths are relative to the project root (e.g., "src/agent/tools/file-read.ts", NOT absolute paths like "/Users/..."). Be careful with destructive operations and provide clear explanations of what you're doing.
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
-- For semantic searches (e.g., "where is the authentication code?", "find database setup", "find a file"), ALWAYS use the rag_file_search tool.
+- For semantic searches through file CONTENTS (e.g., "where is the authentication code?", "find database setup"), use the rag_file_search tool.
+- For searching files by NAME or PATH (e.g., "find auth.ts", "describe package.json", etc.), use the file_search tool FIRST.
 `
 
 /**
@@ -34,7 +36,7 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
  */
 export function createAgent() {
   // Initialize Ollama with the given model (supports tool calling and reasoning)
-  const llm = new ChatOllama({
+  const model = new ChatOllama({
     model: env.AGENT_MODEL,
     temperature: 0.3,
     // Ensure tool calling is enabled
@@ -42,15 +44,8 @@ export function createAgent() {
     streaming: true, // Enable streaming for token-by-token responses
   })
 
-  const tools = [fileReadTool, fileWriteTool, shellTool, ragSearchTool]
+  const tools = [fileReadTool, fileWriteTool, shellTool, ragSearchTool, fileSearchTool]
 
-  /**
-   * Context schema for runtime configuration values.
-   * Context is used for values that don't change during execution
-   * but need to be accessible (e.g., projectPath for future extensibility).
-   * Note: Tools currently use closures to access projectPath, but context
-   * could be used for other runtime dependencies.
-   */
   const stateSchema = z.object({
     projectPath: z.string().describe('The root path of the project'),
     threadId: z.string().describe('The ID of the thread'),
@@ -62,7 +57,7 @@ export function createAgent() {
   // Create the agent using the latest LangChain API
   // The agent automatically handles tool binding and calling
   const agent = createLangChainAgent({
-    model: llm,
+    model,
     tools,
     systemPrompt: SYSTEM_PROMPT,
     checkpointer,

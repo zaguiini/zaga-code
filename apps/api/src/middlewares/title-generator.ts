@@ -104,7 +104,13 @@ export const titleGeneratorMiddleware = createMiddleware({
       apiUrl: env.LANGGRAPH_API_URL,
     })
 
-    generateAndUpdateThreadTitle(langGraphClient, threadId, firstMessage.content as string)
+    generateAndUpdateThreadTitle(
+      langGraphClient,
+      threadId,
+      typeof firstMessage.content === 'string'
+        ? firstMessage.content
+        : firstMessage.content.map(content => content.text).join('')
+    )
 
     return
   },

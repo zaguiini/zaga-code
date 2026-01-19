@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 export function AppSidebar({
   conversations,
 }: {
-  conversations: Array<{ id: string; title?: string; preview?: string; isActive?: boolean }>
+  conversations: Array<{ id: string; title?: string; isActive?: boolean }>
 }) {
   return (
     <Sidebar>
@@ -32,7 +32,7 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               {conversations.map(item => (
-                <SidebarMenuItem key={item.id}>
+                <SidebarMenuItem key={item.id} title={item.title || item.id}>
                   <SidebarMenuButton asChild>
                     <Link
                       to="/$conversationId"
@@ -42,7 +42,7 @@ export function AppSidebar({
                         !item.title && 'text-muted-foreground italic'
                       )}
                     >
-                      <span>{item.title || item.preview || item.id}</span>
+                      <span>{item.title || item.id}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

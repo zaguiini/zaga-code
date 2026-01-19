@@ -35,7 +35,6 @@ function RouteComponent() {
         conversations={conversations.data.map(conversation => ({
           id: conversation.thread_id,
           title: conversation.metadata?.title as string | undefined,
-          preview: conversation.thread_id,
           isActive: conversationRouteParams
             ? conversation.thread_id === conversationRouteParams.conversationId
             : false,

@@ -104,6 +104,7 @@ function RouteComponent() {
                   parts.push({
                     type: 'tool-invocation',
                     toolInvocation: {
+                      args: toolCall.call.args,
                       toolName: toolCall.call.name,
                       state: 'call',
                     },
@@ -116,6 +117,7 @@ function RouteComponent() {
                     toolInvocation: {
                       toolName: toolCall.call.name,
                       state: 'result',
+                      args: toolCall.call.args,
                       result: toolCall.result?.content.toString() ?? 'No result',
                     },
                   })

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { Ban, ChevronRight, Code2, Loader2, Terminal } from 'lucide-react'
+import { ChevronRight, Code2, Loader2 } from 'lucide-react'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
@@ -60,16 +60,19 @@ interface Attachment {
 interface PartialToolCall {
   state: 'partial-call'
   toolName: string
+  args: Record<string, any>
 }
 
 interface ToolCall {
   state: 'call'
   toolName: string
+  args: Record<string, any>
 }
 
 interface ToolResult {
   state: 'result'
   toolName: string
+  args: Record<string, any>
   result: string
   // result: {
   //   __cancelled?: boolean
@@ -319,22 +322,23 @@ function ToolCall({ toolInvocations }: { toolInvocations?: Array<ToolInvocation>
           case 'partial-call':
           case 'call':
             return (
-              <div
+              <CollapsibleBlock
                 key={index}
-                className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
-              >
-                <Terminal className="h-4 w-4" />
-                <span>
-                  Calling{' '}
-                  <span className="font-mono text-xs">
-                    {'`'}
-                    {invocation.toolName}
-                    {'`'}
+                icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                title={
+                  <span>
+                    Calling{' '}
+                    <span className="font-mono text-xs">
+                      {'`'}
+                      {invocation.toolName}
+                      {'`'}
+                    </span>
+                    ...
                   </span>
-                  ...
-                </span>
-                <Loader2 className="h-3 w-3 animate-spin" />
-              </div>
+                }
+              >
+                Arguments: {JSON.stringify(invocation.args)}
+              </CollapsibleBlock>
             )
           case 'result':
             return (
@@ -352,6 +356,7 @@ function ToolCall({ toolInvocations }: { toolInvocations?: Array<ToolInvocation>
                   </span>
                 }
               >
+                <pre className="mb-2">Arguments: {JSON.stringify(invocation.args)}</pre>
                 {invocation.result}
               </CollapsibleBlock>
             )
