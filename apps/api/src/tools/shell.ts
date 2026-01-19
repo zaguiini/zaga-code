@@ -3,8 +3,17 @@ import { promisify } from 'node:util'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { tool } from '@langchain/core/tools'
+import type { ToolRuntime } from '@langchain/core/tools'
 
 const execAsync = promisify(exec)
+
+const shellSchema = z.object({
+  command: z.string().describe('Shell command to execute'),
+})
+
+const stateSchema = z.object({
+  projectPath: z.string(),
+})
 
 /**
  * Creates a LangGraph tool for executing shell commands.
@@ -13,47 +22,44 @@ const execAsync = promisify(exec)
  * @param projectPath - The root path of the project directory (used as cwd)
  * @returns A LangGraph tool that executes shell commands
  */
-export function shellTool(projectPath: string) {
-  const shellSchema = z.object({
-    command: z.string().describe('Shell command to execute'),
-  })
+export const shellTool = tool(
+  async (
+    input: z.infer<typeof shellSchema>,
+    { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
+  ) => {
+    try {
+      const resolvedProjectPath = resolve(projectPath)
+      const { stdout, stderr } = await execAsync(input.command, {
+        cwd: resolvedProjectPath,
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+      })
 
-  return tool(
-    async (input: z.infer<typeof shellSchema>) => {
-      try {
-        const resolvedProjectPath = resolve(projectPath)
-        const { stdout, stderr } = await execAsync(input.command, {
-          cwd: resolvedProjectPath,
-          maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-        })
-
-        // Combine stdout and stderr, indicating which is which
-        let output = ''
-        if (stdout) {
-          output += `STDOUT:\n${stdout}`
-        }
-        if (stderr) {
-          output += output ? `\n\nSTDERR:\n${stderr}` : `STDERR:\n${stderr}`
-        }
-
-        return output || 'Command executed successfully (no output)'
-      } catch (error: any) {
-        // execAsync throws an error with stdout/stderr properties
-        let errorMessage = `Command failed: ${error.message}`
-        if (error.stdout) {
-          errorMessage += `\n\nSTDOUT:\n${error.stdout}`
-        }
-        if (error.stderr) {
-          errorMessage += `\n\nSTDERR:\n${error.stderr}`
-        }
-        return errorMessage
+      // Combine stdout and stderr, indicating which is which
+      let output = ''
+      if (stdout) {
+        output += `STDOUT:\n${stdout}`
       }
-    },
-    {
-      name: 'shell',
-      description:
-        'Execute a shell command in the project directory. Captures both stdout and stderr. No command restrictions for MVP.',
-      schema: shellSchema,
+      if (stderr) {
+        output += output ? `\n\nSTDERR:\n${stderr}` : `STDERR:\n${stderr}`
+      }
+
+      return output || 'Command executed successfully (no output)'
+    } catch (error: any) {
+      // execAsync throws an error with stdout/stderr properties
+      let errorMessage = `Command failed: ${error.message}`
+      if (error.stdout) {
+        errorMessage += `\n\nSTDOUT:\n${error.stdout}`
+      }
+      if (error.stderr) {
+        errorMessage += `\n\nSTDERR:\n${error.stderr}`
+      }
+      return errorMessage
     }
-  )
-}
+  },
+  {
+    name: 'shell',
+    description:
+      'Execute a shell command in the project directory. Captures both stdout and stderr. No command restrictions for MVP.',
+    schema: shellSchema,
+  }
+)

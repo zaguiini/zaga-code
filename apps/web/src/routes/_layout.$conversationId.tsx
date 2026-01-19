@@ -55,7 +55,12 @@ function RouteComponent() {
             return {
               id: message.id!,
               role: message.type === 'human' ? 'user' : 'assistant',
-              content: message.content as string,
+              content: Array.isArray(message.content)
+                ? message.content
+                    .filter(content => content.type === 'text')
+                    .map(content => content.text)
+                    .join('')
+                : message.content,
             }
           }
 
@@ -143,7 +148,9 @@ function RouteComponent() {
         onSubmit={e => {
           e.preventDefault()
           stream.submit(
-            { messages: [{ type: 'human', content: input }] },
+            {
+              messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
+            },
             { streamMode: ['messages', 'values'] }
           )
           setInput('')

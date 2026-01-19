@@ -4,13 +4,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useStream } from '@langchain/langgraph-sdk/react'
 import { client } from '@/lib/ai-client'
 import { MessageInput } from '@/components/ui/message-input'
 import { Input } from '@/components/ui/input'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { threadsSearchQuery } from '@/queries/threads'
-import { env } from '@/env'
 
 const createConversationInputValidator = z.object({
   projectPath: z.string(),
@@ -27,26 +25,6 @@ const STORAGE_KEY = 'agent-project-path'
 function NewChat() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-
-  const stream = useStream({
-    apiUrl: env.VITE_LANGGRAPH_API_URL,
-    assistantId: 'agent',
-    onCreated: run => {
-      window.sessionStorage.setItem(`resume:${run.thread_id}`, run.run_id)
-
-      queryClient.invalidateQueries(threadsSearchQuery())
-
-      navigate({
-        to: '/$conversationId',
-        params: { conversationId: run.thread_id },
-      })
-    },
-    onFinish: (_, run) => {
-      if (run?.thread_id) {
-        window.sessionStorage.removeItem(`resume:${run.thread_id}`)
-      }
-    },
-  })
 
   const {
     subscribe,
@@ -96,22 +74,30 @@ function NewChat() {
       <h2 className="text-3xl font-bold">Start New Chat</h2>
 
       <form
-        onSubmit={handleSubmit(data => {
-          const threadId = crypto.randomUUID()
+        onSubmit={handleSubmit(async data => {
+          const { thread_id: threadId } = await client.threads.create({
+            graphId: 'agent',
+          })
 
-          stream.submit(
-            {
-              messages: [
-                { type: 'human', content: data.initialPrompt, additional_kwargs: { threadId } },
-              ],
-            },
-            {
-              threadId,
-              streamResumable: true,
-              context: { threadId },
-              config: { configurable: { threadId } },
-            }
-          )
+          return client.runs
+            .create(threadId, 'agent', {
+              input: {
+                projectPath: projectPath,
+                threadId,
+                messages: [
+                  { type: 'human', content: [{ type: 'text', text: data.initialPrompt }] },
+                ],
+              },
+            })
+            .then(run => {
+              window.sessionStorage.setItem(`resume:${threadId}`, run.run_id)
+              queryClient.invalidateQueries(threadsSearchQuery())
+
+              navigate({
+                to: '/$conversationId',
+                params: { conversationId: run.thread_id },
+              })
+            })
         })}
         className="w-full max-w-xl flex flex-col gap-10"
       >

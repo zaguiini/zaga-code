@@ -33,9 +33,9 @@ type ProjectSetupState = z.infer<typeof projectSetupState>
  * Indexes a project by reading files, chunking them, generating embeddings,
  * and storing them in SQLite using sqlite-vec
  */
-async function indexProject(state: ProjectSetupState): Promise<Partial<ProjectSetupState>> {
-  const { projectPath } = state
-
+async function indexProject({
+  projectPath,
+}: ProjectSetupState): Promise<Partial<ProjectSetupState>> {
   try {
     const db = getVecDatabase()
     const drizzleDb = drizzle({ client: db })

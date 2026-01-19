@@ -1,6 +1,7 @@
 import { ChatOllama } from '@langchain/ollama'
 import { HumanMessage, createMiddleware } from 'langchain'
 import { Client } from '@langchain/langgraph-sdk'
+import { z } from 'zod'
 import { env } from '@/env'
 
 /**
@@ -83,20 +84,19 @@ async function generateAndUpdateThreadTitle(
 
 export const titleGeneratorMiddleware = createMiddleware({
   name: 'TitleGenerator',
-  beforeAgent: state => {
-    if (state.messages.length > 1) {
+  stateSchema: z.object({
+    // We should be able to get the threadId from the context, but for some reason we aren't.
+    // Yes, I've tried beforeModel and afterAgent.
+    threadId: z.string().describe('The ID of the thread'),
+  }),
+  beforeAgent: ({ messages, threadId }) => {
+    if (messages.length > 1 || !threadId) {
       return
     }
 
-    const [firstMessage] = state.messages
+    const [firstMessage] = messages
 
     if (!HumanMessage.isInstance(firstMessage)) {
-      return
-    }
-
-    const threadId = firstMessage.additional_kwargs.threadId as string | undefined
-
-    if (!threadId) {
       return
     }
 

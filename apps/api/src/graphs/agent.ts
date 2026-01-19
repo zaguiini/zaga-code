@@ -1,15 +1,11 @@
 import { createAgent as createLangChainAgent } from 'langchain'
 import { ChatOllama } from '@langchain/ollama'
-import { glob } from 'glob'
 import { z } from 'zod'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
 import { fileReadTool } from '../tools/file-read'
 import { fileWriteTool } from '../tools/file-write'
 import { shellTool } from '../tools/shell'
-import { grepTool } from '../tools/grep'
-import { globTool } from '../tools/glob'
-import { fuzzyFileSearchTool } from '../tools/fuzzy-file-search'
-import { createRAGFileSearchToolSQLite } from '../tools/rag-file-search-sqlite'
+import { ragSearchTool } from '../tools/rag-search'
 import { titleGeneratorMiddleware } from '@/middlewares/title-generator'
 import { env } from '@/env'
 import { DB_PATH } from '@/db/constants'
@@ -17,8 +13,7 @@ import { DB_PATH } from '@/db/constants'
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
  */
-function getSystemPrompt({ projectPath }: { projectPath: string }) {
-  return `You are an AI developer assistant that helps users with coding tasks. The project path is ${projectPath}.
+const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
 
 **When given a task:**
 - You MUST use the appropriate tools to gather information - never guess, make up information, or say you can't use a tool
@@ -29,7 +24,6 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
 - When the user passes a file name, do not assume it's in the current directory. Use the fuzzy_file_search tool to find the file.
 - For semantic searches (e.g., "where is the authentication code?", "find database setup"), ALWAYS use the rag_file_search tool FIRST instead of fuzzy_file_search. Use fuzzy_file_search only when you have a specific filename to locate.
 `
-}
 
 /**
  * Creates a LangChain agent with a given model and development tools.
@@ -40,9 +34,7 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
  * @param model - The model to use
  * @returns A configured LangChain agent ready to use
  */
-export async function createAgent() {
-  const projectPath = '/Users/zaguini/Development/zaga-code/apps/api/src'
-
+export function createAgent() {
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
     model: env.AGENT_MODEL,
@@ -52,26 +44,7 @@ export async function createAgent() {
     streaming: true, // Enable streaming for token-by-token responses
   })
 
-  // Get all project files for the fuzzy search index
-  const projectFiles = await glob('**/*', {
-    cwd: projectPath,
-    absolute: false, // Return relative paths
-    ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '.next/**'], // Ignore common directories
-  })
-
-  // Create the tools with the project path
-  // Note: RAG tool reads from SQLite database instead of memory
-  const ragTool = createRAGFileSearchToolSQLite(projectPath)
-
-  const tools = [
-    fileReadTool(projectPath),
-    fileWriteTool(projectPath),
-    shellTool(projectPath),
-    grepTool(projectPath),
-    globTool(projectPath),
-    fuzzyFileSearchTool(projectFiles),
-    ragTool,
-  ]
+  const tools = [fileReadTool, fileWriteTool, shellTool, ragSearchTool]
 
   /**
    * Context schema for runtime configuration values.
@@ -80,24 +53,20 @@ export async function createAgent() {
    * Note: Tools currently use closures to access projectPath, but context
    * could be used for other runtime dependencies.
    */
-  const contextSchema = z.object({
-    projectPath: z.string().optional(),
+  const stateSchema = z.object({
+    projectPath: z.string().describe('The root path of the project'),
+    threadId: z.string().describe('The ID of the thread'),
   })
-
-  /**
-   * Middleware that triggers the background title generation job after the first message.
-   * This follows the pattern from LangChain's open-canvas project where a separate
-   * subgraph handles title generation asynchronously.
-   */
 
   // Create the agent using the latest LangChain API
   // The agent automatically handles tool binding and calling
   const agent = createLangChainAgent({
     model: llm,
     tools,
-    systemPrompt: getSystemPrompt({ projectPath }),
+    systemPrompt: SYSTEM_PROMPT,
     checkpointer: SqliteSaver.fromConnString(DB_PATH),
     middleware: [titleGeneratorMiddleware],
+    stateSchema,
   })
 
   return agent
