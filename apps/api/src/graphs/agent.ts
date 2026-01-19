@@ -1,18 +1,18 @@
-import { HumanMessage, createAgent as createLangChainAgent, createMiddleware } from 'langchain'
+import { createAgent as createLangChainAgent } from 'langchain'
 import { ChatOllama } from '@langchain/ollama'
 import { glob } from 'glob'
-import { Client } from '@langchain/langgraph-sdk'
 import { z } from 'zod'
-import { fileReadTool } from './tools/file-read'
-import { fileWriteTool } from './tools/file-write'
-import { shellTool } from './tools/shell'
-import { grepTool } from './tools/grep'
-import { globTool } from './tools/glob'
-import { fuzzyFileSearchTool } from './tools/fuzzy-file-search'
-import { createRAGFileSearchToolSQLite } from './tools/rag-file-search-sqlite'
-import { getCheckpointer } from './chekpointer'
-import { generateAndUpdateThreadTitle } from './title-generator'
-import { env } from '@/graphs/env'
+import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
+import { fileReadTool } from '../tools/file-read'
+import { fileWriteTool } from '../tools/file-write'
+import { shellTool } from '../tools/shell'
+import { grepTool } from '../tools/grep'
+import { globTool } from '../tools/glob'
+import { fuzzyFileSearchTool } from '../tools/fuzzy-file-search'
+import { createRAGFileSearchToolSQLite } from '../tools/rag-file-search-sqlite'
+import { titleGeneratorMiddleware } from '@/middlewares/title-generator'
+import { env } from '@/env'
+import { DB_PATH } from '@/db/constants'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -41,7 +41,7 @@ function getSystemPrompt({ projectPath }: { projectPath: string }) {
  * @returns A configured LangChain agent ready to use
  */
 export async function createAgent() {
-  const projectPath = '/Users/zaguini/Development/zaga-code/src'
+  const projectPath = '/Users/zaguini/Development/zaga-code/apps/api/src'
 
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const llm = new ChatOllama({
@@ -89,34 +89,6 @@ export async function createAgent() {
    * This follows the pattern from LangChain's open-canvas project where a separate
    * subgraph handles title generation asynchronously.
    */
-  const titleGeneratorMiddleware = createMiddleware({
-    name: 'TitleGenerator',
-    beforeAgent: state => {
-      if (state.messages.length > 1) {
-        return
-      }
-
-      const [firstMessage] = state.messages
-
-      if (!HumanMessage.isInstance(firstMessage)) {
-        return
-      }
-
-      const threadId = firstMessage.additional_kwargs.threadId as string | undefined
-
-      if (!threadId) {
-        return
-      }
-
-      const langGraphClient = new Client({
-        apiUrl: env.LANGGRAPH_API_URL,
-      })
-
-      generateAndUpdateThreadTitle(langGraphClient, threadId, firstMessage.content as string)
-
-      return
-    },
-  })
 
   // Create the agent using the latest LangChain API
   // The agent automatically handles tool binding and calling
@@ -124,7 +96,7 @@ export async function createAgent() {
     model: llm,
     tools,
     systemPrompt: getSystemPrompt({ projectPath }),
-    checkpointer: getCheckpointer(),
+    checkpointer: SqliteSaver.fromConnString(DB_PATH),
     middleware: [titleGeneratorMiddleware],
   })
 

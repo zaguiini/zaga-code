@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama'
-import { env } from './env'
+import { env } from '@/env'
 
 /**
  * Checks if a model is already downloaded in Ollama

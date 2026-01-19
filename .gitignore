@@ -12,9 +12,3 @@ count.txt
 .vinxi
 todos.json
 .playwright-mcp
-zaga-code.db
-zaga-code.db-shm
-zaga-code.db-wal
-
-# LangGraph API
-.langgraph_api

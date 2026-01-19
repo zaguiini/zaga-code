@@ -9,9 +9,9 @@ import { z } from 'zod'
 import { glob } from 'glob'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm'
-import { getVecDatabase, initVectorTable } from '@/graphs/db/vec-init'
-import { projectEmbeddingsTable } from '@/graphs/db/schema'
-import { env } from '@/graphs/env'
+import { getVecDatabase, initVectorTable } from '@/db/vec-init'
+import { projectEmbeddingsTable } from '@/db/schema'
+import { env } from '@/env'
 
 /**
  * State schema for the project-setup graph

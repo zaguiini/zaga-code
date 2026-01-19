@@ -1,6 +1,7 @@
 import { ChatOllama } from '@langchain/ollama'
-import type { Client } from '@langchain/langgraph-sdk'
-import { env } from '@/graphs/env'
+import { HumanMessage, createMiddleware } from 'langchain'
+import { Client } from '@langchain/langgraph-sdk'
+import { env } from '@/env'
 
 /**
  * Generates a concise title (4-8 words) from a user message using the LLM.
@@ -51,11 +52,7 @@ function createFallbackTitle(messageContent: string): string {
 /**
  * Updates the thread metadata with a generated title.
  */
-export async function updateThreadTitle(
-  client: Client,
-  threadId: string,
-  title: string
-): Promise<void> {
+async function updateThreadTitle(client: Client, threadId: string, title: string): Promise<void> {
   try {
     await client.threads.update(threadId, {
       metadata: { title },
@@ -70,7 +67,7 @@ export async function updateThreadTitle(
  * Generates and updates a thread title in one operation.
  * This is the main function to call after the first message in a thread.
  */
-export async function generateAndUpdateThreadTitle(
+async function generateAndUpdateThreadTitle(
   client: Client,
   threadId: string,
   firstUserMessage: string
@@ -83,3 +80,32 @@ export async function generateAndUpdateThreadTitle(
     // Don't throw - this is a non-critical feature
   }
 }
+
+export const titleGeneratorMiddleware = createMiddleware({
+  name: 'TitleGenerator',
+  beforeAgent: state => {
+    if (state.messages.length > 1) {
+      return
+    }
+
+    const [firstMessage] = state.messages
+
+    if (!HumanMessage.isInstance(firstMessage)) {
+      return
+    }
+
+    const threadId = firstMessage.additional_kwargs.threadId as string | undefined
+
+    if (!threadId) {
+      return
+    }
+
+    const langGraphClient = new Client({
+      apiUrl: env.LANGGRAPH_API_URL,
+    })
+
+    generateAndUpdateThreadTitle(langGraphClient, threadId, firstMessage.content as string)
+
+    return
+  },
+})

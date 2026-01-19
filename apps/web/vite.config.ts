@@ -8,6 +8,7 @@ import { nitro } from 'nitro/vite'
 import tailwindcss from '@tailwindcss/vite'
 
 const config = defineConfig({
+  envDir: '../../',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -16,7 +17,7 @@ const config = defineConfig({
   plugins: [
     devtools(),
     tailwindcss(),
-    nitro({ preset: 'node' }),
+    nitro(),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
       projects: ['./tsconfig.json'],

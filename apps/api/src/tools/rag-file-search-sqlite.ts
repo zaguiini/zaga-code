@@ -3,9 +3,9 @@ import { OllamaEmbeddings } from '@langchain/ollama'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { and, eq, inArray } from 'drizzle-orm'
-import { getVecDatabase, getVecDatabaseName } from '@/graphs/db/vec-init'
-import { projectEmbeddingsTable } from '@/graphs/db/schema'
-import { env } from '@/graphs/env'
+import { getVecDatabase, getVecDatabaseName } from '@/db/vec-init'
+import { projectEmbeddingsTable } from '@/db/schema'
+import { env } from '@/env'
 
 const ragSearchSchema = z.object({
   query: z
