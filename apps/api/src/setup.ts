@@ -1,4 +1,6 @@
 import { Ollama } from 'ollama'
+import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
+import { initVectorTable } from './db/vec-init'
 import { env } from '@/env'
 
 /**
@@ -73,10 +75,38 @@ async function setupOllamaModels() {
 }
 
 /**
+ * Sets up the Postgres checkpointer tables
+ */
+async function setupPostgresCheckpointer() {
+  console.log('Setting up Postgres checkpointer...')
+  try {
+    const checkpointer = PostgresSaver.fromConnString(env.DATABASE_URL)
+    await checkpointer.setup()
+    console.log('✓ Postgres checkpointer tables created')
+  } catch (error) {
+    console.error('✗ Failed to setup Postgres checkpointer:', error)
+    throw error
+  }
+}
+
+async function setupVectorTable() {
+  console.log('Setting up vector table...')
+  try {
+    await initVectorTable()
+    console.log('✓ Vector table created')
+  } catch (error) {
+    console.error('✗ Failed to setup vector table:', error)
+    throw error
+  }
+}
+
+/**
  * Main setup function
  */
 const setup = async () => {
   try {
+    await setupPostgresCheckpointer()
+    await setupVectorTable()
     await setupOllamaModels()
   } catch (error) {
     console.error('Setup failed:', error)

@@ -5,7 +5,7 @@ const envSchema = z.object({
   RAG_MODEL: z.string(),
   OLLAMA_API_URL: z.url(),
   LANGGRAPH_API_URL: z.url(),
-  DB_NAME: z.string(),
+  DATABASE_URL: z.string().url(),
 })
 
 export const env = envSchema.parse(process.env)

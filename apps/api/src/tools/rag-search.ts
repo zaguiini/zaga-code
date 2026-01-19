@@ -1,12 +1,12 @@
 import { tool } from '@langchain/core/tools'
 import { OllamaEmbeddings } from '@langchain/ollama'
 import { z } from 'zod'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { and, eq, inArray } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { cosineDistance, desc, eq, gt, sql } from 'drizzle-orm'
 import type { ToolRuntime } from '@langchain/core/tools'
-import { getVecDatabase, getVecDatabaseName } from '@/db/vec-init'
 import { projectEmbeddingsTable } from '@/db/schema'
 import { env } from '@/env'
+import { DB_CONNECTION } from '@/db/constants'
 
 const ragSearchSchema = z.object({
   query: z
@@ -30,9 +30,7 @@ export const ragSearchTool = tool(
     input: z.infer<typeof ragSearchSchema>,
     { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
   ) => {
-    const db = getVecDatabase()
-    const drizzleDb = drizzle({ client: db })
-    const tableName = getVecDatabaseName(projectPath)
+    const drizzleDb = drizzle(DB_CONNECTION)
 
     // Initialize embeddings using Ollama (same model as used for indexing)
     const embeddings = new OllamaEmbeddings({
@@ -57,62 +55,24 @@ export const ragSearchTool = tool(
       // Generate embedding for the query
       const queryEmbedding = await embeddings.embedQuery(query)
 
-      // Convert to Float32Array buffer
-      const queryEmbeddingBuffer = new Float32Array(queryEmbedding).buffer
-      const queryEmbeddingBlob = new Uint8Array(queryEmbeddingBuffer)
-
-      // Perform KNN search using vec0 MATCH operator
-      // vec0 supports MATCH for efficient KNN search with the distance metric specified in table creation
-      const searchQuery = `
-          SELECT 
-            rowid,
-            distance
-          FROM ${tableName}
-          WHERE embedding MATCH ?
-          LIMIT ?
-        `
-
-      const results = db.prepare(searchQuery).all(queryEmbeddingBlob, limit) as Array<{
-        rowid: number
-        distance: number
-      }>
+      const similarity = sql<number>`1 - (${cosineDistance(projectEmbeddingsTable.embedding, queryEmbedding)})`
+      const results = await drizzleDb
+        .select({
+          file: projectEmbeddingsTable.file,
+          content: projectEmbeddingsTable.content,
+          similarity,
+        })
+        .from(projectEmbeddingsTable)
+        .where(gt(similarity, 0.5))
+        .orderBy(t => desc(t.similarity))
+        .limit(limit)
 
       if (results.length === 0) {
         return `No relevant files found for query: "${query}". Try rephrasing your search or using fuzzy_file_search for filename-based search.`
       }
 
-      // Get the rowids and fetch corresponding metadata from project_embeddings
-      const rowids = results.map(r => r.rowid)
-
-      // Create a map of rowid to distance for quick lookup
-      const distanceMap = new Map(results.map(r => [r.rowid, r.distance]))
-
-      // Fetch all embeddings for these rowids in one query
-      const allEmbeddingsData = await drizzleDb
-        .select()
-        .from(projectEmbeddingsTable)
-        .where(
-          and(
-            eq(projectEmbeddingsTable.projectPath, projectPath),
-            inArray(projectEmbeddingsTable.vecRowid, rowids)
-          )
-        )
-
-      // Combine with distances and sort by distance
-      const allEmbeddings = allEmbeddingsData
-        .map(data => ({
-          ...data,
-          distance: distanceMap.get(data.vecRowid) ?? Infinity,
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, limit)
-
-      if (allEmbeddings.length === 0) {
-        return `No relevant files found for query: "${query}". Try rephrasing your search or using fuzzy_file_search for filename-based search.`
-      }
-
       // Format results with file paths and content snippets
-      const formattedResults = allEmbeddings.map((result, index) => {
+      const formattedResults = results.map((result, index) => {
         const file = result.file
         const content = result.content
         // Truncate content if too long
@@ -125,9 +85,9 @@ export const ragSearchTool = tool(
       })
 
       const resultText = formattedResults.join('\n\n')
-      const fileCount = new Set(allEmbeddings.map(r => r.file)).size
+      const fileCount = new Set(results.map(r => r.file)).size
 
-      return `Found ${allEmbeddings.length} relevant content chunk(s) across ${fileCount} file(s) for "${query}":\n\n${resultText}\n\nUse file_read to read the full contents of any file.`
+      return `Found ${results.length} relevant content chunk(s) across ${fileCount} file(s) for "${query}":\n\n${resultText}\n\nUse file_read to read the full contents of any file.`
     } catch (error) {
       if (error instanceof Error) {
         return `Error performing semantic search: ${error.message}`

@@ -1,15 +1,14 @@
 import { resolve } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
 import { Document } from '@langchain/core/documents'
 import { OllamaEmbeddings } from '@langchain/ollama'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
 import { END, START, StateGraph, StateSchema } from '@langchain/langgraph'
 import { z } from 'zod'
 import { glob } from 'glob'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { drizzle } from 'drizzle-orm/postgres-js'
 import { eq } from 'drizzle-orm'
-import { getVecDatabase, initVectorTable } from '@/db/vec-init'
+import { DB_CONNECTION } from '@/db/constants'
 import { projectEmbeddingsTable } from '@/db/schema'
 import { env } from '@/env'
 
@@ -31,15 +30,13 @@ type ProjectSetupState = z.infer<typeof projectSetupState>
 
 /**
  * Indexes a project by reading files, chunking them, generating embeddings,
- * and storing them in SQLite using sqlite-vec
+ * and storing them in PostgreSQL using pgvector
  */
 async function indexProject({
   projectPath,
 }: ProjectSetupState): Promise<Partial<ProjectSetupState>> {
   try {
-    const db = getVecDatabase()
-    const drizzleDb = drizzle({ client: db })
-    const tableName = initVectorTable(db, projectPath)
+    const drizzleDb = drizzle(DB_CONNECTION)
 
     // Filter to only include text-based files
     const textExtensions = [
@@ -118,9 +115,6 @@ async function indexProject({
       .delete(projectEmbeddingsTable)
       .where(eq(projectEmbeddingsTable.projectPath, projectPath))
 
-    // Clear the vector table
-    db.exec(`DELETE FROM ${tableName}`)
-
     for (const file of textFiles.slice(0, 500)) {
       // Limit to 500 files
       try {
@@ -153,27 +147,16 @@ async function indexProject({
           const chunk = chunks[i]
           const embedding = embeddingVectors[i]
 
-          // Convert embedding array to Float32Array buffer for sqlite-vec
-          const embeddingBuffer = new Float32Array(embedding).buffer
-          const embeddingBlob = new Uint8Array(embeddingBuffer)
-
-          // Insert into vec0 virtual table first to get the rowid
-          const insertVec = db.prepare(`INSERT INTO ${tableName} (embedding) VALUES (?)`)
-          const vecResult = insertVec.run(embeddingBlob)
-          const vecRowid = Number(vecResult.lastInsertRowid)
-
-          // Insert into project_embeddings table with the vec rowid
-          const embeddingId = randomUUID()
+          // Insert into project_embeddings table with vector embedding
+          // The vector type from drizzle-orm handles conversion
           await drizzleDb.insert(projectEmbeddingsTable).values({
-            id: embeddingId,
             projectPath,
             file: chunk.metadata.file as string,
             filePath: chunk.metadata.filePath as string,
             content: chunk.pageContent,
             chunkIndex: i,
-            vecRowid: vecRowid,
-            embedding: Buffer.from(embeddingBuffer),
-            createdAt: Date.now(),
+            embedding: embedding, // Array of numbers, vector type handles conversion
+            createdAt: new Date(), // Use Date object, not Date.now() number
           })
 
           chunksIndexed++

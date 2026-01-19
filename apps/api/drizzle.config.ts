@@ -3,8 +3,8 @@ import { env } from '@/env'
 
 export default defineConfig({
   schema: './src/db/schema.ts',
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   dbCredentials: {
-    url: `${env.DB_NAME}.db`,
+    url: env.DATABASE_URL,
   },
 })

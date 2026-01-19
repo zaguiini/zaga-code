@@ -16,17 +16,17 @@ function RouteComponent() {
 
   const conversations = useSuspenseQuery({
     ...threadsSearchQuery(),
-    // refetchInterval: query => {
-    //   if (!query.state.data || !conversationRouteParams) {
-    //     return false
-    //   }
+    refetchInterval: query => {
+      if (!query.state.data || !conversationRouteParams) {
+        return false
+      }
 
-    //   // Check if the most recent thread (first in list) doesn't have a title yet
-    //   const mostRecentThread = query.state.data[0]
+      // Check if the most recent thread (first in list) doesn't have a title yet
+      const mostRecentThread = query.state.data[0]
 
-    //   // Poll every 2 seconds if the most recent thread needs a title
-    //   return !mostRecentThread.metadata?.title ? 2_000 : false
-    // },
+      // Poll every 2 seconds if the most recent thread needs a title
+      return !mostRecentThread.metadata?.title ? 2_000 : false
+    },
   })
 
   return (

@@ -1,14 +1,13 @@
 import { createAgent as createLangChainAgent } from 'langchain'
 import { ChatOllama } from '@langchain/ollama'
 import { z } from 'zod'
-import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
+import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
 import { fileReadTool } from '../tools/file-read'
 import { fileWriteTool } from '../tools/file-write'
 import { shellTool } from '../tools/shell'
 import { ragSearchTool } from '../tools/rag-search'
 import { titleGeneratorMiddleware } from '@/middlewares/title-generator'
 import { env } from '@/env'
-import { DB_PATH } from '@/db/constants'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -58,13 +57,16 @@ export function createAgent() {
     threadId: z.string().describe('The ID of the thread'),
   })
 
+  // Create Postgres checkpointer
+  const checkpointer = PostgresSaver.fromConnString(env.DATABASE_URL)
+
   // Create the agent using the latest LangChain API
   // The agent automatically handles tool binding and calling
   const agent = createLangChainAgent({
     model: llm,
     tools,
     systemPrompt: SYSTEM_PROMPT,
-    checkpointer: SqliteSaver.fromConnString(DB_PATH),
+    checkpointer,
     middleware: [titleGeneratorMiddleware],
     stateSchema,
   })
