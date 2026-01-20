@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { threadsSearchQuery } from '@/queries/threads'
 
-const createConversationInputValidator = z.object({
+const createThreadInputValidator = z.object({
   projectPath: z.string(),
   initialPrompt: z.string(),
 })
@@ -36,7 +36,7 @@ function NewChat() {
     defaultValues: {
       projectPath: localStorage.getItem(STORAGE_KEY) || '',
     },
-    resolver: zodResolver(createConversationInputValidator),
+    resolver: zodResolver(createThreadInputValidator),
   })
 
   const projectPath = watch('projectPath')
@@ -95,8 +95,8 @@ function NewChat() {
               queryClient.invalidateQueries(threadsSearchQuery())
 
               navigate({
-                to: '/$conversationId',
-                params: { conversationId: run.thread_id },
+                to: '/$threadId',
+                params: { threadId: run.thread_id },
               })
             })
         })}

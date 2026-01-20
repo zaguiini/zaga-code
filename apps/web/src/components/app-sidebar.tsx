@@ -14,9 +14,9 @@ import {
 import { cn } from '@/lib/utils'
 
 export function AppSidebar({
-  conversations,
+  threads,
 }: {
-  conversations: Array<{ id: string; title?: string; isActive?: boolean }>
+  threads: Array<{ id: string; title?: string; isActive?: boolean }>
 }) {
   return (
     <Sidebar>
@@ -31,12 +31,12 @@ export function AppSidebar({
           </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
-              {conversations.map(item => (
+              {threads.map(item => (
                 <SidebarMenuItem key={item.id} title={item.title || item.id}>
                   <SidebarMenuButton asChild>
                     <Link
-                      to="/$conversationId"
-                      params={{ conversationId: item.id }}
+                      to="/$threadId"
+                      params={{ threadId: item.id }}
                       className={cn(
                         item.isActive && 'bg-sidebar-accent',
                         !item.title && 'text-muted-foreground italic'

@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout.index'
-import { Route as LayoutConversationIdRouteImport } from './routes/_layout.$conversationId'
+import { Route as LayoutThreadIdRouteImport } from './routes/_layout.$threadId'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -22,32 +22,32 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutConversationIdRoute = LayoutConversationIdRouteImport.update({
-  id: '/$conversationId',
-  path: '/$conversationId',
+const LayoutThreadIdRoute = LayoutThreadIdRouteImport.update({
+  id: '/$threadId',
+  path: '/$threadId',
   getParentRoute: () => LayoutRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
-  '/$conversationId': typeof LayoutConversationIdRoute
+  '/$threadId': typeof LayoutThreadIdRoute
 }
 export interface FileRoutesByTo {
-  '/$conversationId': typeof LayoutConversationIdRoute
+  '/$threadId': typeof LayoutThreadIdRoute
   '/': typeof LayoutIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
-  '/_layout/$conversationId': typeof LayoutConversationIdRoute
+  '/_layout/$threadId': typeof LayoutThreadIdRoute
   '/_layout/': typeof LayoutIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$conversationId'
+  fullPaths: '/' | '/$threadId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/$conversationId' | '/'
-  id: '__root__' | '/_layout' | '/_layout/$conversationId' | '/_layout/'
+  to: '/$threadId' | '/'
+  id: '__root__' | '/_layout' | '/_layout/$threadId' | '/_layout/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -70,23 +70,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/$conversationId': {
-      id: '/_layout/$conversationId'
-      path: '/$conversationId'
-      fullPath: '/$conversationId'
-      preLoaderRoute: typeof LayoutConversationIdRouteImport
+    '/_layout/$threadId': {
+      id: '/_layout/$threadId'
+      path: '/$threadId'
+      fullPath: '/$threadId'
+      preLoaderRoute: typeof LayoutThreadIdRouteImport
       parentRoute: typeof LayoutRoute
     }
   }
 }
 
 interface LayoutRouteChildren {
-  LayoutConversationIdRoute: typeof LayoutConversationIdRoute
+  LayoutThreadIdRoute: typeof LayoutThreadIdRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
-  LayoutConversationIdRoute: LayoutConversationIdRoute,
+  LayoutThreadIdRoute: LayoutThreadIdRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
 

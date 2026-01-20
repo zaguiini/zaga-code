@@ -6,17 +6,17 @@ import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 import { env } from '@/env'
 
-export const Route = createFileRoute('/_layout/$conversationId')({
+export const Route = createFileRoute('/_layout/$threadId')({
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const { conversationId } = Route.useParams()
+  const { threadId } = Route.useParams()
 
   const stream = useStream({
     assistantId: 'agent',
     apiUrl: env.VITE_LANGGRAPH_API_URL,
-    threadId: conversationId,
+    threadId: threadId,
     reconnectOnMount: true,
     onCreated: created => {
       window.sessionStorage.setItem(`resume:${created.thread_id}`, created.run_id)
@@ -30,16 +30,16 @@ function RouteComponent() {
 
   const joinedThreadId = useRef<string | null>(null)
   useEffect(() => {
-    if (!conversationId) return
+    if (!threadId) return
 
-    const resumeRunId = window.sessionStorage.getItem(`resume:${conversationId}`)
-    if (resumeRunId && joinedThreadId.current !== conversationId) {
+    const resumeRunId = window.sessionStorage.getItem(`resume:${threadId}`)
+    if (resumeRunId && joinedThreadId.current !== threadId) {
       stream.joinStream(resumeRunId, undefined, {
         streamMode: ['messages', 'values'],
       })
-      joinedThreadId.current = conversationId
+      joinedThreadId.current = threadId
     }
-  }, [conversationId, stream])
+  }, [threadId, stream])
 
   const messages = useMemo(
     () =>

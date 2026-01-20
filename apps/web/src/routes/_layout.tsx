@@ -12,12 +12,12 @@ export const Route = createFileRoute('/_layout')({
 function RouteComponent() {
   const routerState = useMatchRoute()
 
-  const conversationRouteParams = routerState({ to: '/$conversationId' })
+  const threadRouteParams = routerState({ to: '/$threadId' })
 
-  const conversations = useSuspenseQuery({
+  const threads = useSuspenseQuery({
     ...threadsSearchQuery(),
     refetchInterval: query => {
-      if (!query.state.data || !conversationRouteParams) {
+      if (!query.state.data || !threadRouteParams) {
         return false
       }
 
@@ -30,14 +30,12 @@ function RouteComponent() {
   })
 
   return (
-    <SidebarProvider defaultOpen={conversations.data.length > 0}>
+    <SidebarProvider defaultOpen={threads.data.length > 0}>
       <AppSidebar
-        conversations={conversations.data.map(conversation => ({
-          id: conversation.thread_id,
-          title: conversation.metadata?.title as string | undefined,
-          isActive: conversationRouteParams
-            ? conversation.thread_id === conversationRouteParams.conversationId
-            : false,
+        threads={threads.data.map(thread => ({
+          id: thread.thread_id,
+          title: thread.metadata?.title as string | undefined,
+          isActive: threadRouteParams ? thread.thread_id === threadRouteParams.threadId : false,
         }))}
       />
       <main className="w-full h-screen relative p-4">
