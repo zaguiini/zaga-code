@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
-import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { ToolRuntime } from '@langchain/core/tools'
 import { validatePath } from '@/utils/validate-path'
+import { toolWithState } from '@/utils/tool-with-state'
 
 const fileReadSchema = z.object({
   path: z
@@ -14,7 +14,7 @@ const stateSchema = z.object({
   projectPath: z.string(),
 })
 
-export const fileReadTool = tool(
+export const fileReadTool = toolWithState(
   async (
     input: z.infer<typeof fileReadSchema>,
     { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>

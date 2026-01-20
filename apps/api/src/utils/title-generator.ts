@@ -1,7 +1,5 @@
 import { ChatOllama } from '@langchain/ollama'
-import { HumanMessage, createMiddleware } from 'langchain'
-import { Client } from '@langchain/langgraph-sdk'
-import { z } from 'zod'
+import type { Client } from '@langchain/langgraph-sdk'
 import { env } from '@/env'
 
 /**
@@ -12,7 +10,7 @@ export async function generateThreadTitle(messageContent: string): Promise<strin
   try {
     // Use the same model as the main agent for consistency
     const llm = new ChatOllama({
-      model: env.AGENT_MODEL,
+      model: env.SUMMARIZATION_MODEL,
       temperature: 0.5, // Slightly higher temp for more creative titles
     })
 
@@ -68,50 +66,11 @@ async function updateThreadTitle(client: Client, threadId: string, title: string
  * Generates and updates a thread title in one operation.
  * This is the main function to call after the first message in a thread.
  */
-async function generateAndUpdateThreadTitle(
+export async function generateAndUpdateThreadTitle(
   client: Client,
   threadId: string,
   firstUserMessage: string
 ): Promise<void> {
-  try {
-    const title = await generateThreadTitle(firstUserMessage)
-    await updateThreadTitle(client, threadId, title)
-  } catch (error) {
-    console.error(`Failed to generate and update title for thread ${threadId}:`, error)
-    // Don't throw - this is a non-critical feature
-  }
+  const title = await generateThreadTitle(firstUserMessage)
+  return updateThreadTitle(client, threadId, title)
 }
-
-export const titleGeneratorMiddleware = createMiddleware({
-  name: 'TitleGenerator',
-  stateSchema: z.object({
-    // We should be able to get the threadId from the context, but for some reason we aren't.
-    // Yes, I've tried beforeModel and afterAgent.
-    threadId: z.string().describe('The ID of the thread'),
-  }),
-  beforeAgent: ({ messages, threadId }) => {
-    if (messages.length > 1 || !threadId) {
-      return
-    }
-
-    const [firstMessage] = messages
-
-    if (!HumanMessage.isInstance(firstMessage)) {
-      return
-    }
-
-    const langGraphClient = new Client({
-      apiUrl: env.LANGGRAPH_API_URL,
-    })
-
-    generateAndUpdateThreadTitle(
-      langGraphClient,
-      threadId,
-      typeof firstMessage.content === 'string'
-        ? firstMessage.content
-        : firstMessage.content.map(content => content.text).join('')
-    )
-
-    return
-  },
-})

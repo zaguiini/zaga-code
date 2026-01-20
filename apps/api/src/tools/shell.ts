@@ -2,8 +2,8 @@ import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { tool } from '@langchain/core/tools'
 import type { ToolRuntime } from '@langchain/core/tools'
+import { toolWithState } from '@/utils/tool-with-state'
 
 const execAsync = promisify(exec)
 
@@ -22,7 +22,7 @@ const stateSchema = z.object({
  * @param projectPath - The root path of the project directory (used as cwd)
  * @returns A LangGraph tool that executes shell commands
  */
-export const shellTool = tool(
+export const shellTool = toolWithState(
   async (
     input: z.infer<typeof shellSchema>,
     { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>

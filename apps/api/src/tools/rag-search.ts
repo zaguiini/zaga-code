@@ -1,4 +1,3 @@
-import { tool } from '@langchain/core/tools'
 import { OllamaEmbeddings } from '@langchain/ollama'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/postgres-js'
@@ -7,6 +6,7 @@ import type { ToolRuntime } from '@langchain/core/tools'
 import { projectEmbeddingsTable } from '@/db/schema'
 import { env } from '@/env'
 import { DB_CONNECTION } from '@/db/constants'
+import { toolWithState } from '@/utils/tool-with-state'
 
 const ragSearchSchema = z.object({
   query: z
@@ -25,7 +25,7 @@ const stateSchema = z.object({
   projectPath: z.string(),
 })
 
-export const ragSearchTool = tool(
+export const ragSearchTool = toolWithState(
   async (
     input: z.infer<typeof ragSearchSchema>,
     { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>

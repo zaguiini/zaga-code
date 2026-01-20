@@ -56,6 +56,7 @@ async function setupOllamaModels() {
   const models = [
     { name: env.AGENT_MODEL, purpose: 'agent and title generation' },
     { name: env.RAG_MODEL, purpose: 'embeddings for RAG' },
+    { name: env.SUMMARIZATION_MODEL, purpose: 'summarization for title generation' },
   ]
 
   console.log('Checking Ollama models...\n')
