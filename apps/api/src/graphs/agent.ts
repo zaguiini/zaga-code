@@ -2,6 +2,7 @@ import { ChatOllama } from '@langchain/ollama'
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
 import { Annotation, END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt'
+import { MultiServerMCPClient } from '@langchain/mcp-adapters'
 import { fileWriteTool } from '@/tools/file-write'
 import { shellTool } from '@/tools/shell'
 import { ragSearchTool } from '@/tools/rag-search'
@@ -11,6 +12,13 @@ import { env } from '@/env'
 import { titleGeneratorNode } from '@/nodes/title-generator'
 import { createLlmNode } from '@/nodes/llm'
 
+const client = new MultiServerMCPClient({
+  context7: {
+    transport: 'http',
+    url: 'https://mcp.context7.com/mcp',
+  },
+})
+
 /**
  * Extended state annotation that includes messages and project context
  */
@@ -18,8 +26,6 @@ const stateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
   projectPath: Annotation<string>(),
 })
-
-const tools = [fileSearchTool, fileReadTool, fileWriteTool, shellTool, ragSearchTool]
 
 /**
  * Creates a custom ReAct-style agent using LangGraph.
@@ -31,7 +37,16 @@ const tools = [fileSearchTool, fileReadTool, fileWriteTool, shellTool, ragSearch
  *
  * @returns A compiled LangGraph agent ready to use
  */
-export function createAgent() {
+export async function createAgent() {
+  const tools = [
+    fileSearchTool,
+    fileReadTool,
+    fileWriteTool,
+    shellTool,
+    ragSearchTool,
+    ...(await client.getTools()),
+  ]
+
   // Initialize Ollama with the given model (supports tool calling and reasoning)
   const model = new ChatOllama({
     model: env.AGENT_MODEL,
