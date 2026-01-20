@@ -19,12 +19,8 @@ const client = new MultiServerMCPClient({
   },
 })
 
-/**
- * Extended state annotation that includes messages and project context
- */
 const stateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
-  projectPath: Annotation<string>(),
 })
 
 /**

@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
+import { tool } from 'langchain'
 import type { ToolRuntime } from '@langchain/core/tools'
 import { validatePath } from '@/utils/validate-path'
-import { toolWithState } from '@/utils/tool-with-state'
 
 const fileWriteSchema = z.object({
   path: z
@@ -12,8 +12,8 @@ const fileWriteSchema = z.object({
   content: z.string().describe('Content to write to the file'),
 })
 
-const stateSchema = z.object({
-  projectPath: z.string(),
+const contextSchema = z.object({
+  project_path: z.string(),
 })
 
 /**
@@ -23,13 +23,13 @@ const stateSchema = z.object({
  * @param projectPath - The root path of the project directory
  * @returns A LangGraph tool that writes files within the project directory
  */
-export const fileWriteTool = toolWithState(
+export const fileWriteTool = tool(
   async (
     input: z.infer<typeof fileWriteSchema>,
-    { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
+    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     try {
-      const validatedPath = validatePath(input.path, projectPath)
+      const validatedPath = validatePath(input.path, project_path)
       const directory = dirname(validatedPath)
 
       // Create parent directories if they don't exist

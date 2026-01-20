@@ -36,7 +36,7 @@ export function createLlmNode(modelWithTools: Runnable<Array<BaseMessage>>) {
     const { messages } = state
 
     // Prepare messages with system prompt
-    // Only add system message if it's not already in the conversation
+    // Only add system message if it's not already in the thread
     const messagesWithSystem = messages.some(
       (msg): msg is SystemMessage => msg instanceof SystemMessage
     )

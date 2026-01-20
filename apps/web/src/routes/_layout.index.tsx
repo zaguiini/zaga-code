@@ -81,9 +81,10 @@ function NewChat() {
 
           return client.runs
             .create(threadId, 'agent', {
+              context: {
+                project_path: projectPath,
+              },
               input: {
-                projectPath: projectPath,
-                threadId,
                 messages: [
                   { type: 'human', content: [{ type: 'text', text: data.initialPrompt }] },
                 ],

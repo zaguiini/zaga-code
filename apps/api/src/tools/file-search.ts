@@ -2,10 +2,10 @@ import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { eq } from 'drizzle-orm'
 import Fuse from 'fuse.js'
+import { tool } from 'langchain'
 import type { ToolRuntime } from '@langchain/core/tools'
 import { projectEmbeddingsTable } from '@/db/schema'
 import { DB_CONNECTION } from '@/db/constants'
-import { toolWithState } from '@/utils/tool-with-state'
 
 const fileSearchSchema = z.object({
   query: z
@@ -20,14 +20,14 @@ const fileSearchSchema = z.object({
     .describe('Maximum number of results to return (default: 10)'),
 })
 
-const stateSchema = z.object({
-  projectPath: z.string(),
+const contextSchema = z.object({
+  project_path: z.string(),
 })
 
-export const fileSearchTool = toolWithState(
+export const fileSearchTool = tool(
   async (
     input: z.infer<typeof fileSearchSchema>,
-    { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
+    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     const drizzleDb = drizzle(DB_CONNECTION)
 
@@ -40,7 +40,7 @@ export const fileSearchTool = toolWithState(
           file: projectEmbeddingsTable.file,
         })
         .from(projectEmbeddingsTable)
-        .where(eq(projectEmbeddingsTable.projectPath, projectPath))
+        .where(eq(projectEmbeddingsTable.projectPath, project_path))
 
       if (files.length === 0) {
         return 'No files have been indexed. Please run the project-setup graph first to index the project.'

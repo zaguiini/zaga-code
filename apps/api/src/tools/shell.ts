@@ -2,8 +2,8 @@ import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { resolve } from 'node:path'
 import { z } from 'zod'
+import { tool } from 'langchain'
 import type { ToolRuntime } from '@langchain/core/tools'
-import { toolWithState } from '@/utils/tool-with-state'
 
 const execAsync = promisify(exec)
 
@@ -11,8 +11,8 @@ const shellSchema = z.object({
   command: z.string().describe('Shell command to execute'),
 })
 
-const stateSchema = z.object({
-  projectPath: z.string(),
+const contextSchema = z.object({
+  project_path: z.string(),
 })
 
 /**
@@ -22,13 +22,13 @@ const stateSchema = z.object({
  * @param projectPath - The root path of the project directory (used as cwd)
  * @returns A LangGraph tool that executes shell commands
  */
-export const shellTool = toolWithState(
+export const shellTool = tool(
   async (
     input: z.infer<typeof shellSchema>,
-    { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
+    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     try {
-      const resolvedProjectPath = resolve(projectPath)
+      const resolvedProjectPath = resolve(project_path)
       const { stdout, stderr } = await execAsync(input.command, {
         cwd: resolvedProjectPath,
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer

@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
+import { tool } from '@langchain/core/tools'
 import type { ToolRuntime } from '@langchain/core/tools'
 import { validatePath } from '@/utils/validate-path'
-import { toolWithState } from '@/utils/tool-with-state'
 
 const fileReadSchema = z.object({
   path: z
@@ -10,17 +10,17 @@ const fileReadSchema = z.object({
     .describe('Relative path to the file to read, must be within the project directory'),
 })
 
-const stateSchema = z.object({
-  projectPath: z.string(),
+const contextSchema = z.object({
+  project_path: z.string(),
 })
 
-export const fileReadTool = toolWithState(
+export const fileReadTool = tool(
   async (
     input: z.infer<typeof fileReadSchema>,
-    { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
+    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     try {
-      const validatedPath = validatePath(input.path, projectPath)
+      const validatedPath = validatePath(input.path, project_path)
       const content = await readFile(validatedPath, 'utf-8')
       return content
     } catch (error) {

@@ -2,11 +2,11 @@ import { OllamaEmbeddings } from '@langchain/ollama'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { cosineDistance, desc, eq, gt, sql } from 'drizzle-orm'
+import { tool } from 'langchain'
 import type { ToolRuntime } from '@langchain/core/tools'
 import { projectEmbeddingsTable } from '@/db/schema'
 import { env } from '@/env'
 import { DB_CONNECTION } from '@/db/constants'
-import { toolWithState } from '@/utils/tool-with-state'
 
 const ragSearchSchema = z.object({
   query: z
@@ -21,14 +21,14 @@ const ragSearchSchema = z.object({
     .describe('Maximum number of results to return (default: 5)'),
 })
 
-const stateSchema = z.object({
-  projectPath: z.string(),
+const contextSchema = z.object({
+  project_path: z.string(),
 })
 
-export const ragSearchTool = toolWithState(
+export const ragSearchTool = tool(
   async (
     input: z.infer<typeof ragSearchSchema>,
-    { state: { projectPath } }: ToolRuntime<z.infer<typeof stateSchema>>
+    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     const drizzleDb = drizzle(DB_CONNECTION)
 
@@ -45,7 +45,7 @@ export const ragSearchTool = toolWithState(
       const existingEmbeddings = await drizzleDb
         .select()
         .from(projectEmbeddingsTable)
-        .where(eq(projectEmbeddingsTable.projectPath, projectPath))
+        .where(eq(projectEmbeddingsTable.projectPath, project_path))
         .limit(1)
 
       if (existingEmbeddings.length === 0) {
