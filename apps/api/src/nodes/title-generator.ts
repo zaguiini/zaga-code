@@ -10,13 +10,13 @@ type AgentState = { messages: Array<BaseMessage> }
 export function titleGeneratorNode(state: AgentState, config: RunnableConfig): Partial<AgentState> {
   const threadId = config.configurable?.thread_id
 
-  if (state.messages.length > 1 || !threadId) {
+  if (!threadId || config.metadata?.title) {
     return state
   }
 
-  const [firstMessage] = state.messages
+  const firstMessage = state.messages.find(message => HumanMessage.isInstance(message))
 
-  if (!HumanMessage.isInstance(firstMessage)) {
+  if (!firstMessage) {
     return state
   }
 

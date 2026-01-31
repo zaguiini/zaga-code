@@ -1,6 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages'
 import type { Runnable } from '@langchain/core/runnables'
-import type { BaseMessage } from 'langchain'
+import type { BaseMessage, Runtime } from 'langchain'
+import { fileReadTool } from '@/tools/file-read'
 
 /**
  * System prompt describing the AI developer assistant's role and capabilities.
@@ -23,16 +24,52 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
 - If a tool call fails, reason about why it failed and try a different approach
 `
 
+const SYSTEM_PROMPT_WITH_AGENTS_MD = `
+${SYSTEM_PROMPT}\n\n
+
+Use the following project-specific instructions to guide your actions:
+
+{{agentsMd}}
+`
 type AgentState = {
   messages: Array<BaseMessage>
 }
 
+type AgentContext = {
+  project_path: string
+}
+
+const isAgentContext = (context: unknown): context is AgentContext => {
+  return typeof context === 'object' && context !== null && 'project_path' in context
+}
+
+async function injectSystemPrompt(
+  messages: Array<BaseMessage>,
+  runtime: Runtime
+): Promise<Array<BaseMessage>> {
+  let projectSystemPrompt: BaseMessage
+
+  if (isAgentContext(runtime.context)) {
+    const agentsMd = await fileReadTool.invoke(
+      { path: 'AGENTS.md' },
+      { context: { project_path: runtime.context.project_path } }
+    )
+
+    projectSystemPrompt = new SystemMessage(
+      SYSTEM_PROMPT_WITH_AGENTS_MD.replace('{{agentsMd}}', agentsMd)
+    )
+  } else {
+    projectSystemPrompt = new SystemMessage(SYSTEM_PROMPT)
+  }
+
+  return [projectSystemPrompt, ...messages]
+}
 /**
  * Creates the LLM node function that calls the model with tools bound.
  * This node implements the "think" and "act" phases of ReAct.
  */
 export function createLlmNode(modelWithTools: Runnable<Array<BaseMessage>>) {
-  return async (state: AgentState): Promise<Partial<AgentState>> => {
+  return async (state: AgentState, runtime: Runtime): Promise<Partial<AgentState>> => {
     const { messages } = state
 
     // Prepare messages with system prompt
@@ -41,7 +78,7 @@ export function createLlmNode(modelWithTools: Runnable<Array<BaseMessage>>) {
       (msg): msg is SystemMessage => msg instanceof SystemMessage
     )
       ? messages
-      : [new SystemMessage(SYSTEM_PROMPT), ...messages]
+      : await injectSystemPrompt(messages, runtime)
 
     // Invoke the model - it will reason about the task and decide whether to use tools
     const response = await modelWithTools.invoke(messagesWithSystem)
