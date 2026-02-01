@@ -75,15 +75,18 @@ function NewChat() {
 
       <form
         onSubmit={handleSubmit(async data => {
+          const context = {
+            project_path: projectPath,
+          }
+
           const { thread_id: threadId } = await client.threads.create({
             graphId: 'agent',
+            metadata: { context },
           })
 
           return client.runs
             .create(threadId, 'agent', {
-              context: {
-                project_path: projectPath,
-              },
+              context,
               input: {
                 messages: [
                   { type: 'human', content: [{ type: 'text', text: data.initialPrompt }] },

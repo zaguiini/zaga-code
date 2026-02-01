@@ -1,10 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 import { env } from '@/env'
+import { threadsSearchQuery } from '@/queries/threads'
 
 export const Route = createFileRoute('/_layout/$threadId')({
   component: RouteComponent,
@@ -12,6 +14,13 @@ export const Route = createFileRoute('/_layout/$threadId')({
 
 function RouteComponent() {
   const { threadId } = Route.useParams()
+
+  const thread = useSuspenseQuery({
+    ...threadsSearchQuery(),
+    select: data => data.find(threadCandidate => threadCandidate.thread_id === threadId),
+  })
+
+  const context = thread.data?.metadata?.context as { project_path: string } | undefined
 
   const stream = useStream({
     assistantId: 'agent',
@@ -153,7 +162,7 @@ function RouteComponent() {
             {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
             },
-            { streamMode: ['messages', 'values'] }
+            { streamMode: ['messages', 'values'], context }
           )
           setInput('')
         }}
