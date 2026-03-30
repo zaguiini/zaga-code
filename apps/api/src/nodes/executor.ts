@@ -52,7 +52,8 @@ function buildSystemPromptContent(
     content += `\n\n## Previous Attempt Feedback\n\nA previous attempt was reviewed and found these issues. Fix them:\n\n${critiqueFeedback}`
   }
 
-  return content
+  // /think triggers Qwen3's native thinking mode via the chat template
+  return content + '\n\n/think'
 }
 
 async function buildSystemPrompt(
