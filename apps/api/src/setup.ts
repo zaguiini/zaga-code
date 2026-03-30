@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process'
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
-import { initVectorTable } from './db/vec-init'
 import { env } from '@/env'
 
 function runLms(args: Array<string>): Promise<void> {
@@ -64,21 +63,9 @@ async function setupPostgresCheckpointer() {
   }
 }
 
-async function setupVectorTable() {
-  console.log('Setting up vector table...')
-  try {
-    await initVectorTable()
-    console.log('✓ Vector table created')
-  } catch (error) {
-    console.error('✗ Failed to setup vector table:', error)
-    throw error
-  }
-}
-
 const setup = async () => {
   try {
     await setupPostgresCheckpointer()
-    await setupVectorTable()
     await setupLmStudioModels()
     console.log('✓ Setup complete!')
   } catch (error) {

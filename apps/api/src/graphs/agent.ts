@@ -5,10 +5,8 @@ import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
 import { fileWriteTool } from '@/tools/file-write'
 import { shellTool } from '@/tools/shell'
-import { ragSearchTool } from '@/tools/rag-search'
 import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
-import { helloWorldTool } from '@/tools/hello-world'
 import { env } from '@/env'
 import { titleGeneratorNode } from '@/nodes/title-generator'
 import { createRouterNode } from '@/nodes/router'
@@ -55,8 +53,6 @@ export async function createAgent() {
     fileReadTool,
     fileWriteTool,
     shellTool,
-    ragSearchTool,
-    helloWorldTool,
     ...(await client.getTools()),
   ]
 

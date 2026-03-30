@@ -4,7 +4,6 @@ const envSchema = z.object({
   REASONING_MODEL: z.string(),
   CODING_MODEL: z.string(),
   LM_STUDIO_API_URL: z.url(),
-  RAG_MODEL: z.string(),
   SUMMARIZATION_MODEL: z.string(),
   LANGGRAPH_API_URL: z.url(),
   DATABASE_URL: z.url(),

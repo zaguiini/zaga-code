@@ -1,7 +1,6 @@
 {
   "graphs": {
-    "agent": "./src/graphs/agent.ts:createAgent",
-    "project-setup": "./src/graphs/project-setup.ts:createProjectSetupGraph"
+    "agent": "./src/graphs/agent.ts:createAgent"
   },
   "env": ".env"
 }
