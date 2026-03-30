@@ -34,12 +34,9 @@ export function createPlannerNode(model: {
           ? latestHumanMessage.content
           : JSON.stringify(latestHumanMessage.content)
 
-      // Append /think to enable Qwen3's native thinking mode
-      const userContentWithThink = `${userContent}\n\n/think`
-
       const response = await model.invoke([
         new SystemMessage(PLANNER_SYSTEM_PROMPT(planningDepth)),
-        new HumanMessage(userContentWithThink),
+        new HumanMessage(userContent),
       ])
 
       const plan = typeof response.content === 'string' ? response.content.trim() : null

@@ -38,7 +38,7 @@ function RouteComponent() {
           isActive: threadRouteParams ? thread.thread_id === threadRouteParams.threadId : false,
         }))}
       />
-      <main className="w-full h-screen relative p-4">
+      <main className="w-full min-w-0 h-screen relative p-4">
         <Outlet />
         <SidebarTrigger className="absolute top-4 left-4 bg-background" />
       </main>

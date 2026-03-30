@@ -65,7 +65,6 @@ export async function createAgent() {
     configuration: { baseURL: env.LM_STUDIO_API_URL },
     apiKey: 'lm-studio',
     temperature: 0,
-    modelKwargs: { enable_thinking: true },
   })
 
   const codingModel = new ChatOpenAI({

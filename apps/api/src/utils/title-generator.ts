@@ -16,7 +16,7 @@ export async function generateThreadTitle(messageContent: string): Promise<strin
       temperature: 0.5,
     })
 
-    const prompt = `Generate a concise, descriptive title (4-8 words) for a conversation that starts with this message. Return ONLY the title, no quotes or explanations.
+    const prompt = `Generate a concise, descriptive title (16 words at most) for a conversation that starts with this message. Return ONLY the title, no quotes or explanations. Do not include "inquiry" or similar words in the title. If the user is asking a question, the title should be a question.
 
 User message: ${messageContent}
 
