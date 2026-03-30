@@ -1,4 +1,4 @@
-import { SystemMessage } from '@langchain/core/messages'
+import { AIMessage, SystemMessage } from '@langchain/core/messages'
 import type { Runnable } from '@langchain/core/runnables'
 import type { BaseMessage, Runtime } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
@@ -77,6 +77,22 @@ async function buildSystemPrompt(
   return new SystemMessage(buildSystemPromptContent(BASE_SYSTEM_PROMPT, plan, critiqueFeedback))
 }
 
+function extractThinking(response: BaseMessage): BaseMessage {
+  if (typeof response.content !== 'string') return response
+
+  const match = response.content.match(/^<think>([\s\S]*?)<\/think>\s*/i)
+  if (!match) return response
+
+  return new AIMessage({
+    content: response.content.slice(match[0].length),
+    tool_calls: (response as AIMessage).tool_calls,
+    additional_kwargs: {
+      ...response.additional_kwargs,
+      reasoning_content: match[1].trim(),
+    },
+  })
+}
+
 export function createExecutorNode(modelWithTools: Runnable<Array<BaseMessage>>) {
   return async (state: AgentState, runtime: Runtime): Promise<Partial<AgentState>> => {
     const { messages, plan, critiqueFeedback } = state
@@ -91,6 +107,6 @@ export function createExecutorNode(modelWithTools: Runnable<Array<BaseMessage>>)
 
     const response = await modelWithTools.invoke(messagesWithSystem)
 
-    return { messages: [response] }
+    return { messages: [extractThinking(response)] }
   }
 }

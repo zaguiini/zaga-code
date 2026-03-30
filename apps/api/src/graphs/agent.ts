@@ -8,6 +8,7 @@ import { shellTool } from '@/tools/shell'
 import { ragSearchTool } from '@/tools/rag-search'
 import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
+import { helloWorldTool } from '@/tools/hello-world'
 import { env } from '@/env'
 import { titleGeneratorNode } from '@/nodes/title-generator'
 import { createRouterNode } from '@/nodes/router'
@@ -55,6 +56,7 @@ export async function createAgent() {
     fileWriteTool,
     shellTool,
     ragSearchTool,
+    helloWorldTool,
     ...(await client.getTools()),
   ]
 
@@ -63,6 +65,7 @@ export async function createAgent() {
     configuration: { baseURL: env.LM_STUDIO_API_URL },
     apiKey: 'lm-studio',
     temperature: 0,
+    modelKwargs: { enable_thinking: true },
   })
 
   const codingModel = new ChatOpenAI({
