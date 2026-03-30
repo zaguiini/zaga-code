@@ -1,83 +1,57 @@
-import { Ollama } from 'ollama'
+import { spawn } from 'node:child_process'
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
 import { initVectorTable } from './db/vec-init'
 import { env } from '@/env'
 
-/**
- * Checks if a model is already downloaded in Ollama
- */
-async function isModelAvailable(ollama: Ollama, model: string): Promise<boolean> {
-  try {
-    const response = await ollama.list()
-    return response.models.some(m => m.name === model || m.name.startsWith(`${model}:`))
-  } catch (error) {
-    console.error(`Error checking for model ${model}:`, error)
-    return false
-  }
-}
-
-/**
- * Downloads an Ollama model with progress feedback
- */
-async function downloadModel(ollama: Ollama, model: string): Promise<void> {
-  console.log(`Downloading model: ${model}...`)
-  console.log('This may take a while depending on your internet connection and model size.')
-
-  try {
-    const stream = await ollama.pull({ model, stream: true })
-
-    for await (const chunk of stream) {
-      if (chunk.status === 'pulling manifest') {
-        console.log(`  Pulling manifest for ${model}...`)
-      } else if (chunk.status === 'downloading') {
-        const progress =
-          chunk.completed && chunk.total
-            ? `  ${((chunk.completed / chunk.total) * 100).toFixed(1)}%`
-            : '  Downloading...'
-        process.stdout.write(`\r${progress}`)
-      } else if (chunk.status === 'success') {
-        console.log(`\n  ✓ Successfully downloaded ${model}`)
-      }
-    }
-  } catch (error) {
-    console.error(`\n  ✗ Failed to download ${model}:`, error)
-    throw error
-  }
-}
-
-/**
- * Sets up Ollama models required for the application
- */
-async function setupOllamaModels() {
-  const ollama = new Ollama({
-    host: env.OLLAMA_API_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''),
+function runLms(args: Array<string>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('lms', args, { stdio: 'inherit' })
+    child.on('close', code => {
+      if (code === 0) resolve()
+      else reject(new Error(`lms ${args.join(' ')} exited with code ${code}`))
+    })
+    child.on('error', reject)
   })
+}
+
+async function setupLmStudioModels() {
+  console.log('Setting up LM Studio models...\n')
 
   const models = [
-    { name: env.AGENT_MODEL, purpose: 'agent and title generation' },
-    { name: env.RAG_MODEL, purpose: 'embeddings for RAG' },
-    { name: env.SUMMARIZATION_MODEL, purpose: 'summarization for title generation' },
+    { name: env.REASONING_MODEL, purpose: 'router, planner, critic' },
+    { name: env.CODING_MODEL, purpose: 'executor (code generation)' },
+    { name: env.SUMMARIZATION_MODEL, purpose: 'thread title generation' },
   ]
 
-  console.log('Checking Ollama models...\n')
-
   for (const { name, purpose } of models) {
-    const isAvailable = await isModelAvailable(ollama, name)
-
-    if (isAvailable) {
-      console.log(`✓ Model "${name}" (${purpose}) is already available`)
-    } else {
-      console.log(`✗ Model "${name}" (${purpose}) is not available`)
-      await downloadModel(ollama, name)
+    console.log(`Downloading ${name} (${purpose})...`)
+    try {
+      await runLms(['get', name])
+      console.log(`✓ ${name} downloaded\n`)
+    } catch {
+      console.log(`⚠ Could not download ${name} — may already be present, continuing...\n`)
     }
   }
 
-  console.log('\n✓ All required Ollama models are ready!')
+  console.log('Loading models...')
+  for (const { name } of models) {
+    try {
+      await runLms(['load', name])
+      console.log(`✓ Loaded ${name}`)
+    } catch {
+      console.log(`⚠ Could not load ${name} — may already be loaded`)
+    }
+  }
+
+  console.log('\nStarting LM Studio server...')
+  try {
+    await runLms(['server', 'start'])
+    console.log(`✓ LM Studio server started at ${env.LM_STUDIO_API_URL}\n`)
+  } catch {
+    console.log('⚠ Server may already be running\n')
+  }
 }
 
-/**
- * Sets up the Postgres checkpointer tables
- */
 async function setupPostgresCheckpointer() {
   console.log('Setting up Postgres checkpointer...')
   try {
@@ -101,14 +75,12 @@ async function setupVectorTable() {
   }
 }
 
-/**
- * Main setup function
- */
 const setup = async () => {
   try {
     await setupPostgresCheckpointer()
     await setupVectorTable()
-    await setupOllamaModels()
+    await setupLmStudioModels()
+    console.log('✓ Setup complete!')
   } catch (error) {
     console.error('Setup failed:', error)
     process.exit(1)

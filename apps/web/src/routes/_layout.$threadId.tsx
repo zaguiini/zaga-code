@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
 import { MessageList } from '@/components/ui/message-list'
@@ -150,14 +150,41 @@ function RouteComponent() {
 
   const [input, setInput] = useState('')
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
+
+  const BOTTOM_THRESHOLD_PX = 80
+
+  const updateStickToBottom = () => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    stickToBottomRef.current = distanceFromBottom <= BOTTOM_THRESHOLD_PX
+  }
+
+  useLayoutEffect(() => {
+    stickToBottomRef.current = true
+  }, [threadId])
+
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el || !stickToBottomRef.current) return
+    el.scrollTop = el.scrollHeight
+  }, [messages, stream.isLoading])
+
   return (
     <div className="w-full h-full flex flex-col justify-center items-center gap-8">
-      <div className="w-full flex-1 min-h-0 overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        onScroll={updateStickToBottom}
+        className="w-full flex-1 min-h-0 overflow-y-auto"
+      >
         <MessageList messages={messages} isTyping={stream.isLoading} />
       </div>
       <form
         onSubmit={e => {
           e.preventDefault()
+          stickToBottomRef.current = true
           stream.submit(
             {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],

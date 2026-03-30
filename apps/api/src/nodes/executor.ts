@@ -1,12 +1,10 @@
 import { SystemMessage } from '@langchain/core/messages'
 import type { Runnable } from '@langchain/core/runnables'
 import type { BaseMessage, Runtime } from 'langchain'
+import type { AgentState } from '@/graphs/agent'
 import { fileReadTool } from '@/tools/file-read'
 
-/**
- * System prompt describing the AI developer assistant's role and capabilities.
- */
-const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
+const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
 
 **When given a task:**
 - You MUST use the appropriate tools to gather information - never guess, make up information, or say you can't use a tool
@@ -24,16 +22,12 @@ const SYSTEM_PROMPT = `You are an AI developer assistant that helps users with c
 - If a tool call fails, reason about why it failed and try a different approach
 `
 
-const SYSTEM_PROMPT_WITH_AGENTS_MD = `
-${SYSTEM_PROMPT}\n\n
-
+const AGENTS_MD_PROMPT = `
+${BASE_SYSTEM_PROMPT}\n\n
 Use the following project-specific instructions to guide your actions:
 
 {{agentsMd}}
 `
-type AgentState = {
-  messages: Array<BaseMessage>
-}
 
 type AgentContext = {
   project_path: string
@@ -43,47 +37,60 @@ const isAgentContext = (context: unknown): context is AgentContext => {
   return typeof context === 'object' && context !== null && 'project_path' in context
 }
 
-async function injectSystemPrompt(
-  messages: Array<BaseMessage>,
-  runtime: Runtime
-): Promise<Array<BaseMessage>> {
-  let projectSystemPrompt: BaseMessage
+function buildSystemPromptContent(
+  base: string,
+  plan: string | null,
+  critiqueFeedback: string | null
+): string {
+  let content = base
 
-  if (isAgentContext(runtime.context)) {
-    const agentsMd = await fileReadTool.invoke(
-      { path: 'AGENTS.md' },
-      { context: { project_path: runtime.context.project_path } }
-    )
-
-    projectSystemPrompt = new SystemMessage(
-      SYSTEM_PROMPT_WITH_AGENTS_MD.replace('{{agentsMd}}', agentsMd)
-    )
-  } else {
-    projectSystemPrompt = new SystemMessage(SYSTEM_PROMPT)
+  if (plan) {
+    content += `\n\n## Your Plan\n\nFollow this plan to complete the task:\n\n${plan}`
   }
 
-  return [projectSystemPrompt, ...messages]
-}
-/**
- * Creates the LLM node function that calls the model with tools bound.
- * This node implements the "think" and "act" phases of ReAct.
- */
-export function createLlmNode(modelWithTools: Runnable<Array<BaseMessage>>) {
-  return async (state: AgentState, runtime: Runtime): Promise<Partial<AgentState>> => {
-    const { messages } = state
+  if (critiqueFeedback) {
+    content += `\n\n## Previous Attempt Feedback\n\nA previous attempt was reviewed and found these issues. Fix them:\n\n${critiqueFeedback}`
+  }
 
-    // Prepare messages with system prompt
-    // Only add system message if it's not already in the thread
-    const messagesWithSystem = messages.some(
+  return content
+}
+
+async function buildSystemPrompt(
+  _messages: Array<BaseMessage>,
+  runtime: Runtime,
+  plan: string | null,
+  critiqueFeedback: string | null
+): Promise<BaseMessage> {
+  if (isAgentContext(runtime.context)) {
+    try {
+      const agentsMd = await fileReadTool.invoke(
+        { path: 'AGENTS.md' },
+        { context: { project_path: runtime.context.project_path } }
+      )
+      const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
+      return new SystemMessage(buildSystemPromptContent(base, plan, critiqueFeedback))
+    } catch {
+      // AGENTS.md not found, fall through to base prompt
+    }
+  }
+
+  return new SystemMessage(buildSystemPromptContent(BASE_SYSTEM_PROMPT, plan, critiqueFeedback))
+}
+
+export function createExecutorNode(modelWithTools: Runnable<Array<BaseMessage>>) {
+  return async (state: AgentState, runtime: Runtime): Promise<Partial<AgentState>> => {
+    const { messages, plan, critiqueFeedback } = state
+
+    const hasSystemMessage = messages.some(
       (msg): msg is SystemMessage => msg instanceof SystemMessage
     )
-      ? messages
-      : await injectSystemPrompt(messages, runtime)
 
-    // Invoke the model - it will reason about the task and decide whether to use tools
+    const messagesWithSystem = hasSystemMessage
+      ? messages
+      : [await buildSystemPrompt(messages, runtime, plan, critiqueFeedback), ...messages]
+
     const response = await modelWithTools.invoke(messagesWithSystem)
 
-    // Return the response to be added to the state
     return { messages: [response] }
   }
 }
