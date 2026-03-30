@@ -1,4 +1,4 @@
-import { ChatOllama } from '@langchain/ollama'
+import { ChatOpenAI } from '@langchain/openai'
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
 import { Annotation, END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt'
@@ -10,7 +10,10 @@ import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
 import { env } from '@/env'
 import { titleGeneratorNode } from '@/nodes/title-generator'
-import { createLlmNode } from '@/nodes/llm'
+import { createRouterNode } from '@/nodes/router'
+import { createPlannerNode } from '@/nodes/planner'
+import { createExecutorNode } from '@/nodes/executor'
+import { createCriticNode, shouldRetry } from '@/nodes/critic'
 
 const client = new MultiServerMCPClient({
   context7: {
@@ -45,16 +48,6 @@ export const agentStateSchema = Annotation.Root({
 
 export type AgentState = typeof agentStateSchema.State
 
-/**
- * Creates a custom ReAct-style agent using LangGraph.
- * The agent is mindful of tool calls and reasoning:
- * - It reasons about tasks before taking action
- * - It strategically uses tools to gather information
- * - It decides when it has enough information to respond
- * - It handles tool execution errors gracefully
- *
- * @returns A compiled LangGraph agent ready to use
- */
 export async function createAgent() {
   const tools = [
     fileSearchTool,
@@ -65,45 +58,49 @@ export async function createAgent() {
     ...(await client.getTools()),
   ]
 
-  // Initialize Ollama with the given model (supports tool calling and reasoning)
-  const model = new ChatOllama({
-    model: env.AGENT_MODEL,
+  const reasoningModel = new ChatOpenAI({
+    model: env.REASONING_MODEL,
+    configuration: { baseURL: env.LM_STUDIO_API_URL },
+    apiKey: 'lm-studio',
+    temperature: 0,
+  })
+
+  const codingModel = new ChatOpenAI({
+    model: env.CODING_MODEL,
+    configuration: { baseURL: env.LM_STUDIO_API_URL },
+    apiKey: 'lm-studio',
     temperature: 0.3,
-    format: undefined, // Don't force JSON format, let model handle tool calling
-    streaming: true, // Enable streaming for token-by-token responses
+    streaming: true,
   })
 
-  const modelWithTools = model.bindTools(tools)
+  const codingModelWithTools = codingModel.bindTools(tools)
 
-  // Create ToolNode to execute tool calls
-  // Tools now use getCurrentTaskInput() to access state, so ToolNode works automatically
-  const toolNode = new ToolNode(tools, {
-    handleToolErrors: true,
-  })
+  const toolNode = new ToolNode(tools, { handleToolErrors: true })
 
-  // Create the agent node with the model and tools already bound
-  const llmNode = createLlmNode(modelWithTools)
+  const routerNode = createRouterNode(reasoningModel as any)
 
-  // Build the ReAct agent graph
+  const plannerNode = createPlannerNode(reasoningModel as any)
+
+  const executorNode = createExecutorNode(codingModelWithTools as any)
+
+  const criticNode = createCriticNode(reasoningModel as any)
+
   const workflow = new StateGraph(agentStateSchema)
     .addNode('title-generator', titleGeneratorNode)
-    // Add the agent node - this is where reasoning and tool call decisions happen
-    .addNode('llm', llmNode)
-    // Add the tools node - this executes tool calls
+    .addNode('router', routerNode)
+    .addNode('planner', plannerNode)
+    .addNode('executor', executorNode)
     .addNode('tools', toolNode)
-    // Start with the agent
+    .addNode('critic', criticNode)
     .addEdge(START, 'title-generator')
-    .addEdge('title-generator', 'llm')
-    // After agent, conditionally route to tools or end
-    // When shouldContinue returns END, LangGraph handles it automatically
-    .addConditionalEdges('llm', toolsCondition, ['tools', END])
-    // After tools execute, go back to agent to process results
-    .addEdge('tools', 'llm')
+    .addEdge('title-generator', 'router')
+    .addEdge('router', 'planner')
+    .addEdge('planner', 'executor')
+    .addConditionalEdges('executor', toolsCondition, { tools: 'tools', __end__: 'critic' })
+    .addEdge('tools', 'executor')
+    .addConditionalEdges('critic', shouldRetry, { executor: 'executor', __end__: END })
 
-  // Compile the graph with checkpointer
-  const app = workflow.compile({
+  return workflow.compile({
     checkpointer: PostgresSaver.fromConnString(env.DATABASE_URL),
   })
-
-  return app
 }
