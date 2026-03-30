@@ -19,9 +19,31 @@ const client = new MultiServerMCPClient({
   },
 })
 
-const stateSchema = Annotation.Root({
+export const agentStateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
+  complexity: Annotation<'simple' | 'medium' | 'complex'>({
+    reducer: (_, next) => next,
+    default: () => 'medium' as const,
+  }),
+  planningDepth: Annotation<'brief' | 'detailed' | 'decomposed'>({
+    reducer: (_, next) => next,
+    default: () => 'detailed' as const,
+  }),
+  plan: Annotation<string | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
+  critiqueAttempts: Annotation<number>({
+    reducer: (_, next) => next,
+    default: () => 0,
+  }),
+  critiqueFeedback: Annotation<string | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
 })
+
+export type AgentState = typeof agentStateSchema.State
 
 /**
  * Creates a custom ReAct-style agent using LangGraph.
@@ -63,7 +85,7 @@ export async function createAgent() {
   const llmNode = createLlmNode(modelWithTools)
 
   // Build the ReAct agent graph
-  const workflow = new StateGraph(stateSchema)
+  const workflow = new StateGraph(agentStateSchema)
     .addNode('title-generator', titleGeneratorNode)
     // Add the agent node - this is where reasoning and tool call decisions happen
     .addNode('llm', llmNode)
