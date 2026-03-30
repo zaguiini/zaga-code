@@ -56,7 +56,7 @@ function buildSystemPromptContent(
 }
 
 async function buildSystemPrompt(
-  messages: Array<BaseMessage>,
+  _messages: Array<BaseMessage>,
   runtime: Runtime,
   plan: string | null,
   critiqueFeedback: string | null
