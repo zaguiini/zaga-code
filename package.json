@@ -15,7 +15,8 @@
     "lint:fix": "pnpm --filter web lint:fix && pnpm --filter api lint:fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "present": "pnpx serve -l 8766 presentations/zaga-code"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.4",

@@ -1,0 +1,213 @@
+/*
+ * Automattic reveal.js theme
+ * Colors extracted from the official Automattic Deck Template (Google Slides)
+ *
+ * Theme palette:
+ *   Text/BG 1:  #000000  (black text)
+ *   Text/BG 2:  #ffffff  (white)
+ *   Text/BG 3:  #595959  (medium gray)
+ *   Text/BG 4:  #eeeeee  (light gray)
+ *   Accent 1:   #4285f4  (blue - primary accent)
+ *   Accent 2:   #212121  (dark charcoal)
+ *   Accent 3:   #78909c  (blue-gray)
+ *   Accent 4:   #83b2ff  (light blue)
+ *   Accent 5:   #3858e9  (deep blue - section backgrounds)
+ *   Accent 6:   #4039c7  (indigo/purple)
+ *   Link:       #4285f4  (blue)
+ */
+
+:root {
+  --a8c-blue: #4285f4;
+  --a8c-blue-light: #83b2ff;
+  --a8c-blue-deep: #3858e9;
+  --a8c-blue-dark: #4039c7;
+  --a8c-text: #000000;
+  --a8c-text-medium: #595959;
+  --a8c-gray-light: #eeeeee;
+  --a8c-gray-border: #dcdcde;
+  --a8c-white: #ffffff;
+  --a8c-charcoal: #212121;
+  --a8c-blue-gray: #78909c;
+  --a8c-link: #4285f4;
+}
+
+.reveal {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell,
+    'Helvetica Neue', sans-serif;
+  font-size: 36px;
+  color: var(--a8c-text);
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4 {
+  color: var(--a8c-text);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.reveal h1 {
+  font-size: 2.2em;
+}
+.reveal h2 {
+  font-size: 1.6em;
+}
+.reveal h3 {
+  font-size: 1.2em;
+}
+.reveal h4 {
+  font-size: 1em;
+}
+
+/* Section divider slides - deep blue background, white text */
+.reveal section[data-background-color] h2,
+.reveal section[data-background-color] h3,
+.reveal section[data-background-color] p,
+.reveal section[data-background-color] li {
+  color: var(--a8c-white);
+}
+
+/* Tables */
+.reveal table {
+  font-size: 0.85em;
+  border-collapse: collapse;
+  margin: 0 auto;
+  min-width: 70%;
+}
+
+.reveal table th {
+  background: var(--a8c-blue-deep);
+  color: var(--a8c-white);
+  padding: 0.7em 1em;
+  font-weight: 600;
+}
+
+.reveal table td {
+  padding: 0.6em 1em;
+  border-bottom: 1px solid var(--a8c-gray-border);
+}
+
+.reveal table tr:nth-child(even) {
+  background: var(--a8c-gray-light);
+}
+
+/* Blockquotes */
+.reveal blockquote {
+  background: var(--a8c-gray-light);
+  border-left: 4px solid var(--a8c-blue);
+  padding: 1em 1.5em;
+  font-style: normal;
+  width: 80%;
+  box-shadow: none;
+  margin: 0.5em auto;
+}
+
+/* Code blocks */
+.reveal pre {
+  font-size: 0.6em;
+  box-shadow: none;
+  border: 1px solid var(--a8c-gray-border);
+  border-radius: 6px;
+  padding: 1em;
+  background: #272822;
+}
+
+.reveal code {
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+/* Inline code */
+.reveal p code,
+.reveal li code {
+  background: var(--a8c-gray-light);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Links */
+.reveal a {
+  color: var(--a8c-link);
+  text-decoration: none;
+}
+
+.reveal a:hover {
+  text-decoration: underline;
+}
+
+/* Lists */
+.reveal ul,
+.reveal ol {
+  text-align: left;
+}
+
+.reveal li {
+  margin-bottom: 0.4em;
+}
+
+/* Subtitle / small text */
+.reveal .subtitle {
+  color: var(--a8c-text-medium);
+  font-size: 0.75em;
+}
+
+/* Image styling */
+.reveal img {
+  border: none;
+  box-shadow: none;
+}
+
+/* Fragment highlights */
+.reveal .fragment.highlight-blue.visible {
+  color: var(--a8c-blue);
+}
+
+/* ==========================================================================
+   Brand-specific layout overrides
+   ========================================================================== */
+
+/* Brand logo for ::before pseudo-element in layouts.css */
+:root {
+  --brand-logo: url('assets/logo-white.svg');
+  --brand-logo-width: 240px;
+  --brand-logo-height: 44px;
+  --brand-accent: #4285f4;
+  --brand-accent-deep: #3858e9;
+}
+
+/* Title slide: background color is set via data-background-color in markdown */
+
+/* Dark quote: blue attribution (higher specificity to override [data-background-color] rule) */
+.reveal .slides section.dark-quote[data-background-color] .attribution,
+.reveal .slides section.dark-quote[data-background-color] cite,
+.reveal .slides section.dark-quote .attribution,
+.reveal .slides section.dark-quote cite {
+  color: var(--a8c-blue) !important;
+}
+
+/* Stats: blue numbers */
+.reveal .slides section.stats .stat-number {
+  color: var(--a8c-blue);
+}
+
+/* Section divider on black: blue number */
+.reveal .slides section[data-background-color='#000000'] h2,
+.reveal .slides section[data-background-color='#000000'] p {
+  color: var(--a8c-white);
+}
+
+.reveal .slides section.section-number {
+  font-size: 8em;
+  font-weight: 700;
+  color: var(--a8c-blue);
+  position: absolute;
+  bottom: 0;
+  right: 0.2em;
+  line-height: 0.9;
+  opacity: 0.85;
+}

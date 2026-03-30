@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zaga Code</title>
+    <link rel="stylesheet" href="node_modules/reveal.js/dist/reveal.css">
+    <link rel="stylesheet" href="node_modules/reveal.js/dist/theme/white.css">
+    <link rel="stylesheet" href="node_modules/reveal.js/plugin/highlight/monokai.css">
+    <link rel="stylesheet" href="layouts.css">
+    <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <section data-markdown="slides.md"
+                     data-separator="^\n---\n"
+                     data-separator-vertical="^\n--\n"
+                     data-separator-notes="^Notes:">
+            </section>
+        </div>
+    </div>
+
+    <script src="node_modules/reveal.js/dist/reveal.js"></script>
+    <script src="node_modules/reveal.js/plugin/markdown/markdown.js"></script>
+    <script src="node_modules/reveal.js/plugin/highlight/highlight.js"></script>
+    <script src="node_modules/reveal.js/plugin/notes/notes.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ],
+            width: 1280,
+            height: 720,
+            margin: 0.1,
+            transition: 'slide',
+        });
+    </script>
+</body>
+</html>

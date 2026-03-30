@@ -1,5 +1,4 @@
 import { ChatOpenAI } from '@langchain/openai'
-import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
 import { Annotation, END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
@@ -98,7 +97,5 @@ export async function createAgent() {
     .addEdge('tools', 'executor')
     .addConditionalEdges('critic', shouldRetry, { executor: 'executor', __end__: END })
 
-  return workflow.compile({
-    checkpointer: PostgresSaver.fromConnString(env.DATABASE_URL),
-  })
+  return workflow.compile()
 }

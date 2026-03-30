@@ -1,0 +1,8 @@
+{
+  "name": "zaga-code",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "reveal.js": "^5.2.1"
+  }
+}

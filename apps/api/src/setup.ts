@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
 import { env } from '@/env'
 
 function runLms(args: Array<string>): Promise<void> {
@@ -51,21 +50,8 @@ async function setupLmStudioModels() {
   }
 }
 
-async function setupPostgresCheckpointer() {
-  console.log('Setting up Postgres checkpointer...')
-  try {
-    const checkpointer = PostgresSaver.fromConnString(env.DATABASE_URL)
-    await checkpointer.setup()
-    console.log('✓ Postgres checkpointer tables created')
-  } catch (error) {
-    console.error('✗ Failed to setup Postgres checkpointer:', error)
-    throw error
-  }
-}
-
 const setup = async () => {
   try {
-    await setupPostgresCheckpointer()
     await setupLmStudioModels()
     console.log('✓ Setup complete!')
   } catch (error) {
