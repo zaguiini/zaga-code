@@ -1,4 +1,4 @@
-import { ChatOllama } from '@langchain/ollama'
+import { ChatOpenAI } from '@langchain/openai'
 import type { Client } from '@langchain/langgraph-sdk'
 import { env } from '@/env'
 
@@ -9,9 +9,11 @@ import { env } from '@/env'
 export async function generateThreadTitle(messageContent: string): Promise<string> {
   try {
     // Use the same model as the main agent for consistency
-    const llm = new ChatOllama({
+    const llm = new ChatOpenAI({
       model: env.SUMMARIZATION_MODEL,
-      temperature: 0.5, // Slightly higher temp for more creative titles
+      configuration: { baseURL: env.LM_STUDIO_API_URL },
+      apiKey: 'lm-studio',
+      temperature: 0.5,
     })
 
     const prompt = `Generate a concise, descriptive title (4-8 words) for a conversation that starts with this message. Return ONLY the title, no quotes or explanations.

@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
 import { Document } from '@langchain/core/documents'
-import { OllamaEmbeddings } from '@langchain/ollama'
+import { OpenAIEmbeddings } from '@langchain/openai'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
 import { END, START, StateGraph, StateSchema } from '@langchain/langgraph'
 import { z } from 'zod'
@@ -92,10 +92,10 @@ async function indexProject({
       return textExtensions.includes(ext.toLowerCase())
     })
 
-    // Initialize embeddings using Ollama
-    const embeddings = new OllamaEmbeddings({
+    const embeddings = new OpenAIEmbeddings({
       model: env.RAG_MODEL,
-      baseUrl: env.OLLAMA_API_URL,
+      apiKey: 'lm-studio',
+      configuration: { baseURL: env.LM_STUDIO_API_URL },
     })
 
     // Initialize text splitter

@@ -1,4 +1,4 @@
-import { OllamaEmbeddings } from '@langchain/ollama'
+import { OpenAIEmbeddings } from '@langchain/openai'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { cosineDistance, desc, eq, gt, sql } from 'drizzle-orm'
@@ -32,10 +32,10 @@ export const ragSearchTool = tool(
   ) => {
     const drizzleDb = drizzle(DB_CONNECTION)
 
-    // Initialize embeddings using Ollama (same model as used for indexing)
-    const embeddings = new OllamaEmbeddings({
+    const embeddings = new OpenAIEmbeddings({
       model: env.RAG_MODEL,
-      baseUrl: env.OLLAMA_API_URL,
+      apiKey: 'lm-studio',
+      configuration: { baseURL: env.LM_STUDIO_API_URL },
     })
 
     try {
