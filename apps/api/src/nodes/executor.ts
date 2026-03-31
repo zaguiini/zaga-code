@@ -9,9 +9,13 @@ export function createExecutorNode(
   modelName?: string
 ) {
   return async (state: AgentState, runtime: Runtime): Promise<Partial<AgentState>> => {
+    const conversationMessages = state.messages.filter(
+      msg => !msg.additional_kwargs.progress_update
+    )
+
     // Sanitize messages: convert any "generic" type messages (ChatMessage with no role)
     // to AIMessages to prevent OpenAI API format errors
-    const messages = state.messages.map(msg =>
+    const messages = conversationMessages.map(msg =>
       msg.type === 'generic'
         ? new AIMessage({
             content: msg.content,
