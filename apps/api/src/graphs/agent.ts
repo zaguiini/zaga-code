@@ -1,7 +1,7 @@
-import { ChatOpenAI } from '@langchain/openai'
 import { Annotation, END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
+import { ChatOpenAIWithReasoning } from '@/utils/chat-openai-with-reasoning'
 import { fileWriteTool } from '@/tools/file-write'
 import { shellTool } from '@/tools/shell'
 import { fileSearchTool } from '@/tools/file-search'
@@ -55,14 +55,15 @@ export async function createAgent() {
     ...(await client.getTools()),
   ]
 
-  const reasoningModel = new ChatOpenAI({
+  const reasoningModel = new ChatOpenAIWithReasoning({
     model: env.REASONING_MODEL,
     configuration: { baseURL: env.LM_STUDIO_API_URL },
     apiKey: 'lm-studio',
     temperature: 0,
+    streaming: true,
   })
 
-  const codingModel = new ChatOpenAI({
+  const codingModel = new ChatOpenAIWithReasoning({
     model: env.CODING_MODEL,
     configuration: { baseURL: env.LM_STUDIO_API_URL },
     apiKey: 'lm-studio',

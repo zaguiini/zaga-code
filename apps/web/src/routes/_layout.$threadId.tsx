@@ -93,12 +93,19 @@ function RouteComponent() {
             })
           }
 
-          if (message.content) {
+          const messageContent = Array.isArray(message.content)
+            ? message.content
+                .filter(content => content.type === 'text')
+                .map(content => content.text)
+                .join('')
+            : message.content.toString().trim()
+
+          if (messageContent) {
             result.push({
               id: message.id!,
               role: 'assistant',
-              content: message.content as string,
-              parts: [{ type: 'text', text: message.content as string }],
+              content: messageContent,
+              parts: [{ type: 'text', text: messageContent }],
             })
           }
 
