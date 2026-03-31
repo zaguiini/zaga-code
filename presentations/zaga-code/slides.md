@@ -25,18 +25,15 @@ Let us start with the motivation.
 - How do L L M agents actually work? <!-- .element: class="fragment" -->
 - What goes into a ReAct loop? <!-- .element: class="fragment" -->
 - How do M C P servers integrate? <!-- .element: class="fragment" -->
-- What does a multi-agent pipeline feel like to build? <!-- .element: class="fragment" -->
 
 Notes:
 Zaga Code exists for one reason: to learn by building. [[slnc 400]]
 [fragment]
 I wanted to understand how L L M agents actually work — not just use them, but build one end to end.
 [fragment]
-That means implementing a ReAct loop from scratch: tool calls, state management, and all the edge cases.
+That means implementing a ReAct loop from scratch: tool calls, state management, etc.
 [fragment]
-I also wanted hands-on experience integrating M C P servers — the emerging standard for giving models access to external tools and documentation.
-[fragment]
-And finally, I wanted to feel what it is like to compose multiple agents into a pipeline, where each one has a specific responsibility.
+I also wanted hands-on experience integrating M C P servers — the standard for giving models access to external tools and documentation.
 
 ---
 
@@ -53,52 +50,47 @@ Now let us look at how Zaga Code is built.
 
 - **Web U I** — React, TanStack Router <!-- .element: class="fragment" -->
 - **A P I** — Node.js + LangGraph agent pipeline <!-- .element: class="fragment" -->
-- **Model** — Qwen 3 Coder running locally via L M Studio <!-- .element: class="fragment" -->
+- **Model** — Qwen 3.5 running locally via L M Studio <!-- .element: class="fragment" -->
 - **Tools** — File read, write, search, shell + M C P <!-- .element: class="fragment" -->
 
 Notes:
-At a high level, Zaga Code has three layers.
+At a high level, Zaga Code has a few distinct layers.
 [fragment]
 A web front end built with React and TanStack Router. It handles conversation threads and real-time streaming.
 [fragment]
 An A P I layer in Node dot J S, where the agent pipeline lives using LangGraph.
 [fragment]
-And a single model: Qwen 3 Coder, running entirely on my local machine through L M Studio. No cloud, no A P I keys.
+A single model: Qwen 3.5, running entirely on my local machine through L M Studio. No cloud, no A P I keys.
 [fragment]
-The agent gets a set of tools: read and write files, search the codebase, run shell commands, and connect to M C P servers.
+And a focused tool set: read and write files, search the codebase, run shell commands, and connect to M C P servers.
 
 ---
 
 ### The agent pipeline
 
 ```
-classifier → planner → executor → critic
-           ↘ (simple)     ↑            |
-                          └── retry ───┘
+`system-prompt` -> `executor` <-> `tools`
 ```
 
 Notes:
-The core of the system is a four-phase pipeline built with LangGraph.
+The core of the system is a focused ReAct loop built with LangGraph.
 
 ---
 
-### Four agents, one pipeline
+### The pipeline
 
-- **Classifier** — classifies the request and routes it: simple tasks skip planning <!-- .element: class="fragment" -->
-- **Planner** — writes a step-by-step plan for medium and complex tasks <!-- .element: class="fragment" -->
-- **Executor** — runs the ReAct loop with full tool access <!-- .element: class="fragment" -->
-- **Critic** — reviews the output and triggers a retry if needed <!-- .element: class="fragment" -->
+- **System prompt** — injects workspace context before execution begins <!-- .element: class="fragment" -->
+- **Executor** — runs the ReAct loop: reason, call tools, observe, repeat <!-- .element: class="fragment" -->
+- **Tools** — file read, write, search, shell, and M C P servers <!-- .element: class="fragment" -->
 
 Notes:
-Each phase is a separate agent node with a focused responsibility.
+The pipeline is intentionally simple.
 [fragment]
-The classifier reads the request and determines its complexity. Simple tasks — questions, explanations — bypass the planner entirely and go straight to the executor. Medium and complex tasks get a structured plan first.
+Before the executor runs, a system prompt node injects context about the current workspace — what the project is, what tools are available, and how to behave.
 [fragment]
-The planner produces a plan tailored to the complexity level — anywhere from a brief two-step outline to a full decomposition with sub-tasks and dependencies.
+The executor is the heart of the agent: a ReAct loop that reasons about the task, calls tools, observes results, and keeps going until the work is done.
 [fragment]
-The executor runs the actual work: a ReAct loop that calls tools, reads files, writes code, and runs commands.
-[fragment]
-Finally, the critic reviews whether the task was actually completed. If not, it sends feedback back to the executor for another pass — up to two retries.
+The tool set covers everything needed to work inside a codebase: reading and writing files, searching, running shell commands, and connecting to M C P servers for live documentation.
 
 ---
 
@@ -121,10 +113,32 @@ But M C P is pluggable. Any server can be dropped in: a database, an internal A 
 
 <!-- .slide: data-background-color="#3858e9" -->
 
-## Demo
+## Demo 1: Using an M C P
 
 Notes:
-Let us see it in action.
+Let us start with the simpler demo — using an M C P server the agent already knows about.
+
+---
+
+### Simple demo — live docs via Context 7
+
+Ask the agent about a library.
+
+> "What are the text styling possibilities in Tailwind?"
+
+---
+
+<!-- .slide: data-background-color="#3858e9" -->
+
+## Demo 2: Adding a New Tool
+
+---
+
+### Complex demo — extending the agent
+
+Add a new tool and register it.
+
+> "Let's add a new Hello World tool and expose it to the agent."
 
 ---
 

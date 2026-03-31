@@ -16,7 +16,6 @@ async function setupLmStudioModels() {
   console.log('Setting up LM Studio models...\n')
 
   const models = [
-    { name: env.REASONING_MODEL, purpose: 'router, planner, critic' },
     { name: env.CODING_MODEL, purpose: 'executor (code generation)' },
     { name: env.SUMMARIZATION_MODEL, purpose: 'thread title generation' },
   ]
