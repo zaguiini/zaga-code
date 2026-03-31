@@ -12,16 +12,16 @@
 
 ## File Map
 
-| Action | Path                                  | Responsibility                                                    |
-| ------ | ------------------------------------- | ----------------------------------------------------------------- |
-| Create | `apps/api/src/utils/langfuse.ts`      | Singleton client + `createCallbackHandler` factory                |
-| Modify | `apps/api/src/env.ts`                 | Add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` |
-| Modify | `apps/api/.env`                       | Add actual Langfuse env var values                                |
-| Modify | `apps/api/src/nodes/classifier.ts`    | Accept `RunnableConfig`, pass callbacks, annotate trace           |
-| Modify | `apps/api/src/nodes/planner.ts`       | Accept `RunnableConfig`, pass callbacks, annotate trace           |
-| Modify | `apps/api/src/nodes/executor.ts`      | Pass callbacks to `modelWithTools.invoke`                         |
-| Modify | `apps/api/src/nodes/critic.ts`        | Accept `RunnableConfig`, pass callbacks, annotate trace           |
-| Create | `apps/api/src/utils/langfuse.test.ts` | Unit tests for the utility                                        |
+| Action | Path                                  | Responsibility                                                        |
+| ------ | ------------------------------------- | --------------------------------------------------------------------- |
+| Create | `apps/api/src/utils/langfuse.ts`      | Singleton client + `createCallbackHandler` factory                    |
+| Modify | `apps/api/src/env.ts`                 | Add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` |
+| Modify | `apps/api/.env`                       | Add actual Langfuse env var values                                    |
+| Modify | `apps/api/src/nodes/classifier.ts`    | Accept `RunnableConfig`, pass callbacks, annotate trace               |
+| Modify | `apps/api/src/nodes/planner.ts`       | Accept `RunnableConfig`, pass callbacks, annotate trace               |
+| Modify | `apps/api/src/nodes/executor.ts`      | Pass callbacks to `modelWithTools.invoke`                             |
+| Modify | `apps/api/src/nodes/critic.ts`        | Accept `RunnableConfig`, pass callbacks, annotate trace               |
+| Create | `apps/api/src/utils/langfuse.test.ts` | Unit tests for the utility                                            |
 
 ---
 
@@ -48,7 +48,7 @@ Add these three lines to `apps/api/.env`:
 ```
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_HOST=http://localhost:3000
+LANGFUSE_BASE_URL=http://localhost:3000
 ```
 
 Replace `pk-lf-...` and `sk-lf-...` with the actual keys from your Langfuse self-hosted instance (Settings → API Keys in the Langfuse UI). Adjust the port if your Langfuse runs on a different one.
@@ -69,7 +69,7 @@ const envSchema = z.object({
   DATABASE_URL: z.url(),
   LANGFUSE_PUBLIC_KEY: z.string(),
   LANGFUSE_SECRET_KEY: z.string(),
-  LANGFUSE_HOST: z.url(),
+  LANGFUSE_BASE_URL: z.url(),
 })
 
 export const env = envSchema.parse(process.env)
@@ -110,7 +110,7 @@ vi.mock('@/env', () => ({
   env: {
     LANGFUSE_PUBLIC_KEY: 'pk-test',
     LANGFUSE_SECRET_KEY: 'sk-test',
-    LANGFUSE_HOST: 'http://localhost:3000',
+    LANGFUSE_BASE_URL: 'http://localhost:3000',
   },
 }))
 
@@ -152,7 +152,7 @@ import { env } from '@/env'
 export const langfuse = new Langfuse({
   publicKey: env.LANGFUSE_PUBLIC_KEY,
   secretKey: env.LANGFUSE_SECRET_KEY,
-  baseUrl: env.LANGFUSE_HOST,
+  baseUrl: env.LANGFUSE_BASE_URL,
 })
 
 process.on('beforeExit', async () => {
@@ -163,7 +163,7 @@ export function createCallbackHandler(sessionId: string): CallbackHandler {
   return new CallbackHandler({
     publicKey: env.LANGFUSE_PUBLIC_KEY,
     secretKey: env.LANGFUSE_SECRET_KEY,
-    baseUrl: env.LANGFUSE_HOST,
+    baseUrl: env.LANGFUSE_BASE_URL,
     sessionId,
   })
 }
@@ -235,7 +235,7 @@ export function createClassifierNode(model: BaseChatModel) {
     }
 
     const threadId = config.configurable?.thread_id as string | undefined
-    const handler = createCallbackHandler(threadId ?? 'unknown')
+    const handler = createCallbackHandler(threadId)
 
     try {
       const userContent =
@@ -331,7 +331,7 @@ export function createPlannerNode(model: BaseChatModel) {
     }
 
     const threadId = config.configurable?.thread_id as string | undefined
-    const handler = createCallbackHandler(threadId ?? 'unknown')
+    const handler = createCallbackHandler(threadId)
 
     try {
       const userContent =
@@ -476,7 +476,7 @@ export function createExecutorNode(modelWithTools: Runnable<Array<BaseMessage>>)
     const { messages, plan, critiqueFeedback } = state
 
     const threadId = (runtime as any).configurable?.thread_id as string | undefined
-    const handler = createCallbackHandler(threadId ?? 'unknown')
+    const handler = createCallbackHandler(threadId)
 
     const hasSystemMessage = messages.some(
       (msg): msg is SystemMessage => msg instanceof SystemMessage
@@ -561,7 +561,7 @@ export function createCriticNode(model: BaseChatModel) {
     const latestResponse = aiMessages.at(-1)
 
     const threadId = config.configurable?.thread_id as string | undefined
-    const handler = createCallbackHandler(threadId ?? 'unknown')
+    const handler = createCallbackHandler(threadId)
 
     try {
       const userContent =

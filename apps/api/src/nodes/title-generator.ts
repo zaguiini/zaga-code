@@ -1,4 +1,3 @@
-import { HumanMessage } from 'langchain'
 import { Client } from '@langchain/langgraph-sdk'
 import type { RunnableConfig } from '@langchain/core/runnables'
 import type { BaseMessage } from 'langchain'
@@ -14,7 +13,7 @@ export function titleGeneratorNode(state: AgentState, config: RunnableConfig): P
     return state
   }
 
-  const firstMessage = state.messages.find(message => HumanMessage.isInstance(message))
+  const firstMessage = state.messages.find(message => message.type === 'human')
 
   if (!firstMessage) {
     return state

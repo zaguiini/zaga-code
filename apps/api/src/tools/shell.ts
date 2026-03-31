@@ -15,6 +15,8 @@ const contextSchema = z.object({
   project_path: z.string(),
 })
 
+const FORBIDDEN_PATH_SEGMENT = 'node_modules'
+
 /**
  * Creates a LangGraph tool for executing shell commands.
  * Commands are executed in the project directory context.
@@ -28,6 +30,10 @@ export const shellTool = tool(
     { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     try {
+      if (input.command.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
+        return `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+      }
+
       const resolvedProjectPath = resolve(project_path)
       const { stdout, stderr } = await execAsync(input.command, {
         cwd: resolvedProjectPath,
@@ -59,7 +65,7 @@ export const shellTool = tool(
   {
     name: 'shell',
     description:
-      'Execute a shell command in the project directory. Captures both stdout and stderr. No command restrictions for MVP.',
+      'Execute a shell command in the project directory. Captures both stdout and stderr. Commands referencing node_modules are blocked.',
     schema: shellSchema,
   }
 )

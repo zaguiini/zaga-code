@@ -16,19 +16,26 @@ export async function generateThreadTitle(messageContent: string): Promise<strin
       temperature: 0.5,
     })
 
-    const prompt = `Generate a concise, descriptive title (16 words at most) for a conversation that starts with this message. Return ONLY the title, no quotes or explanations. Do not include "inquiry" or similar words in the title. If the user is asking a question, the title should be a question.
+    const prompt = `Write a concise conversation title.
+
+Rules:
+- Return only the title text (no quotes, labels, markdown, or explanation).
+- Use sentence case.
+- Maximum 16 words.
+- Do not use words like "inquiry", "request", "question", or "help".
+- Keep it specific to the user's message.
 
 User message: ${messageContent}
 
 Title:`
 
     const response = await llm.invoke(prompt)
-    const title = response.content.toString().trim()
+    const rawTitle = response.content.toString().trim()
+    const title = normalizeTitle(rawTitle)
 
     // Validate and clean the title
     if (title && title.length > 0 && title.length < 100) {
-      // Remove surrounding quotes if present
-      return title.replace(/^["']|["']$/g, '')
+      return title
     }
 
     // Fallback to message preview
@@ -50,6 +57,28 @@ function createFallbackTitle(messageContent: string): string {
   return messageContent.substring(0, maxLength).trim() + '...'
 }
 
+function normalizeTitle(rawTitle: string): string {
+  let title = rawTitle
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  title = title
+    .replace(/\b(inquiry|request|question|help)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const words = title.split(' ').filter(Boolean)
+  if (words.length > 16) {
+    title = words.slice(0, 16).join(' ')
+  }
+
+  if (title.length > 0) {
+    title = title.charAt(0).toUpperCase() + title.slice(1).toLowerCase()
+  }
+
+  return title.trim()
+}
 /**
  * Updates the thread metadata with a generated title.
  */

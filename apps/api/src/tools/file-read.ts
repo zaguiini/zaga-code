@@ -14,12 +14,18 @@ const contextSchema = z.object({
   project_path: z.string(),
 })
 
+const FORBIDDEN_PATH_SEGMENT = 'node_modules'
+
 export const fileReadTool = tool(
   async (
     input: z.infer<typeof fileReadSchema>,
     { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
   ) => {
     try {
+      if (input.path.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
+        return `Path blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+      }
+
       const validatedPath = validatePath(input.path, project_path)
       const content = await readFile(validatedPath, 'utf-8')
       return content

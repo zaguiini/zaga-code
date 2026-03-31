@@ -8,9 +8,7 @@
     "dev": "pnpx @langchain/langgraph-cli dev --no-browser",
     "setup-environment": "tsx --env-file .env src/setup.ts",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@langchain/classic": "^1.0.9",
@@ -23,6 +21,8 @@
     "fuse.js": "^7.1.0",
     "glob": "^13.0.0",
     "langchain": "^1.2.10",
+    "langfuse": "^3.38.6",
+    "langfuse-langchain": "^3.38.6",
     "ollama": "^0.6.3",
     "zod": "^4.3.5"
   },
@@ -34,7 +34,6 @@
     "eslint-plugin-prettier": "^5.5.5",
     "prettier": "^3.8.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "typescript": "^5.7.2"
   }
 }

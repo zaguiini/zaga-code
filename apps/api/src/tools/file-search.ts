@@ -22,6 +22,8 @@ const contextSchema = z.object({
   project_path: z.string(),
 })
 
+const FORBIDDEN_PATH_SEGMENT = 'node_modules'
+
 export const fileSearchTool = tool(
   async (
     input: z.infer<typeof fileSearchSchema>,
@@ -29,6 +31,9 @@ export const fileSearchTool = tool(
   ) => {
     try {
       const { query, limit } = input
+      if (query.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
+        return `Search blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+      }
 
       const filePaths = await glob('**/*', {
         cwd: project_path,
