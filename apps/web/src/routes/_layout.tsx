@@ -32,6 +32,7 @@ function RouteComponent() {
   return (
     <SidebarProvider defaultOpen={threads.data.length > 0}>
       <AppSidebar
+        activeThreadId={threadRouteParams ? threadRouteParams.threadId : undefined}
         threads={threads.data.map(thread => ({
           id: thread.thread_id,
           title: thread.metadata?.title as string | undefined,

@@ -1,5 +1,7 @@
-import { Link } from '@tanstack/react-router'
-import { PlusIcon } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { PlusIcon, Trash2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   Sidebar,
   SidebarContent,
@@ -8,16 +10,36 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { client } from '@/lib/ai-client'
 import { cn } from '@/lib/utils'
 
 export function AppSidebar({
+  activeThreadId,
   threads,
 }: {
+  activeThreadId?: string
   threads: Array<{ id: string; title?: string; isActive?: boolean }>
 }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const deleteThread = useMutation({
+    mutationFn: (threadId: string) => client.threads.delete(threadId),
+    onSuccess: (_, threadId) => {
+      window.sessionStorage.removeItem(`resume:${threadId}`)
+      queryClient.invalidateQueries({ queryKey: ['threads'] })
+      if (threadId === activeThreadId) {
+        navigate({ to: '/' })
+      }
+    },
+    onError: () => {
+      toast.error('Failed to delete chat.')
+    },
+  })
   return (
     <Sidebar>
       <SidebarContent>
@@ -33,7 +55,7 @@ export function AppSidebar({
             <SidebarMenu>
               {threads.map(item => (
                 <SidebarMenuItem key={item.id} title={item.title || item.id}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild isActive={item.isActive}>
                     <Link
                       to="/$threadId"
                       params={{ threadId: item.id }}
@@ -45,6 +67,19 @@ export function AppSidebar({
                       <span>{item.title || item.id}</span>
                     </Link>
                   </SidebarMenuButton>
+                  <SidebarMenuAction
+                    showOnHover
+                    type="button"
+                    disabled={deleteThread.isPending && deleteThread.variables === item.id}
+                    aria-label="Delete chat"
+                    onClick={event => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      deleteThread.mutate(item.id)
+                    }}
+                  >
+                    <Trash2Icon />
+                  </SidebarMenuAction>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
