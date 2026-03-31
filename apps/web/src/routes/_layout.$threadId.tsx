@@ -189,7 +189,7 @@ function RouteComponent() {
             {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
             },
-            { streamMode: ['messages', 'values'], context }
+            { streamMode: ['messages', 'values'], context, config: { recursion_limit: 1000 } }
           )
           setInput('')
         }}

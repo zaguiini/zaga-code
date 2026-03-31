@@ -8,7 +8,7 @@ import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
 import { env } from '@/env'
 import { titleGeneratorNode } from '@/nodes/title-generator'
-import { createRouterNode } from '@/nodes/router'
+import { createClassifierNode } from '@/nodes/classifier'
 import { createPlannerNode } from '@/nodes/planner'
 import { createExecutorNode } from '@/nodes/executor'
 import { createCriticNode, shouldRetry } from '@/nodes/critic'
@@ -74,24 +74,28 @@ export async function createAgent() {
 
   const toolNode = new ToolNode(tools, { handleToolErrors: true })
 
-  const routerNode = createRouterNode(reasoningModel as any)
+  const classifierNode = createClassifierNode(reasoningModel)
 
-  const plannerNode = createPlannerNode(reasoningModel as any)
+  const plannerNode = createPlannerNode(reasoningModel)
 
-  const executorNode = createExecutorNode(codingModelWithTools as any)
+  const executorNode = createExecutorNode(codingModelWithTools)
 
-  const criticNode = createCriticNode(reasoningModel as any)
+  const criticNode = createCriticNode(reasoningModel)
 
   const workflow = new StateGraph(agentStateSchema)
     .addNode('title-generator', titleGeneratorNode)
-    .addNode('router', routerNode)
+    .addNode('classifier', classifierNode)
     .addNode('planner', plannerNode)
     .addNode('executor', executorNode)
     .addNode('tools', toolNode)
     .addNode('critic', criticNode)
     .addEdge(START, 'title-generator')
-    .addEdge('title-generator', 'router')
-    .addEdge('router', 'planner')
+    .addEdge('title-generator', 'classifier')
+    .addConditionalEdges(
+      'classifier',
+      (state: AgentState) => (state.complexity === 'simple' ? 'executor' : 'planner'),
+      { executor: 'executor', planner: 'planner' }
+    )
     .addEdge('planner', 'executor')
     .addConditionalEdges('executor', toolsCondition, { tools: 'tools', __end__: 'critic' })
     .addEdge('tools', 'executor')

@@ -72,9 +72,9 @@ The agent gets a set of tools: read and write files, search the codebase, run sh
 ### The agent pipeline
 
 ```
-router → planner → executor → critic
-                      ↑            |
-                      └── retry ───┘
+classifier → planner → executor → critic
+           ↘ (simple)     ↑            |
+                          └── retry ───┘
 ```
 
 Notes:
@@ -84,17 +84,17 @@ The core of the system is a four-phase pipeline built with LangGraph.
 
 ### Four agents, one pipeline
 
-- **Router** — classifies the request: simple, medium, or complex <!-- .element: class="fragment" -->
-- **Planner** — writes a step-by-step plan before any code is touched <!-- .element: class="fragment" -->
+- **Classifier** — classifies the request and routes it: simple tasks skip planning <!-- .element: class="fragment" -->
+- **Planner** — writes a step-by-step plan for medium and complex tasks <!-- .element: class="fragment" -->
 - **Executor** — runs the ReAct loop with full tool access <!-- .element: class="fragment" -->
 - **Critic** — reviews the output and triggers a retry if needed <!-- .element: class="fragment" -->
 
 Notes:
 Each phase is a separate agent node with a focused responsibility.
 [fragment]
-The router reads the request and classifies its complexity. That classification drives how much planning happens.
+The classifier reads the request and determines its complexity. Simple tasks — questions, explanations — bypass the planner entirely and go straight to the executor. Medium and complex tasks get a structured plan first.
 [fragment]
-The planner produces a structured plan — anywhere from two steps to a full decomposition with dependencies.
+The planner produces a plan tailored to the complexity level — anywhere from a brief two-step outline to a full decomposition with sub-tasks and dependencies.
 [fragment]
 The executor runs the actual work: a ReAct loop that calls tools, reads files, writes code, and runs commands.
 [fragment]

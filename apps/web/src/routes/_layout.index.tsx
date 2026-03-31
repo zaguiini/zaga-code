@@ -77,6 +77,7 @@ function NewChat() {
                   { type: 'human', content: [{ type: 'text', text: data.initialPrompt }] },
                 ],
               },
+              config: { recursion_limit: 1000 },
             })
             .then(run => {
               window.sessionStorage.setItem(`resume:${threadId}`, run.run_id)
@@ -93,7 +94,12 @@ function NewChat() {
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="projectPath">Project Path</FieldLabel>
-            <Input id="projectPath" type="text" placeholder="Project Path" />
+            <Input
+              id="projectPath"
+              type="text"
+              placeholder="Project Path"
+              {...register('projectPath')}
+            />
             {errors.projectPath?.message && <FieldError>{errors.projectPath.message}</FieldError>}
           </Field>
         </FieldGroup>

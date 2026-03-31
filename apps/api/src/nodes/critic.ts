@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { AgentState } from '@/graphs/agent'
 
 const criticOutputSchema = z.object({
@@ -22,9 +23,7 @@ Reject only if:
 
 ${plan ? `The assistant was following this plan:\n${plan}\n\n` : ''}Return your assessment as structured output.`
 
-export function createCriticNode(model: {
-  withStructuredOutput: (schema: unknown) => { invoke: (messages: unknown) => Promise<unknown> }
-}) {
+export function createCriticNode(model: BaseChatModel) {
   const structuredCritic = model.withStructuredOutput(criticOutputSchema)
 
   return async (state: AgentState): Promise<Partial<AgentState>> => {

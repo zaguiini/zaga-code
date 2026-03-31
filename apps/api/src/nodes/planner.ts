@@ -1,4 +1,5 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { AgentState } from '@/graphs/agent'
 
 const DEPTH_INSTRUCTIONS: Record<'brief' | 'detailed' | 'decomposed', string> = {
@@ -14,9 +15,7 @@ ${DEPTH_INSTRUCTIONS[depth]}
 
 Output ONLY the plan as markdown. No preamble, no explanation. The plan will be injected into the coding agent's context.`
 
-export function createPlannerNode(model: {
-  invoke: (messages: unknown) => Promise<{ content: unknown }>
-}) {
+export function createPlannerNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const { messages, planningDepth = 'detailed' } = state
 
