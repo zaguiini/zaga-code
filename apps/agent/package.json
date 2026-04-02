@@ -6,7 +6,8 @@
   "exports": {
     "./setup": "./src/setup.ts",
     "./graphs/agent": "./src/graphs/agent.ts",
-    "./env": "./src/env.ts"
+    "./env": "./src/env.ts",
+    "./utils/token-budget": "./src/utils/token-budget.ts"
   },
   "scripts": {
     "docker:start": "docker compose up -d",
