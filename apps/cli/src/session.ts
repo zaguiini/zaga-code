@@ -1,36 +1,35 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
 
-/** Append-only agent stream log for debugging (next to `.zaga/session`). */
-export function zagaEventsLogPath(projectPath: string): string {
-  return join(projectPath, '.zaga', 'events.ndjson')
+/** Root directory for all zaga data (~/.zaga). */
+export function zagaHomeDir(): string {
+  return join(homedir(), '.zaga')
+}
+
+/** Path to the shared history database (~/.zaga/history.db). */
+export function zagaHistoryDbPath(): string {
+  return join(zagaHomeDir(), 'history.db')
+}
+
+/** Per-session events log (~/.zaga/events-{sessionId}.ndjson). */
+export function zagaEventsLogPath(sessionId: string): string {
+  return join(zagaHomeDir(), `events-${sessionId}.ndjson`)
 }
 
 export type Session = {
   threadId: string
-  setThreadId: (id: string) => Promise<void>
+  setThreadId: (id: string) => void
 }
 
-export async function createSession(projectPath: string): Promise<Session> {
-  const zagaDir = join(projectPath, '.zaga')
-  const sessionFile = join(zagaDir, 'session')
-  await mkdir(zagaDir, { recursive: true })
-
-  let threadId: string
-  try {
-    threadId = (await readFile(sessionFile, 'utf-8')).trim()
-  } catch {
-    threadId = crypto.randomUUID()
-    await writeFile(sessionFile, threadId, 'utf-8')
-  }
+export function createSession(): Session {
+  let threadId: string = crypto.randomUUID()
 
   return {
     get threadId() {
       return threadId
     },
-    async setThreadId(id: string) {
+    setThreadId(id: string) {
       threadId = id
-      await writeFile(sessionFile, id, 'utf-8')
     },
   }
 }

@@ -1,6 +1,6 @@
 import { appendFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { useCallback, useReducer, useRef } from 'react'
+import { useCallback, useLayoutEffect, useReducer, useRef } from 'react'
 import { HumanMessage } from '@langchain/core/messages'
 import { estimateMessagesTokens } from '@zaga/agent/utils/token-budget'
 import type { CompiledStateGraph } from '@langchain/langgraph'
@@ -28,28 +28,17 @@ function extractChunkText(chunk: any): string | null {
   return null
 }
 
-function jsonLineForStreamEvent(threadId: string, event: unknown): string {
-  const payload = { ts: new Date().toISOString(), threadId, event }
-  const seen = new WeakSet<object>()
+async function logEvent(
+  eventsLogPath: string,
+  threadId: string,
+  type: 'stream_start' | 'stream_end',
+  data?: Record<string, unknown>
+): Promise<void> {
+  const payload = { ts: new Date().toISOString(), threadId, type, ...data }
   try {
-    return JSON.stringify(payload, (_key, value) => {
-      if (typeof value === 'bigint') {
-        return value.toString()
-      }
-      if (value !== null && typeof value === 'object') {
-        if (seen.has(value)) {
-          return '[Circular]'
-        }
-        seen.add(value)
-      }
-      return value
-    })
+    await appendFile(eventsLogPath, `${JSON.stringify(payload)}\n`, 'utf-8')
   } catch {
-    return JSON.stringify({
-      ts: new Date().toISOString(),
-      threadId,
-      error: 'unserializable_event',
-    })
+    // Best-effort; never break the run on I/O errors
   }
 }
 
@@ -57,12 +46,33 @@ export function useAgent({ agent, threadId, projectPath }: UseAgentOptions) {
   const [state, dispatch] = useReducer(appReducer, initialState)
   const abortRef = useRef<AbortController | null>(null)
 
+  // Hydrate token count from existing thread state on mount
+  useLayoutEffect(() => {
+    agent
+      .getState({ configurable: { thread_id: threadId } })
+      .then(snapshot => {
+        if (snapshot.values?.messages) {
+          dispatch({
+            type: 'update_tokens',
+            count: estimateMessagesTokens(snapshot.values.messages),
+            maxTokens: snapshot.values.maxTokens ?? 0,
+          })
+        }
+      })
+      .catch(() => {
+        // No existing state — fresh session
+      })
+  }, [agent, threadId])
+
   const send = useCallback(
     async (text: string) => {
       dispatch({ type: 'send', userMessage: text })
 
       const controller = new AbortController()
       abortRef.current = controller
+
+      const eventsLogPath = zagaEventsLogPath(threadId)
+      await mkdir(dirname(eventsLogPath), { recursive: true })
 
       try {
         const stream = agent.streamEvents(
@@ -78,16 +88,10 @@ export function useAgent({ agent, threadId, projectPath }: UseAgentOptions) {
         // Nodes whose LLM output should NOT be shown in the UI
         const silentNodes = new Set(['should-plan', 'make-plan', 'maybe-compact'])
 
-        const eventsLogPath = zagaEventsLogPath(projectPath)
-        await mkdir(dirname(eventsLogPath), { recursive: true })
+        // Log stream start
+        await logEvent(eventsLogPath, threadId, 'stream_start', { userMessage: text })
 
         for await (const event of stream) {
-          try {
-            await appendFile(eventsLogPath, `${jsonLineForStreamEvent(threadId, event)}\n`, 'utf-8')
-          } catch {
-            // Best-effort debug log; never break the run on I/O errors
-          }
-
           if (event.event === 'on_chat_model_stream') {
             // Suppress output from gate/planning nodes (they emit "yes"/"no", plans, etc.)
             const node = event.metadata.langgraph_node
@@ -130,11 +134,18 @@ export function useAgent({ agent, threadId, projectPath }: UseAgentOptions) {
         }
 
         dispatch({ type: 'stream_end' })
+
+        // Log stream end
+        await logEvent(eventsLogPath, threadId, 'stream_end')
       } catch (error: any) {
         if (error.name === 'AbortError') {
           dispatch({ type: 'stream_end' })
+          await logEvent(eventsLogPath, threadId, 'stream_end', { aborted: true })
         } else {
           dispatch({ type: 'stream_error', error: error.message ?? 'Unknown error' })
+          await logEvent(eventsLogPath, threadId, 'stream_end', {
+            error: error.message ?? 'Unknown error',
+          })
         }
       } finally {
         abortRef.current = null
