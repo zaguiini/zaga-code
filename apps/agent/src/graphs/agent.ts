@@ -20,6 +20,7 @@ import { createVerifyNode } from '@/nodes/verify'
 import { createExploreGraph } from '@/graphs/explore-graph'
 import { createVerifyGraph } from '@/graphs/verify-graph'
 import { titleGeneratorNode } from '@/nodes/title-generator'
+import { queryModelInfo } from '@/setup'
 
 const client = new MultiServerMCPClient({
   context7: {
@@ -80,7 +81,7 @@ export function createModel() {
   })
 }
 
-export async function buildAgentGraph(maxTokens: number) {
+async function buildAgentGraph(maxTokens: number) {
   const model = createModel()
 
   const readOnlyTools = [fileSearchTool, fileReadTool, grepTool]
@@ -135,8 +136,15 @@ export async function buildAgentGraph(maxTokens: number) {
     })
 }
 
+async function queryMaxTokens(): Promise<number> {
+  const info = await queryModelInfo(env.MODEL)
+
+  return info.maxTokens
+}
+
 /** Convenience: builds and compiles with no checkpointer (for LangGraph API server compat) */
-export async function createAgent(maxTokens = 0) {
+export async function createAgent() {
+  const maxTokens = await queryMaxTokens()
   const graph = await buildAgentGraph(maxTokens)
   return graph.compile()
 }

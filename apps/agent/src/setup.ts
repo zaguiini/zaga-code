@@ -104,7 +104,7 @@ export type ModelInfo = {
   maxTokens: number
 }
 
-async function queryModelInfo(modelId: string): Promise<ModelInfo> {
+export async function queryModelInfo(modelId: string): Promise<ModelInfo> {
   const output = await runLms(['ps', '--json'], { silent: true })
   const parsed = JSON.parse(output)
   const models = Array.isArray(parsed) ? parsed : []

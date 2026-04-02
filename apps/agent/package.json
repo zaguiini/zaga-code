@@ -11,7 +11,7 @@
   },
   "scripts": {
     "docker:start": "docker compose up -d",
-    "dev": "pnpx @langchain/langgraph-cli dev --no-browser",
+    "dev": "./node_modules/@langchain/langgraph-cli/dist/cli/cli.mjs dev --no-browser",
     "setup-environment": "tsx --env-file .env -e \"import('./src/setup.ts').then(m => m.setup())\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -20,6 +20,7 @@
     "@langchain/classic": "^1.0.9",
     "@langchain/core": "^1.1.15",
     "@langchain/langgraph": "^1.1.0",
+    "@langchain/langgraph-cli": "^1.1.17",
     "@langchain/langgraph-sdk": "^1.5.4",
     "@langchain/mcp-adapters": "^1.1.1",
     "@langchain/ollama": "^1.2.0",

@@ -179,6 +179,24 @@ function RouteComponent() {
     el.scrollTop = el.scrollHeight
   }, [messages, stream.isLoading])
 
+  const maxTokens = (stream.values as Record<string, unknown> | null)?.maxTokens as
+    | number
+    | undefined
+  const estimatedTokens = useMemo(() => {
+    const msgs = stream.messages
+    return msgs.reduce((total, msg) => {
+      const content =
+        typeof msg.content === 'string'
+          ? msg.content
+          : Array.isArray(msg.content)
+            ? msg.content.map(c => ('text' in c ? c.text : '')).join('')
+            : ''
+      return total + Math.ceil(content.length / 4)
+    }, 0)
+  }, [stream.messages])
+
+  const contextPercent = maxTokens ? Math.round((estimatedTokens / maxTokens) * 100) : null
+
   return (
     <div className="w-full h-full flex flex-col justify-center items-center gap-8">
       <div
@@ -207,6 +225,14 @@ function RouteComponent() {
           value={input}
           onChange={e => setInput(e.target.value)}
         />
+        {maxTokens != null && maxTokens > 0 && (
+          <div className="flex items-center justify-end gap-2 px-2 pt-1 text-xs text-muted-foreground">
+            <span>
+              ~{estimatedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
+            </span>
+            <span>({contextPercent}%)</span>
+          </div>
+        )}
       </form>
     </div>
   )
