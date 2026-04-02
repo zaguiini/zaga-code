@@ -77,16 +77,16 @@ Two models running simultaneously:
 
 ## Document Index — Execution Order
 
-Execute in order: **02 → 03 → 04 → 05 → 06**. Doc 01 (Core Tools) is done.
+Execute in order: **04 → 05 → 06**. Docs 01 (Core Tools), 02 (LLM Setup), and 03 (Context Management) are done.
 
-| Order | Document                                                | Contents                                                    | Est. Time    | Depends On |
-| ----- | ------------------------------------------------------- | ----------------------------------------------------------- | ------------ | ---------- |
-| ~~1~~ | ~~01 — Core Tools~~                                     | ~~file-edit, grep, shell-safety utility~~                   | ~~2–3h~~     | **DONE**   |
-| 2     | [02 — LLM Setup](./02-llm-setup.md)                     | Env config, setup.ts two-model download, model instances    | 1–2h         | —          |
-| 3     | [03 — Context Management](./03-context-management.md)   | Token counting utils, summarize util, maybe-compact node    | 2h           | 02         |
-| 4     | [04 — Graph Architecture](./04-graph-architecture.md)   | State schema, should-plan, explore/plan/verify, full wiring | 4–5h         | 02, 03     |
-| 5     | [05 — Terminal Refactor](./05-terminal-refactor.md)     | Drop web layer, CLI, REPL, streaming, /compact command      | 3–4h         | 03, 04     |
-| 6     | [06 — Enter Planning Mode](./06-enter-planning-mode.md) | Future: model-driven planning trigger, migration from gate  | post-weekend | all        |
+| Order | Document                                                | Contents                                                     | Est. Time    | Depends On |
+| ----- | ------------------------------------------------------- | ------------------------------------------------------------ | ------------ | ---------- |
+| ~~1~~ | ~~01 — Core Tools~~                                     | ~~file-edit, grep, shell-safety utility~~                    | ~~2–3h~~     | **DONE**   |
+| ~~2~~ | ~~02 — LLM Setup~~                                      | ~~Env config, setup.ts two-model download, model instances~~ | ~~1–2h~~     | **DONE**   |
+| ~~3~~ | ~~03 — Context Management~~                             | ~~Token counting utils, summarize util, maybe-compact node~~ | ~~2h~~       | **DONE**   |
+| 4     | [04 — Graph Architecture](./04-graph-architecture.md)   | State schema, should-plan, explore/plan/verify, full wiring  | 4–5h         | 02, 03     |
+| 5     | [05 — Terminal Refactor](./05-terminal-refactor.md)     | Drop web layer, CLI, REPL, streaming, /compact command       | 3–4h         | 03, 04     |
+| 6     | [06 — Enter Planning Mode](./06-enter-planning-mode.md) | Future: model-driven planning trigger, migration from gate   | post-weekend | all        |
 
 **Total: ~12–14h** — a full weekend with buffer.
 

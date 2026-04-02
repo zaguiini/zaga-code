@@ -46,6 +46,10 @@ export const agentStateSchema = Annotation.Root({
     reducer: (_, next) => next,
     default: () => null,
   }),
+  forceCompact: Annotation<boolean>({
+    reducer: (_, next) => next,
+    default: () => false,
+  }),
 })
 
 export type AgentState = typeof agentStateSchema.State

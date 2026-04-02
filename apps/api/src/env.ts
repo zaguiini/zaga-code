@@ -7,6 +7,8 @@ const envSchema = z.object({
   LANGFUSE_PUBLIC_KEY: z.string(),
   LANGFUSE_SECRET_KEY: z.string(),
   LANGFUSE_BASE_URL: z.url(),
+  CODING_MODEL_MAX_TOKENS: z.coerce.number().default(262000),
+  FAST_MODEL_MAX_TOKENS: z.coerce.number().default(128000),
 })
 
 export const env = envSchema.parse(process.env)
