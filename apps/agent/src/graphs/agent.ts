@@ -70,28 +70,18 @@ export const agentStateSchema = Annotation.Root({
 
 export type AgentState = typeof agentStateSchema.State
 
-export function createModels() {
-  const codingModel = new ChatOpenAIWithReasoning({
-    model: env.CODING_MODEL,
+export function createModel() {
+  return new ChatOpenAIWithReasoning({
+    model: env.MODEL,
     configuration: { baseURL: env.MODEL_API_BASE_URL },
     apiKey: 'local',
     temperature: 0.3,
     streaming: true,
   })
-
-  const fastModel = new ChatOpenAIWithReasoning({
-    model: env.FAST_MODEL,
-    configuration: { baseURL: env.MODEL_API_BASE_URL },
-    apiKey: 'local',
-    temperature: 0.1,
-    streaming: false,
-  })
-
-  return { codingModel, fastModel }
 }
 
 export async function buildAgentGraph(maxTokens: number) {
-  const { codingModel, fastModel } = createModels()
+  const model = createModel()
 
   const readOnlyTools = [fileSearchTool, fileReadTool, grepTool]
   const allTools = [
@@ -103,19 +93,19 @@ export async function buildAgentGraph(maxTokens: number) {
   ]
   const verifyTools = [...readOnlyTools, shellTool]
 
-  const exploreGraph = createExploreGraph(fastModel, readOnlyTools)
-  const verifyGraph = createVerifyGraph(codingModel, verifyTools)
+  const exploreGraph = createExploreGraph(model, readOnlyTools)
+  const verifyGraph = createVerifyGraph(model, verifyTools)
 
-  const executorNode = createExecutorNode(codingModel.bindTools(allTools), env.CODING_MODEL)
+  const executorNode = createExecutorNode(model.bindTools(allTools), env.MODEL)
   const toolNode = new ToolNode(allTools, { handleToolErrors: true })
 
   return new StateGraph(agentStateSchema)
     .addNode('title-generator', titleGeneratorNode)
     .addNode('command', createCommandNode(maxTokens))
-    .addNode('maybe-compact', createMaybeCompactNode(fastModel))
-    .addNode('should-plan', createShouldPlanNode(fastModel))
+    .addNode('maybe-compact', createMaybeCompactNode(model))
+    .addNode('should-plan', createShouldPlanNode(model))
     .addNode('explore', createExploreNode(exploreGraph))
-    .addNode('make-plan', createPlanNode(fastModel))
+    .addNode('make-plan', createPlanNode(model))
     .addNode('system-prompt', systemPromptNode)
     .addNode('executor', executorNode)
     .addNode('tools', toolNode)

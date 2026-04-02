@@ -18,17 +18,17 @@ Answer NO if:
 
 Reply with exactly one word: yes or no`
 
-export function createShouldPlanNode(fastModel: BaseChatModel) {
+export function createShouldPlanNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
     if (!lastUserMessage) return { shouldPlan: false }
 
-    const response = await fastModel.invoke([
+    const response = await model.invoke([
       new SystemMessage(GATE_PROMPT),
       new HumanMessage(
         typeof lastUserMessage.content === 'string'
           ? lastUserMessage.content
-          : JSON.stringify(lastUserMessage.content)
+          : lastUserMessage.content.map(c => c.text).join('')
       ),
     ])
 

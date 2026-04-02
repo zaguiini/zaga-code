@@ -53,43 +53,36 @@ async function getLmsModelKeys(command: 'ls' | 'ps'): Promise<Set<string>> {
   }
 }
 
-async function setupLmStudioModels() {
-  log('Setting up LM Studio models...\n')
+async function setupLmStudioModel() {
+  log('Setting up LM Studio model...\n')
 
-  const models = [
-    { name: env.CODING_MODEL, purpose: 'executor + verify (code generation)' },
-    { name: env.FAST_MODEL, purpose: 'explore + plan' },
-  ]
+  const modelName = env.MODEL
 
   const localModels = await getLmsModelKeys('ls')
 
-  for (const { name, purpose } of models) {
-    if (localModels.has(name)) {
-      log(`✓ ${name} (${purpose}) already downloaded`)
-      continue
-    }
-    log(`Downloading ${name} (${purpose})...`)
+  if (localModels.has(modelName)) {
+    log(`✓ ${modelName} already downloaded`)
+  } else {
+    log(`Downloading ${modelName}...`)
     try {
-      await runLms(['get', name])
-      log(`✓ ${name} downloaded\n`)
+      await runLms(['get', modelName])
+      log(`✓ ${modelName} downloaded\n`)
     } catch {
-      console.error(`⚠ Could not download ${name} — may already be present, continuing...`)
+      console.error(`⚠ Could not download ${modelName} — may already be present, continuing...`)
     }
   }
 
   const loadedModels = await getLmsModelKeys('ps')
 
-  log('Loading models...')
-  for (const { name } of models) {
-    if (loadedModels.has(name)) {
-      log(`✓ ${name} already loaded`)
-      continue
-    }
+  log('Loading model...')
+  if (loadedModels.has(modelName)) {
+    log(`✓ ${modelName} already loaded`)
+  } else {
     try {
-      await runLms(['load', name])
-      log(`✓ Loaded ${name}`)
+      await runLms(['load', modelName])
+      log(`✓ Loaded ${modelName}`)
     } catch {
-      console.error(`⚠ Could not load ${name} — may already be loaded`)
+      console.error(`⚠ Could not load ${modelName} — may already be loaded`)
     }
   }
 
@@ -123,22 +116,18 @@ async function queryModelInfo(modelId: string): Promise<ModelInfo> {
 }
 
 export type SetupResult = {
-  codingModel: ModelInfo
-  fastModel: ModelInfo
+  model: ModelInfo
 }
 
 export async function setup(options: SetupOptions = {}): Promise<SetupResult> {
   logLevel = options.logLevel ?? 'silent'
   try {
-    await setupLmStudioModels()
+    await setupLmStudioModel()
     log('✓ Setup complete!')
 
-    const [codingModel, fastModel] = await Promise.all([
-      queryModelInfo(env.CODING_MODEL),
-      queryModelInfo(env.FAST_MODEL),
-    ])
+    const model = await queryModelInfo(env.MODEL)
 
-    return { codingModel, fastModel }
+    return { model }
   } catch (error) {
     console.error('Setup failed:', error)
     process.exit(1)

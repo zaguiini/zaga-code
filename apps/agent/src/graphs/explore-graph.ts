@@ -18,10 +18,10 @@ When you have gathered enough information, stop calling tools and write a struct
 Be thorough. The plan node will use your summary to produce an implementation plan.`
 
 export function createExploreGraph(
-  fastModel: BaseChatModel,
+  model: BaseChatModel,
   readOnlyTools: Array<StructuredToolInterface>
 ) {
-  const modelWithTools = fastModel.bindTools!(readOnlyTools)
+  const modelWithTools = model.bindTools!(readOnlyTools)
   const toolNode = new ToolNode(readOnlyTools)
 
   async function exploreExecutor(state: typeof MessagesAnnotation.State) {

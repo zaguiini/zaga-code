@@ -15,7 +15,7 @@ Rules:
 - No code, just the plan
 - If the task is a question or doesn't require changes, write "No implementation needed — this is an informational request"`
 
-export function createPlanNode(fastModel: BaseChatModel) {
+export function createPlanNode(model: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
     if (!lastUserMessage) return {}
@@ -25,7 +25,7 @@ export function createPlanNode(fastModel: BaseChatModel) {
       contextParts.unshift(`Exploration findings:\n${state.exploreSummary}\n\nUser request:`)
     }
 
-    const response = await fastModel.invoke([
+    const response = await model.invoke([
       new SystemMessage(PLAN_SYSTEM_PROMPT),
       new HumanMessage(contextParts.join(' ')),
     ])

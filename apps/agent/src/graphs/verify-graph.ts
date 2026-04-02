@@ -31,10 +31,10 @@ VERDICT: PARTIAL
 PARTIAL is for environmental limitations only — not for "I'm unsure." If you can run the check, you must decide PASS or FAIL.`
 
 export function createVerifyGraph(
-  codingModel: BaseChatModel,
+  model: BaseChatModel,
   verifyTools: Array<StructuredToolInterface>
 ) {
-  const modelWithTools = codingModel.bindTools!(verifyTools)
+  const modelWithTools = model.bindTools!(verifyTools)
   const toolNode = new ToolNode(verifyTools)
 
   async function verifyExecutor(state: typeof MessagesAnnotation.State) {

@@ -12,14 +12,11 @@ Be specific about file paths and content. This summary will replace the original
 
 export async function summarizeMessages(
   messages: Array<BaseMessage>,
-  fastModel: BaseChatModel
+  model: BaseChatModel
 ): Promise<AIMessage> {
   const text = messages.map(m => `${m.type}: ${JSON.stringify(m.content)}`).join('\n\n')
 
-  const response = await fastModel.invoke([
-    new SystemMessage(SUMMARIZE_PROMPT),
-    new HumanMessage(text),
-  ])
+  const response = await model.invoke([new SystemMessage(SUMMARIZE_PROMPT), new HumanMessage(text)])
 
   return new AIMessage({
     content: `[Conversation summary]\n${response.content}`,

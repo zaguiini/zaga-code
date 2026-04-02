@@ -9,7 +9,7 @@ import { env } from '@/env'
 export async function generateThreadTitle(messageContent: string): Promise<string> {
   try {
     const llm = new ChatOpenAI({
-      model: env.FAST_MODEL,
+      model: env.MODEL,
       configuration: { baseURL: env.MODEL_API_BASE_URL },
       apiKey: 'local',
       temperature: 0.5,
