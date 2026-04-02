@@ -21,9 +21,9 @@ Be thorough. The plan node will use your summary to produce an implementation pl
 
 export function createExploreGraph(
   fastModel: BaseChatModel,
-  readOnlyTools: StructuredToolInterface[]
+  readOnlyTools: Array<StructuredToolInterface>
 ) {
-  const modelWithTools = fastModel.bindTools(readOnlyTools)
+  const modelWithTools = fastModel.bindTools!(readOnlyTools)
   const toolNode = new ToolNode(readOnlyTools)
 
   async function exploreExecutor(state: typeof MessagesAnnotation.State) {

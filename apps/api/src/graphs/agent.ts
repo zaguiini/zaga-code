@@ -9,9 +9,16 @@ import { fileReadTool } from '@/tools/file-read'
 import { fileEditTool } from '@/tools/file-edit'
 import { grepTool } from '@/tools/grep'
 import { env } from '@/env'
-import { titleGeneratorNode } from '@/nodes/title-generator'
 import { createExecutorNode } from '@/nodes/executor'
 import { systemPromptNode } from '@/nodes/system-prompt'
+import { createMaybeCompactNode } from '@/nodes/maybe-compact'
+import { createCommandNode } from '@/nodes/command'
+import { createShouldPlanNode } from '@/nodes/should-plan'
+import { createExploreNode } from '@/nodes/explore'
+import { createPlanNode } from '@/nodes/plan'
+import { createVerifyNode } from '@/nodes/verify'
+import { createExploreGraph } from '@/graphs/explore-graph'
+import { createVerifyGraph } from '@/graphs/verify-graph'
 
 const client = new MultiServerMCPClient({
   context7: {
@@ -75,49 +82,59 @@ export function createModels() {
     streaming: false,
   })
 
-  const planModel = new ChatOpenAIWithReasoning({
-    model: env.FAST_MODEL,
-    configuration: { baseURL: env.MODEL_API_BASE_URL },
-    apiKey: 'local',
-    temperature: 0.1,
-    streaming: false,
-  })
-
-  return { codingModel, fastModel, planModel }
+  return { codingModel, fastModel }
 }
 
 export async function createAgent() {
-  const readOnlyTools = [fileSearchTool, fileReadTool]
+  const { codingModel, fastModel } = createModels()
 
-  const tools = [
+  const readOnlyTools = [fileSearchTool, fileReadTool, grepTool]
+  const allTools = [
     ...readOnlyTools,
-    grepTool,
     fileEditTool,
     fileWriteTool,
     shellTool,
     ...(await client.getTools()),
   ]
+  const verifyTools = [...readOnlyTools, shellTool]
 
-  const { codingModel } = createModels()
+  const exploreGraph = createExploreGraph(fastModel, readOnlyTools)
+  const verifyGraph = createVerifyGraph(codingModel, verifyTools)
 
-  const codingModelWithTools = codingModel.bindTools(tools)
+  const executorNode = createExecutorNode(codingModel.bindTools(allTools), env.CODING_MODEL)
+  const toolNode = new ToolNode(allTools, { handleToolErrors: true })
 
-  const toolNode = new ToolNode(tools, { handleToolErrors: true })
-
-  const executorNode = createExecutorNode(codingModelWithTools, env.CODING_MODEL)
-  const workflow = new StateGraph(agentStateSchema)
-    .addNode('title-generator', titleGeneratorNode)
+  return new StateGraph(agentStateSchema)
+    .addNode('command', createCommandNode())
+    .addNode('maybe-compact', createMaybeCompactNode(fastModel))
+    .addNode('should-plan', createShouldPlanNode(fastModel))
+    .addNode('explore', createExploreNode(exploreGraph))
+    .addNode('plan', createPlanNode(fastModel))
     .addNode('system-prompt', systemPromptNode)
     .addNode('executor', executorNode)
     .addNode('tools', toolNode)
-    .addEdge(START, 'title-generator')
-    .addEdge('title-generator', 'system-prompt')
+    .addNode('verify', createVerifyNode(verifyGraph))
+
+    .addEdge(START, 'command')
+    .addConditionalEdges('command', s => {
+      if (!s.commandHandled) return 'maybe-compact'
+      if (s.forceCompact) return 'maybe-compact'
+      return END
+    })
+    .addConditionalEdges('maybe-compact', s => (s.commandHandled ? END : 'should-plan'))
+    .addConditionalEdges('should-plan', s => (s.shouldPlan ? 'explore' : 'system-prompt'))
+    .addEdge('explore', 'plan')
+    .addEdge('plan', 'system-prompt')
     .addEdge('system-prompt', 'executor')
     .addConditionalEdges('executor', toolsCondition, {
       tools: 'tools',
-      __end__: END,
+      __end__: 'verify',
     })
     .addEdge('tools', 'executor')
-
-  return workflow.compile()
+    .addConditionalEdges('verify', s => {
+      if (s.verifyVerdict === 'PASS') return END
+      if (s.critiqueAttempts >= 2) return END
+      return 'system-prompt'
+    })
+    .compile()
 }

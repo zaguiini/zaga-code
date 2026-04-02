@@ -1,9 +1,9 @@
 // apps/api/src/nodes/verify.ts
 import { HumanMessage } from '@langchain/core/messages'
-import type { CompiledStateGraph } from '@langchain/langgraph'
+import type { Runnable } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
-export function createVerifyNode(verifyGraph: CompiledStateGraph) {
+export function createVerifyNode(verifyGraph: Runnable) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
     // Only verify if something was actually implemented
     const hasEdits = state.messages.some(

@@ -34,7 +34,7 @@ export function createVerifyGraph(
   codingModel: BaseChatModel,
   verifyTools: Array<StructuredToolInterface>
 ) {
-  const modelWithTools = codingModel.bindTools(verifyTools)
+  const modelWithTools = codingModel.bindTools!(verifyTools)
   const toolNode = new ToolNode(verifyTools)
 
   async function verifyExecutor(state: typeof MessagesAnnotation.State) {
