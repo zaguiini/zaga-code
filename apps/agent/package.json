@@ -1,8 +1,13 @@
 {
-  "name": "api",
+  "name": "@zaga/agent",
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "exports": {
+    "./setup": "./src/setup.ts",
+    "./graphs/agent": "./src/graphs/agent.ts",
+    "./env": "./src/env.ts"
+  },
   "scripts": {
     "docker:start": "docker compose up -d",
     "dev": "pnpx @langchain/langgraph-cli dev --no-browser",
