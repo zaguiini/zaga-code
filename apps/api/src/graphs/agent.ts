@@ -6,6 +6,8 @@ import { fileWriteTool } from '@/tools/file-write'
 import { shellTool } from '@/tools/shell'
 import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
+import { fileEditTool } from '@/tools/file-edit'
+import { grepTool } from '@/tools/grep'
 import { env } from '@/env'
 import { titleGeneratorNode } from '@/nodes/title-generator'
 import { createExecutorNode } from '@/nodes/executor'
@@ -51,7 +53,14 @@ export type AgentState = typeof agentStateSchema.State
 export async function createAgent() {
   const readOnlyTools = [fileSearchTool, fileReadTool]
 
-  const tools = [...readOnlyTools, fileWriteTool, shellTool, ...(await client.getTools())]
+  const tools = [
+    ...readOnlyTools,
+    grepTool,
+    fileEditTool,
+    fileWriteTool,
+    shellTool,
+    ...(await client.getTools()),
+  ]
 
   const codingModel = new ChatOpenAIWithReasoning({
     model: env.CODING_MODEL,

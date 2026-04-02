@@ -17,9 +17,9 @@ What's missing:
 - No exploration phase before acting (agent guesses at file structure)
 - No planning phase (dives straight into implementation)
 - No verification (reports done without checking)
-- `file-write` overwrites entire files (token-heavy, error-prone on large files)
-- No content search tool (relies on shell grep, no structured results)
-- `shell` runs any command with no confirmation
+- ~~`file-write` overwrites entire files~~ → `file-edit` tool added
+- ~~No content search tool~~ → `grep` tool added
+- ~~`shell` runs any command with no confirmation~~ → shell-safety checks added
 - No context window management (long sessions silently degrade)
 - Web interface adds latency, complexity, and a separate server process
 
@@ -77,14 +77,14 @@ Two models running simultaneously:
 
 ## Document Index — Execution Order
 
-Execute in order: **01 → 02 → 03 → 04 → 05 → 06**. Doc 01 is first because it's purely additive — you can test the new tools through the existing web UI before doc 02 changes the env config and breaks it.
+Execute in order: **02 → 03 → 04 → 05 → 06**. Doc 01 (Core Tools) is done.
 
 | Order | Document                                                | Contents                                                    | Est. Time    | Depends On |
 | ----- | ------------------------------------------------------- | ----------------------------------------------------------- | ------------ | ---------- |
-| 1     | [01 — Core Tools](./01-core-tools.md)                   | file-edit, grep, shell-safety utility                       | 2–3h         | —          |
+| ~~1~~ | ~~01 — Core Tools~~                                     | ~~file-edit, grep, shell-safety utility~~                   | ~~2–3h~~     | **DONE**   |
 | 2     | [02 — LLM Setup](./02-llm-setup.md)                     | Env config, setup.ts two-model download, model instances    | 1–2h         | —          |
 | 3     | [03 — Context Management](./03-context-management.md)   | Token counting utils, summarize util, maybe-compact node    | 2h           | 02         |
-| 4     | [04 — Graph Architecture](./04-graph-architecture.md)   | State schema, should-plan, explore/plan/verify, full wiring | 4–5h         | 01, 02, 03 |
+| 4     | [04 — Graph Architecture](./04-graph-architecture.md)   | State schema, should-plan, explore/plan/verify, full wiring | 4–5h         | 02, 03     |
 | 5     | [05 — Terminal Refactor](./05-terminal-refactor.md)     | Drop web layer, CLI, REPL, streaming, /compact command      | 3–4h         | 03, 04     |
 | 6     | [06 — Enter Planning Mode](./06-enter-planning-mode.md) | Future: model-driven planning trigger, migration from gate  | post-weekend | all        |
 
@@ -92,7 +92,6 @@ Execute in order: **01 → 02 → 03 → 04 → 05 → 06**. Doc 01 is first bec
 
 ### Scoping notes (what each doc should NOT do)
 
-- **Doc 01**: Create model instances and export them. Do NOT wire them to nodes — that happens in 04.
 - **Doc 02**: Create tool files and the shell-safety utility. Register tools in the existing flat array. Do NOT split into `readOnlyTools` / `allTools` — that happens in 04.
 - **Doc 03**: Create utility functions and the `maybe-compact` node function. Do NOT wire it into the graph — that happens in 04.
 - **Doc 04**: This is the integration point. Wire all models (01), tools (02), and nodes (03) into the full graph. Remove `title-generator` here. Add the `command` node that handles `/compact`, `/help`, etc. inside the graph. `createAgent()` returns just the compiled graph — all models stay internal.
