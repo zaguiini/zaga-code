@@ -52,9 +52,16 @@ export function App({ agent, session, projectPath, initialPrompt }: AppProps) {
   return (
     <Box flexDirection="column">
       <MessageHistory history={state.history} />
-      <ActiveResponse activeResponse={state.activeResponse} />
-      <StatusBar projectPath={projectPath} tokenCount={state.tokenCount} />
+      <ActiveResponse
+        activeResponse={state.activeResponse}
+        userMessage={state.currentUserMessage}
+      />
       <InputPrompt isStreaming={isStreaming} onSubmit={handleSubmit} />
+      <StatusBar
+        projectPath={projectPath}
+        tokenCount={state.tokenCount}
+        maxTokens={state.maxTokens}
+      />
     </Box>
   )
 }

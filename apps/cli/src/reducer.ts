@@ -21,6 +21,7 @@ export type AppState = {
   } | null
   currentUserMessage: string | null
   tokenCount: number
+  maxTokens: number
 }
 
 export type AppAction =
@@ -30,7 +31,7 @@ export type AppAction =
   | { type: 'tool_end'; toolCallId: string; output: string }
   | { type: 'stream_end' }
   | { type: 'stream_error'; error: string }
-  | { type: 'update_tokens'; count: number }
+  | { type: 'update_tokens'; count: number; maxTokens: number }
 
 export const initialState: AppState = {
   status: 'idle',
@@ -38,6 +39,7 @@ export const initialState: AppState = {
   activeResponse: null,
   currentUserMessage: null,
   tokenCount: 0,
+  maxTokens: 0,
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -129,6 +131,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'update_tokens':
-      return { ...state, tokenCount: action.count }
+      return { ...state, tokenCount: action.count, maxTokens: action.maxTokens }
   }
 }

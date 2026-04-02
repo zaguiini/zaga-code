@@ -1,14 +1,18 @@
 import { AIMessage } from '@langchain/core/messages'
 import type { Runnable } from '@langchain/core/runnables'
-import type { BaseMessage, Runtime } from 'langchain'
+import type { BaseMessage } from 'langchain'
+import type { LangGraphRunnableConfig } from '@langchain/langgraph'
 import type { AgentState } from '@/graphs/agent'
-import { createCallbackHandler, getLangfuse } from '@/utils/langfuse'
+import { getLangfuse } from '@/utils/langfuse'
 
 export function createExecutorNode(
   modelWithTools: Runnable<Array<BaseMessage>>,
   modelName?: string
 ) {
-  return async (state: AgentState, runtime: Runtime): Promise<Partial<AgentState>> => {
+  return async (
+    state: AgentState,
+    config: LangGraphRunnableConfig
+  ): Promise<Partial<AgentState>> => {
     const conversationMessages = state.messages.filter(
       msg => !msg.additional_kwargs.progress_update
     )
@@ -25,12 +29,8 @@ export function createExecutorNode(
         : msg
     )
 
-    const threadId = runtime.configurable?.thread_id
-    const handler = createCallbackHandler(threadId)
-
-    const response = await modelWithTools.invoke(messages, {
-      ...(handler && { callbacks: [handler] }),
-    })
+    // Pass parent config through so streamEvents callbacks are preserved
+    const response = await modelWithTools.invoke(messages, config)
 
     const reasoning =
       typeof response.additional_kwargs?.reasoning_content === 'string'
@@ -38,8 +38,9 @@ export function createExecutorNode(
         : undefined
 
     const langfuse = getLangfuse()
-    if (langfuse && handler?.traceId && (modelName || reasoning)) {
-      langfuse.trace({ id: handler.traceId }).update({
+    const threadId = config.configurable?.thread_id
+    if (langfuse && threadId) {
+      langfuse.trace({ id: threadId }).update({
         metadata: {
           ...(modelName && { model: modelName }),
           ...(reasoning && { reasoning }),

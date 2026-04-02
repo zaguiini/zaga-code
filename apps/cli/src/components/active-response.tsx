@@ -3,13 +3,25 @@ import Spinner from 'ink-spinner'
 import { ToolCallLine } from './tool-call'
 import type { AppState } from '@/reducer'
 
-export function ActiveResponse({ activeResponse }: { activeResponse: AppState['activeResponse'] }) {
+type ActiveResponseProps = {
+  activeResponse: AppState['activeResponse']
+  userMessage: string | null
+}
+
+export function ActiveResponse({ activeResponse, userMessage }: ActiveResponseProps) {
   if (!activeResponse) return null
 
   const hasContent = activeResponse.text.length > 0 || activeResponse.tools.length > 0
 
   return (
     <Box flexDirection="column">
+      {userMessage && (
+        <Box marginBottom={1}>
+          <Text bold color="blue">
+            {'>'} {userMessage}
+          </Text>
+        </Box>
+      )}
       {!hasContent && (
         <Box>
           <Text color="green">

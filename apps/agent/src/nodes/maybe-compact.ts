@@ -3,15 +3,13 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { AgentState } from '@/graphs/agent'
 import { contextFillRatio } from '@/utils/token-budget'
 import { summarizeMessages } from '@/utils/summarize'
-import { env } from '@/env'
 
 const COMPACT_THRESHOLD = 0.85
 const KEEP_RECENT = 10
 
 export function createMaybeCompactNode(fastModel: BaseChatModel) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
-    const maxTokens = Number(env.CODING_MODEL_MAX_TOKENS)
-    const ratio = contextFillRatio(state.messages, maxTokens)
+    const ratio = contextFillRatio(state.messages, state.maxTokens)
 
     if (ratio < COMPACT_THRESHOLD && !state.forceCompact) return {}
 

@@ -61,6 +61,10 @@ export const agentStateSchema = Annotation.Root({
     reducer: (_, next) => next,
     default: () => null,
   }),
+  maxTokens: Annotation<number>({
+    reducer: (_, next) => next,
+    default: () => 0,
+  }),
 })
 
 export type AgentState = typeof agentStateSchema.State
@@ -85,7 +89,7 @@ export function createModels() {
   return { codingModel, fastModel }
 }
 
-export async function buildAgentGraph() {
+export async function buildAgentGraph(maxTokens: number) {
   const { codingModel, fastModel } = createModels()
 
   const readOnlyTools = [fileSearchTool, fileReadTool, grepTool]
@@ -105,7 +109,7 @@ export async function buildAgentGraph() {
   const toolNode = new ToolNode(allTools, { handleToolErrors: true })
 
   return new StateGraph(agentStateSchema)
-    .addNode('command', createCommandNode())
+    .addNode('command', createCommandNode(maxTokens))
     .addNode('maybe-compact', createMaybeCompactNode(fastModel))
     .addNode('should-plan', createShouldPlanNode(fastModel))
     .addNode('explore', createExploreNode(exploreGraph))
@@ -139,7 +143,7 @@ export async function buildAgentGraph() {
 }
 
 /** Convenience: builds and compiles with no checkpointer (for LangGraph API server compat) */
-export async function createAgent() {
-  const graph = await buildAgentGraph()
+export async function createAgent(maxTokens = 0) {
+  const graph = await buildAgentGraph(maxTokens)
   return graph.compile()
 }

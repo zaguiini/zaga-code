@@ -1,7 +1,8 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { RemoveMessage, SystemMessage } from '@langchain/core/messages'
 import type { BaseMessage, Runtime } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
-import { fileReadTool } from '@/tools/file-read'
 
 const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
 
@@ -68,10 +69,7 @@ async function buildSystemPrompt(
 ): Promise<BaseMessage> {
   if (isAgentContext(runtime.context)) {
     try {
-      const agentsMd = await fileReadTool.invoke(
-        { path: 'AGENTS.md' },
-        { context: { project_path: runtime.context.project_path } }
-      )
+      const agentsMd = await readFile(join(runtime.context.project_path, 'AGENTS.md'), 'utf-8')
       const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
       return new SystemMessage(buildSystemPromptContent(base, plan, critiqueFeedback))
     } catch {

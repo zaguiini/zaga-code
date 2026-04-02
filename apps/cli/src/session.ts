@@ -1,6 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+/** Append-only agent stream log for debugging (next to `.zaga/session`). */
+export function zagaEventsLogPath(projectPath: string): string {
+  return join(projectPath, '.zaga', 'events.ndjson')
+}
+
 export type Session = {
   threadId: string
   setThreadId: (id: string) => Promise<void>
