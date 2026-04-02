@@ -11,7 +11,7 @@
   "scripts": {
     "docker:start": "docker compose up -d",
     "dev": "pnpx @langchain/langgraph-cli dev --no-browser",
-    "setup-environment": "tsx --env-file .env src/setup.ts",
+    "setup-environment": "tsx --env-file .env -e \"import('./src/setup.ts').then(m => m.setup())\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

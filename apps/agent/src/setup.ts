@@ -49,7 +49,7 @@ async function setupLmStudioModels() {
   }
 }
 
-const setup = async () => {
+export async function setup() {
   try {
     await setupLmStudioModels()
     console.log('✓ Setup complete!')
@@ -58,5 +58,3 @@ const setup = async () => {
     process.exit(1)
   }
 }
-
-setup()
