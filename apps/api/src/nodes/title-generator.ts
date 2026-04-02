@@ -22,7 +22,7 @@ export function titleGeneratorNode(state: AgentState, config: RunnableConfig): P
   // Run title generation in the background without blocking the graph
   // Using an unawaited promise with error handling is cleaner than setTimeout
   const langGraphClient = new Client({
-    apiUrl: env.LANGGRAPH_API_URL,
+    apiUrl: env.MODEL_API_BASE_URL,
   })
 
   generateAndUpdateThreadTitle(

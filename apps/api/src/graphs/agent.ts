@@ -50,6 +50,34 @@ export const agentStateSchema = Annotation.Root({
 
 export type AgentState = typeof agentStateSchema.State
 
+export function createModels() {
+  const codingModel = new ChatOpenAIWithReasoning({
+    model: env.CODING_MODEL,
+    configuration: { baseURL: env.MODEL_API_BASE_URL },
+    apiKey: 'local',
+    temperature: 0.3,
+    streaming: true,
+  })
+
+  const fastModel = new ChatOpenAIWithReasoning({
+    model: env.FAST_MODEL,
+    configuration: { baseURL: env.MODEL_API_BASE_URL },
+    apiKey: 'local',
+    temperature: 0.1,
+    streaming: false,
+  })
+
+  const planModel = new ChatOpenAIWithReasoning({
+    model: env.FAST_MODEL,
+    configuration: { baseURL: env.MODEL_API_BASE_URL },
+    apiKey: 'local',
+    temperature: 0.1,
+    streaming: false,
+  })
+
+  return { codingModel, fastModel, planModel }
+}
+
 export async function createAgent() {
   const readOnlyTools = [fileSearchTool, fileReadTool]
 
@@ -62,13 +90,7 @@ export async function createAgent() {
     ...(await client.getTools()),
   ]
 
-  const codingModel = new ChatOpenAIWithReasoning({
-    model: env.CODING_MODEL,
-    configuration: { baseURL: env.LM_STUDIO_API_URL },
-    apiKey: 'lm-studio',
-    temperature: 0.3,
-    streaming: true,
-  })
+  const { codingModel } = createModels()
 
   const codingModelWithTools = codingModel.bindTools(tools)
 

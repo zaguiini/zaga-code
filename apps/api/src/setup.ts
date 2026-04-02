@@ -16,8 +16,8 @@ async function setupLmStudioModels() {
   console.log('Setting up LM Studio models...\n')
 
   const models = [
-    { name: env.CODING_MODEL, purpose: 'executor (code generation)' },
-    { name: env.SUMMARIZATION_MODEL, purpose: 'thread title generation' },
+    { name: env.CODING_MODEL, purpose: 'executor + verify (code generation)' },
+    { name: env.FAST_MODEL, purpose: 'explore + plan' },
   ]
 
   for (const { name, purpose } of models) {
@@ -43,7 +43,7 @@ async function setupLmStudioModels() {
   console.log('\nStarting LM Studio server...')
   try {
     await runLms(['server', 'start'])
-    console.log(`✓ LM Studio server started at ${env.LM_STUDIO_API_URL}\n`)
+    console.log(`✓ LM Studio server started at ${env.MODEL_API_BASE_URL}\n`)
   } catch {
     console.log('⚠ Server may already be running\n')
   }
