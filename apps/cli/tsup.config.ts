@@ -1,3 +1,4 @@
+import { builtinModules } from 'node:module'
 import { resolve } from 'node:path'
 import { defineConfig } from 'tsup'
 import type { Plugin } from 'esbuild'
@@ -24,6 +25,9 @@ const resolveAgentAliases: Plugin = {
   },
 }
 
+// Both bare ('assert') and prefixed ('node:assert') forms
+const nodeBuiltins = builtinModules.flatMap(m => [m, `node:${m}`])
+
 export default defineConfig({
   entry: ['src/index.tsx'],
   format: 'esm',
@@ -33,13 +37,31 @@ export default defineConfig({
   clean: true,
   // Bundle everything including npm deps.
   noExternal: [/.*/],
-  esbuildPlugins: [resolveAgentAliases],
+  esbuildPlugins: [
+    resolveAgentAliases,
+    {
+      name: 'stub-optional-deps',
+      setup(build) {
+        build.onResolve({ filter: /^react-devtools-core$/ }, () => ({
+          path: 'react-devtools-core',
+          namespace: 'stub',
+        }))
+        build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
+          contents: 'export default undefined',
+        }))
+      },
+    },
+  ],
   esbuildOptions(options) {
-    // Native addons and optional deps that can't be bundled.
-    // Set at esbuild level so resolution is skipped entirely.
-    options.external = [...(options.external ?? []), 'better-sqlite3', 'react-devtools-core']
+    // Node builtins and native addons must stay external.
+    options.external = [...(options.external ?? []), ...nodeBuiltins, 'better-sqlite3']
   },
+  splitting: false,
   banner: {
-    js: '#!/usr/bin/env node',
+    js: [
+      '#!/usr/bin/env node',
+      'import { createRequire as __createRequire } from "node:module";',
+      'const require = __createRequire(import.meta.url);',
+    ].join('\n'),
   },
 })
