@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
 import { MessageList } from '@/components/ui/message-list'
@@ -155,6 +155,28 @@ function RouteComponent() {
     [stream.messages]
   )
 
+  const handleInterrupt = useCallback(() => {
+    if (!stream.isLoading) return
+
+    stream.stop()
+
+    const runId = window.sessionStorage.getItem(`resume:${threadId}`)
+    if (runId) {
+      stream.client.runs.cancel(threadId, runId)
+    }
+  }, [stream, threadId])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleInterrupt()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleInterrupt])
+
   const [input, setInput] = useState('')
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -225,14 +247,23 @@ function RouteComponent() {
           value={input}
           onChange={e => setInput(e.target.value)}
         />
-        {maxTokens != null && maxTokens > 0 && (
-          <div className="flex items-center justify-end gap-2 px-2 pt-1 text-xs text-muted-foreground">
-            <span>
-              ~{estimatedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
-            </span>
-            <span>({contextPercent}%)</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          {stream.isLoading && (
+            <p className="text-xs text-muted-foreground text-center">
+              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Esc</kbd>{' '}
+              to interrupt
+            </p>
+          )}
+
+          {maxTokens != null && maxTokens > 0 && (
+            <div className="ml-auto flex items-center justify-end gap-2 text-xs text-muted-foreground">
+              <span>
+                ~{estimatedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
+              </span>
+              <span>({contextPercent}%)</span>
+            </div>
+          )}
+        </div>
       </form>
     </div>
   )
