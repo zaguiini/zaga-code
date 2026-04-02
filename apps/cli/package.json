@@ -7,7 +7,7 @@
     "zaga": "./dist/index.js"
   },
   "scripts": {
-    "dev": "tsx src/index.tsx",
+    "dev": "DEBUG=true tsx src/index.tsx",
     "build": "tsup",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

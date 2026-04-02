@@ -28,10 +28,40 @@ function extractChunkText(chunk: any): string | null {
   return null
 }
 
+/** Shapes assistant model output for NDJSON (avoids dumping huge opaque objects). */
+function assistantMessageForLog(output: unknown): Record<string, unknown> {
+  if (output == null) {
+    return {}
+  }
+  if (typeof output !== 'object') {
+    return { value: String(output) }
+  }
+  const o = output as Record<string, any>
+  let content: string
+  if (typeof o.content === 'string') {
+    content = o.content
+  } else if (Array.isArray(o.content)) {
+    const texts = o.content
+      .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+      .map((b: any) => b.text)
+    content = texts.length > 0 ? texts.join('') : JSON.stringify(o.content)
+  } else {
+    content = JSON.stringify(o.content ?? '')
+  }
+  const toolCalls = o.tool_calls
+  const row: Record<string, unknown> = { content }
+  if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+    row.tool_calls = toolCalls
+  }
+  return row
+}
+
+type EventsLogType = 'stream_start' | 'stream_end' | 'tool_start' | 'tool_end' | 'llm_end'
+
 async function logEvent(
   eventsLogPath: string,
   threadId: string,
-  type: 'stream_start' | 'stream_end',
+  type: EventsLogType,
   data?: Record<string, unknown>
 ): Promise<void> {
   const payload = { ts: new Date().toISOString(), threadId, type, ...data }
@@ -101,24 +131,44 @@ export function useAgent({ agent, threadId, projectPath }: UseAgentOptions) {
             if (chunkText) {
               dispatch({ type: 'text_chunk', chunk: chunkText })
             }
+          } else if (event.event === 'on_chat_model_end') {
+            const node = event.metadata.langgraph_node
+            if (node && silentNodes.has(node)) continue
+            const output = event.data.output
+            await logEvent(eventsLogPath, threadId, 'llm_end', {
+              runId: event.run_id,
+              node: node ?? null,
+              message: assistantMessageForLog(output),
+            })
           } else if (event.event === 'on_tool_start') {
+            const toolInput =
+              typeof event.data.input === 'string'
+                ? event.data.input
+                : JSON.stringify(event.data.input ?? {})
             dispatch({
               type: 'tool_start',
               toolCallId: event.run_id,
               name: event.name,
-              input:
-                typeof event.data.input === 'string'
-                  ? event.data.input
-                  : JSON.stringify(event.data.input ?? {}),
+              input: toolInput,
+            })
+            await logEvent(eventsLogPath, threadId, 'tool_start', {
+              runId: event.run_id,
+              name: event.name,
+              input: toolInput,
             })
           } else if (event.event === 'on_tool_end') {
+            const toolOutput =
+              typeof event.data.output === 'string'
+                ? event.data.output
+                : JSON.stringify(event.data.output ?? {})
             dispatch({
               type: 'tool_end',
               toolCallId: event.run_id,
-              output:
-                typeof event.data.output === 'string'
-                  ? event.data.output
-                  : JSON.stringify(event.data.output ?? {}),
+              output: toolOutput,
+            })
+            await logEvent(eventsLogPath, threadId, 'tool_end', {
+              runId: event.run_id,
+              output: toolOutput,
             })
           }
         }

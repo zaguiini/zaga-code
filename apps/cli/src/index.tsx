@@ -28,6 +28,9 @@ async function main() {
 
   // Create in-memory session, optionally resuming from a previous one
   const session = createSession()
+  if (process.env.DEBUG) {
+    console.log('DEBUG mode', session.threadId)
+  }
   const resumeIdx = process.argv.indexOf('--resume')
   if (resumeIdx !== -1 && process.argv[resumeIdx + 1]) {
     session.setThreadId(process.argv[resumeIdx + 1])
