@@ -109,7 +109,7 @@ export async function buildAgentGraph() {
     .addNode('maybe-compact', createMaybeCompactNode(fastModel))
     .addNode('should-plan', createShouldPlanNode(fastModel))
     .addNode('explore', createExploreNode(exploreGraph))
-    .addNode('plan', createPlanNode(fastModel))
+    .addNode('make-plan', createPlanNode(fastModel))
     .addNode('system-prompt', systemPromptNode)
     .addNode('executor', executorNode)
     .addNode('tools', toolNode)
@@ -123,8 +123,8 @@ export async function buildAgentGraph() {
     })
     .addConditionalEdges('maybe-compact', s => (s.commandHandled ? END : 'should-plan'))
     .addConditionalEdges('should-plan', s => (s.shouldPlan ? 'explore' : 'system-prompt'))
-    .addEdge('explore', 'plan')
-    .addEdge('plan', 'system-prompt')
+    .addEdge('explore', 'make-plan')
+    .addEdge('make-plan', 'system-prompt')
     .addEdge('system-prompt', 'executor')
     .addConditionalEdges('executor', toolsCondition, {
       tools: 'tools',

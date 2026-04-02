@@ -1,15 +1,34 @@
 import { spawn } from 'node:child_process'
 import { env } from '@/env'
 
-function runLms(args: Array<string>): Promise<void> {
+function runLms(args: Array<string>, { silent = false } = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn('lms', args, { stdio: 'inherit' })
+    const child = spawn('lms', args, {
+      stdio: ['inherit', silent ? 'pipe' : 'inherit', 'inherit'],
+    })
+    let stdout = ''
+    if (silent && child.stdout) {
+      child.stdout.on('data', (data: Buffer) => {
+        stdout += data
+      })
+    }
     child.on('close', code => {
-      if (code === 0) resolve()
+      if (code === 0) resolve(stdout)
       else reject(new Error(`lms ${args.join(' ')} exited with code ${code}`))
     })
     child.on('error', reject)
   })
+}
+
+async function getLmsModelKeys(command: 'ls' | 'ps'): Promise<Set<string>> {
+  try {
+    const output = await runLms([command, '--json'], { silent: true })
+    const parsed = JSON.parse(output)
+    const models = Array.isArray(parsed) ? parsed : []
+    return new Set(models.map((m: { modelKey?: string }) => m.modelKey ?? ''))
+  } catch {
+    return new Set()
+  }
 }
 
 async function setupLmStudioModels() {
@@ -20,7 +39,13 @@ async function setupLmStudioModels() {
     { name: env.FAST_MODEL, purpose: 'explore + plan' },
   ]
 
+  const localModels = await getLmsModelKeys('ls')
+
   for (const { name, purpose } of models) {
+    if (localModels.has(name)) {
+      console.log(`✓ ${name} (${purpose}) already downloaded`)
+      continue
+    }
     console.log(`Downloading ${name} (${purpose})...`)
     try {
       await runLms(['get', name])
@@ -30,8 +55,14 @@ async function setupLmStudioModels() {
     }
   }
 
+  const loadedModels = await getLmsModelKeys('ps')
+
   console.log('Loading models...')
   for (const { name } of models) {
+    if (loadedModels.has(name)) {
+      console.log(`✓ ${name} already loaded`)
+      continue
+    }
     try {
       await runLms(['load', name])
       console.log(`✓ Loaded ${name}`)
