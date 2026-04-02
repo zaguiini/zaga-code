@@ -1,10 +1,10 @@
-// apps/api/src/nodes/verify.ts
+import { dispatchCustomEvent } from '@langchain/core/callbacks/dispatch'
 import { HumanMessage } from '@langchain/core/messages'
-import type { Runnable } from '@langchain/core/runnables'
+import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
 export function createVerifyNode(verifyGraph: Runnable) {
-  return async (state: AgentState): Promise<Partial<AgentState>> => {
+  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
 
     // Only check for edits after the last user message (not full history)
@@ -14,12 +14,14 @@ export function createVerifyNode(verifyGraph: Runnable) {
     const hasEdits = currentTurnMessages.some(
       m => m.type === 'tool' && ['file_edit', 'file_write', 'shell'].includes(m.name ?? '')
     )
+
     if (!hasEdits) return { verifyVerdict: 'PASS' }
+
+    await dispatchCustomEvent('phase_start', { phase: 'verify' }, config)
+
     const prompt = `Verify the implementation. Original task: ${String(lastUserMessage?.content ?? 'unknown')}`
 
-    const result = await verifyGraph.invoke({
-      messages: [new HumanMessage(prompt)],
-    })
+    const result = await verifyGraph.invoke({ messages: [new HumanMessage(prompt)] }, config)
 
     const lastMessage = [...result.messages]
       .reverse()
@@ -28,6 +30,8 @@ export function createVerifyNode(verifyGraph: Runnable) {
 
     const verdictMatch = output.match(/VERDICT:\s*(PASS|FAIL|PARTIAL)/)
     const verdict = (verdictMatch?.[1] ?? 'PARTIAL') as 'PASS' | 'FAIL' | 'PARTIAL'
+
+    await dispatchCustomEvent('phase_end', { phase: 'verify' }, config)
 
     return {
       verifyVerdict: verdict,
