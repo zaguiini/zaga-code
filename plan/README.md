@@ -21,7 +21,7 @@ What's missing:
 - ~~No content search tool~~ → `grep` tool added
 - ~~`shell` runs any command with no confirmation~~ → shell-safety checks added
 - ~~No context window management~~ → maybe-compact node with auto-summarization added
-- Web interface adds latency, complexity, and a separate server process
+- ~~Web interface adds latency, complexity, and a separate server process~~ → terminal CLI replaces web UI
 
 ## Target State
 
@@ -77,7 +77,7 @@ Two models running simultaneously:
 
 ## Document Index — Execution Order
 
-Execute in order: **05 → 06**. Docs 01–04 are done.
+Execute: **06**. Docs 01–05 are done.
 
 | Order | Document                                                | Contents                                                        | Est. Time    | Depends On |
 | ----- | ------------------------------------------------------- | --------------------------------------------------------------- | ------------ | ---------- |
@@ -85,27 +85,14 @@ Execute in order: **05 → 06**. Docs 01–04 are done.
 | ~~2~~ | ~~02 — LLM Setup~~                                      | ~~Env config, setup.ts two-model download, model instances~~    | ~~1–2h~~     | **DONE**   |
 | ~~3~~ | ~~03 — Context Management~~                             | ~~Token counting utils, summarize util, maybe-compact node~~    | ~~2h~~       | **DONE**   |
 | ~~4~~ | ~~04 — Graph Architecture~~                             | ~~State schema, should-plan, explore/plan/verify, full wiring~~ | ~~4–5h~~     | **DONE**   |
-| 5     | [05 — Terminal Refactor](./05-terminal-refactor.md)     | Drop web layer, CLI, REPL, streaming, /compact command          | 3–4h         | 03, 04     |
+| ~~5~~ | ~~05 — Terminal Refactor~~                              | ~~Drop web layer, CLI, REPL, streaming, /compact command~~      | ~~3–4h~~     | **DONE**   |
 | 6     | [06 — Enter Planning Mode](./06-enter-planning-mode.md) | Future: model-driven planning trigger, migration from gate      | post-weekend | all        |
 
 **Total: ~12–14h** — a full weekend with buffer.
 
 ### Scoping notes (what each doc should NOT do)
 
-- **Doc 05**: Drop the web layer, create the CLI app, rename `apps/api/` → `apps/agent/`. No `commands/` directory — the REPL sends everything into the graph. Only `/exit` is handled locally (kills the process).
-
-## Suggested Weekend Schedule
-
-### Saturday
-
-- Morning: Core tools (02) + LLM setup (01)
-- Afternoon: Context management (03) + graph architecture (04)
-
-### Sunday
-
-- Morning: Terminal refactor (05) — drop web, CLI with readline
-- Afternoon: End-to-end testing on a real task
-- Evening: Update AGENTS.md, cleanup
+(All scoping notes for docs 01–05 completed.)
 
 ## Constraints
 
