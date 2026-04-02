@@ -22,13 +22,21 @@ const client = new MultiServerMCPClient({
 
 export const agentStateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
-  complexity: Annotation<'simple' | 'medium' | 'complex'>({
+  commandHandled: Annotation<boolean>({
     reducer: (_, next) => next,
-    default: () => 'medium' as const,
+    default: () => false,
   }),
-  planningDepth: Annotation<'brief' | 'detailed' | 'decomposed'>({
+  forceCompact: Annotation<boolean>({
     reducer: (_, next) => next,
-    default: () => 'detailed' as const,
+    default: () => false,
+  }),
+  shouldPlan: Annotation<boolean>({
+    reducer: (_, next) => next,
+    default: () => false,
+  }),
+  exploreSummary: Annotation<string | null>({
+    reducer: (_, next) => next,
+    default: () => null,
   }),
   plan: Annotation<string | null>({
     reducer: (_, next) => next,
@@ -42,13 +50,9 @@ export const agentStateSchema = Annotation.Root({
     reducer: (_, next) => next,
     default: () => null,
   }),
-  critique: Annotation<string | null>({
+  verifyVerdict: Annotation<'PASS' | 'FAIL' | 'PARTIAL' | null>({
     reducer: (_, next) => next,
     default: () => null,
-  }),
-  forceCompact: Annotation<boolean>({
-    reducer: (_, next) => next,
-    default: () => false,
   }),
 })
 
