@@ -27,14 +27,18 @@ const resolveAgentAliases: Plugin = {
 export default defineConfig({
   entry: ['src/index.tsx'],
   format: 'esm',
+  platform: 'node',
   target: 'node22',
   outDir: 'dist',
   clean: true,
-  // Only inline the agent workspace package; everything else stays external
-  // and is resolved from node_modules at runtime (avoids CJS-in-ESM issues).
-  noExternal: ['@zaga/agent'],
-  external: [/^(?!@zaga\/agent|@\/|\.)/],
+  // Bundle everything including npm deps.
+  noExternal: [/.*/],
   esbuildPlugins: [resolveAgentAliases],
+  esbuildOptions(options) {
+    // Native addons and optional deps that can't be bundled.
+    // Set at esbuild level so resolution is skipped entirely.
+    options.external = [...(options.external ?? []), 'better-sqlite3', 'react-devtools-core']
+  },
   banner: {
     js: '#!/usr/bin/env node',
   },

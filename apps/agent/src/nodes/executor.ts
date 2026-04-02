@@ -2,7 +2,7 @@ import { AIMessage } from '@langchain/core/messages'
 import type { Runnable } from '@langchain/core/runnables'
 import type { BaseMessage, Runtime } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
-import { createCallbackHandler, langfuse } from '@/utils/langfuse'
+import { createCallbackHandler, getLangfuse } from '@/utils/langfuse'
 
 export function createExecutorNode(
   modelWithTools: Runnable<Array<BaseMessage>>,
@@ -37,6 +37,7 @@ export function createExecutorNode(
         ? response.additional_kwargs.reasoning_content
         : undefined
 
+    const langfuse = getLangfuse()
     if (langfuse && handler?.traceId && (modelName || reasoning)) {
       langfuse.trace({ id: handler.traceId }).update({
         metadata: {
