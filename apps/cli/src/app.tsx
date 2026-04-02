@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { Box, useApp } from 'ink'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { Session } from '@/session'

@@ -1,6 +1,5 @@
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
-import React from 'react'
 import { render } from 'ink'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
 import { setup } from '@zaga/agent/setup'

@@ -2,7 +2,6 @@ import { useCallback, useReducer, useRef } from 'react'
 import { HumanMessage } from '@langchain/core/messages'
 import { estimateMessagesTokens } from '@zaga/agent/utils/token-budget'
 import type { CompiledStateGraph } from '@langchain/langgraph'
-import type { AppAction, AppState } from '@/reducer'
 import { appReducer, initialState } from '@/reducer'
 
 type UseAgentOptions = {

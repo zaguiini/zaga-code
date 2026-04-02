@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsx src/index.tsx",
-    "build": "tsc",
+    "build": "tsup",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run"
@@ -32,6 +32,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "ink-testing-library": "^4.0.0",
     "prettier": "^3.8.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "vitest": "^3.2.4"

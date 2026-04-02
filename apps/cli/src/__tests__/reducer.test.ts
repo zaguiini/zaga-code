@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { appReducer, initialState } from '../reducer'
-import type { AppAction } from '../reducer'
 
 describe('appReducer', () => {
   it('starts streaming on send', () => {

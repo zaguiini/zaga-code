@@ -1,4 +1,3 @@
-import React from 'react'
 import { Box, Static, Text } from 'ink'
 import { ToolCallLine } from './tool-call'
 import type { CompletedTurn } from '@/reducer'
