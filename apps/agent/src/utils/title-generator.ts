@@ -8,11 +8,10 @@ import { env } from '@/env'
  */
 export async function generateThreadTitle(messageContent: string): Promise<string> {
   try {
-    // Use the same model as the main agent for consistency
     const llm = new ChatOpenAI({
-      model: env.SUMMARIZATION_MODEL,
-      configuration: { baseURL: env.LM_STUDIO_API_URL },
-      apiKey: 'lm-studio',
+      model: env.FAST_MODEL,
+      configuration: { baseURL: env.MODEL_API_BASE_URL },
+      apiKey: 'local',
       temperature: 0.5,
     })
 
@@ -33,12 +32,10 @@ Title:`
     const rawTitle = response.content.toString().trim()
     const title = normalizeTitle(rawTitle)
 
-    // Validate and clean the title
     if (title && title.length > 0 && title.length < 100) {
       return title
     }
 
-    // Fallback to message preview
     return createFallbackTitle(messageContent)
   } catch (error) {
     console.error('Failed to generate thread title:', error)
@@ -46,9 +43,6 @@ Title:`
   }
 }
 
-/**
- * Creates a fallback title by truncating the message content.
- */
 function createFallbackTitle(messageContent: string): string {
   const maxLength = 50
   if (messageContent.length <= maxLength) {
@@ -79,9 +73,7 @@ function normalizeTitle(rawTitle: string): string {
 
   return title.trim()
 }
-/**
- * Updates the thread metadata with a generated title.
- */
+
 async function updateThreadTitle(client: Client, threadId: string, title: string): Promise<void> {
   try {
     await client.threads.update(threadId, {
@@ -93,10 +85,6 @@ async function updateThreadTitle(client: Client, threadId: string, title: string
   }
 }
 
-/**
- * Generates and updates a thread title in one operation.
- * This is the main function to call after the first message in a thread.
- */
 export async function generateAndUpdateThreadTitle(
   client: Client,
   threadId: string,

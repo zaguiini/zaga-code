@@ -33,7 +33,7 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
-  apps/api:
+  apps/agent:
     dependencies:
       '@langchain/classic':
         specifier: ^1.0.9

@@ -1,7 +1,8 @@
-import { SystemMessage } from '@langchain/core/messages'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { RemoveMessage, SystemMessage } from '@langchain/core/messages'
 import type { BaseMessage, Runtime } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
-import { fileReadTool } from '@/tools/file-read'
 
 const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
 
@@ -13,7 +14,10 @@ const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users w
 - If the user does not specify which language the project is written in, use the available tools to figure it out.
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
 - For searching files by NAME or PATH (e.g., "read auth.ts", "describe package.json", etc.), use the file_search tool to find the file.
-- For searching file CONTENTS, use the shell tool with grep or ripgrep.
+- For searching file CONTENTS, use the grep tool with a regex pattern. Use the glob parameter to limit to specific file types.
+- Prefer file_edit over file_write for modifying existing files.
+- Use file_write only for creating new files or complete rewrites.
+- When using file_edit, include 2-3 lines of surrounding context in old_string to ensure uniqueness.
 
 **External Libraries and Documentation:**
 - If the user's question or task involves an external library, package, or framework (e.g. "what are the X classes in tailwind", "how do I use Y in react", "show me Z from lodash"), your FIRST tool call MUST be to Context7 to fetch the documentation. Do NOT search the project files first. Do NOT use your training knowledge. Call Context7 immediately as the very first action.
@@ -65,10 +69,7 @@ async function buildSystemPrompt(
 ): Promise<BaseMessage> {
   if (isAgentContext(runtime.context)) {
     try {
-      const agentsMd = await fileReadTool.invoke(
-        { path: 'AGENTS.md' },
-        { context: { project_path: runtime.context.project_path } }
-      )
+      const agentsMd = await readFile(join(runtime.context.project_path, 'AGENTS.md'), 'utf-8')
       const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
       return new SystemMessage(buildSystemPromptContent(base, plan, critiqueFeedback))
     } catch {
@@ -83,11 +84,19 @@ export async function systemPromptNode(
   state: AgentState,
   runtime: Runtime
 ): Promise<Partial<AgentState>> {
-  const hasSystemMessage = state.messages.some(msg => msg.type === 'system')
-  if (hasSystemMessage) {
-    return {}
-  }
+  const existingSystem = state.messages.find(msg => msg.type === 'system')
+
+  // Skip rebuild if system message exists and we're not on a retry path
+  if (existingSystem && !state.critiqueFeedback) return {}
 
   const systemMessage = await buildSystemPrompt(runtime, state.plan, state.critiqueFeedback)
+
+  // MessagesAnnotation uses an additive reducer. To replace the system
+  // message, remove the old one first then add the new one.
+  if (existingSystem) {
+    return {
+      messages: [new RemoveMessage({ id: existingSystem.id! }), systemMessage],
+    }
+  }
   return { messages: [systemMessage] }
 }

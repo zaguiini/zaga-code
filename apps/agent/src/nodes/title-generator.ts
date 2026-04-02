@@ -19,8 +19,10 @@ export function titleGeneratorNode(state: AgentState, config: RunnableConfig): P
     return state
   }
 
-  // Run title generation in the background without blocking the graph
-  // Using an unawaited promise with error handling is cleaner than setTimeout
+  if (!env.LANGGRAPH_API_URL) {
+    return state
+  }
+
   const langGraphClient = new Client({
     apiUrl: env.LANGGRAPH_API_URL,
   })
@@ -32,7 +34,6 @@ export function titleGeneratorNode(state: AgentState, config: RunnableConfig): P
       ? firstMessage.content
       : firstMessage.content.map(content => content.text).join('')
   ).catch(error => {
-    // Silently handle errors since title generation is non-critical
     console.error('Background title generation failed:', error)
   })
 
