@@ -11,4 +11,14 @@ const envSchema = z.object({
   FAST_MODEL_MAX_TOKENS: z.coerce.number().default(128000),
 })
 
-export const env = envSchema.parse(process.env)
+type Env = z.infer<typeof envSchema>
+
+let cached: Env | null = null
+
+/** Lazily parsed on first access so .env files can be loaded before validation runs. */
+export const env: Env = new Proxy({} as Env, {
+  get(_, prop: string) {
+    if (!cached) cached = envSchema.parse(process.env)
+    return cached[prop as keyof Env]
+  },
+})

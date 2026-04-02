@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { render } from 'ink'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
@@ -9,6 +9,10 @@ import { App } from '@/app'
 
 async function main() {
   const projectPath = process.cwd()
+
+  // Load agent .env before anything accesses env vars
+  const agentDir = resolve(import.meta.dirname, '../../agent')
+  process.loadEnvFile(join(agentDir, '.env'))
 
   // Ensure .zaga directory exists for checkpointer DB
   const zagaDir = join(projectPath, '.zaga')
