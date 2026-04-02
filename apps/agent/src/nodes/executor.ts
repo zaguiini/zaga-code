@@ -28,14 +28,16 @@ export function createExecutorNode(
     const threadId = runtime.configurable?.thread_id
     const handler = createCallbackHandler(threadId)
 
-    const response = await modelWithTools.invoke(messages, { callbacks: [handler] })
+    const response = await modelWithTools.invoke(messages, {
+      ...(handler && { callbacks: [handler] }),
+    })
 
     const reasoning =
       typeof response.additional_kwargs?.reasoning_content === 'string'
         ? response.additional_kwargs.reasoning_content
         : undefined
 
-    if (handler.traceId && (modelName || reasoning)) {
+    if (langfuse && handler?.traceId && (modelName || reasoning)) {
       langfuse.trace({ id: handler.traceId }).update({
         metadata: {
           ...(modelName && { model: modelName }),
