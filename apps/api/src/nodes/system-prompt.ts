@@ -1,4 +1,4 @@
-import { SystemMessage } from '@langchain/core/messages'
+import { RemoveMessage, SystemMessage } from '@langchain/core/messages'
 import type { BaseMessage, Runtime } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
 import { fileReadTool } from '@/tools/file-read'
@@ -86,11 +86,19 @@ export async function systemPromptNode(
   state: AgentState,
   runtime: Runtime
 ): Promise<Partial<AgentState>> {
-  const hasSystemMessage = state.messages.some(msg => msg.type === 'system')
-  if (hasSystemMessage) {
-    return {}
-  }
+  const existingSystem = state.messages.find(msg => msg.type === 'system')
+
+  // Skip rebuild if system message exists and we're not on a retry path
+  if (existingSystem && !state.critiqueFeedback) return {}
 
   const systemMessage = await buildSystemPrompt(runtime, state.plan, state.critiqueFeedback)
+
+  // MessagesAnnotation uses an additive reducer. To replace the system
+  // message, remove the old one first then add the new one.
+  if (existingSystem) {
+    return {
+      messages: [new RemoveMessage({ id: existingSystem.id! }), systemMessage],
+    }
+  }
   return { messages: [systemMessage] }
 }
