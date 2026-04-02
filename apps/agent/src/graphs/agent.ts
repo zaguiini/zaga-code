@@ -19,7 +19,6 @@ import { createPlanNode } from '@/nodes/plan'
 import { createVerifyNode } from '@/nodes/verify'
 import { createExploreGraph } from '@/graphs/explore-graph'
 import { createVerifyGraph } from '@/graphs/verify-graph'
-import { titleGeneratorNode } from '@/nodes/title-generator'
 import { queryModelInfo } from '@/setup'
 
 const client = new MultiServerMCPClient({
@@ -101,7 +100,6 @@ async function buildAgentGraph(maxTokens: number) {
   const toolNode = new ToolNode(allTools, { handleToolErrors: true })
 
   return new StateGraph(agentStateSchema)
-    .addNode('title-generator', titleGeneratorNode)
     .addNode('command', createCommandNode(maxTokens))
     .addNode('maybe-compact', createMaybeCompactNode(model))
     .addNode('should-plan', createShouldPlanNode(model))
@@ -112,8 +110,7 @@ async function buildAgentGraph(maxTokens: number) {
     .addNode('tools', toolNode)
     .addNode('verify', createVerifyNode(verifyGraph))
 
-    .addEdge(START, 'title-generator')
-    .addEdge('title-generator', 'command')
+    .addEdge(START, 'command')
     .addConditionalEdges('command', s => {
       if (!s.commandHandled) return 'maybe-compact'
       if (s.forceCompact) return 'maybe-compact'
