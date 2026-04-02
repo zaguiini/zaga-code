@@ -85,7 +85,7 @@ export function createModels() {
   return { codingModel, fastModel }
 }
 
-export async function createAgent() {
+export async function buildAgentGraph() {
   const { codingModel, fastModel } = createModels()
 
   const readOnlyTools = [fileSearchTool, fileReadTool, grepTool]
@@ -136,5 +136,10 @@ export async function createAgent() {
       if (s.critiqueAttempts >= 2) return END
       return 'system-prompt'
     })
-    .compile()
+}
+
+/** Convenience: builds and compiles with no checkpointer (for LangGraph API server compat) */
+export async function createAgent() {
+  const graph = await buildAgentGraph()
+  return graph.compile()
 }
