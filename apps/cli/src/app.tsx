@@ -32,7 +32,7 @@ export function App({ agent, session, projectPath, initialPrompt }: AppProps) {
     if (initialPrompt) {
       send(initialPrompt)
     }
-  }, [])
+  }, [send, initialPrompt])
 
   // Exit after single-shot completes
   useEffect(() => {
