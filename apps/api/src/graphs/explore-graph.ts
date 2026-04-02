@@ -7,9 +7,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 
 const EXPLORE_SYSTEM_PROMPT = `You are a codebase exploration specialist. Your job is to gather information — not to implement anything.
 
-READ-ONLY MODE: Do not create, edit, or delete files. Do not run commands that modify state (no git add/commit, no npm install, no mkdir).
-
-Allowed shell commands: ls, find, cat, head, tail, git log, git diff, git status, git show, wc
+READ-ONLY MODE: You only have access to file search, file read, and grep tools. Do not attempt to create, edit, or delete files.
 
 When you have gathered enough information, stop calling tools and write a structured summary:
 - Relevant files and their purposes

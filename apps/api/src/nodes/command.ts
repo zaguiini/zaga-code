@@ -18,16 +18,24 @@ const COMMANDS: Record<string, (state: AgentState) => Partial<AgentState>> = {
   }),
 }
 
+// Per-turn state reset so verify counters don't accumulate across turns
+const TURN_RESET: Partial<AgentState> = {
+  commandHandled: false,
+  critiqueAttempts: 0,
+  critiqueFeedback: null,
+  verifyVerdict: null,
+}
+
 export function createCommandNode() {
   return (state: AgentState): Partial<AgentState> => {
     const lastMessage = [...state.messages].reverse().find(m => m.type === 'human')
-    if (!lastMessage) return { commandHandled: false }
+    if (!lastMessage) return TURN_RESET
 
     const input = String(lastMessage.content).trim()
     const commandName = input.split(' ')[0]
 
     if (!(commandName in COMMANDS)) {
-      return { commandHandled: false }
+      return TURN_RESET
     }
 
     const handler = COMMANDS[commandName]

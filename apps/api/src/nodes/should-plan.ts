@@ -29,6 +29,6 @@ export function createShouldPlanNode(fastModel: BaseChatModel) {
     ])
 
     const answer = String(response.content).trim().toLowerCase()
-    return { shouldPlan: answer === 'yes' }
+    return { shouldPlan: answer.startsWith('yes') }
   }
 }

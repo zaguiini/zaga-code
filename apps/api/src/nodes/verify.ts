@@ -5,13 +5,16 @@ import type { AgentState } from '@/graphs/agent'
 
 export function createVerifyNode(verifyGraph: Runnable) {
   return async (state: AgentState): Promise<Partial<AgentState>> => {
-    // Only verify if something was actually implemented
-    const hasEdits = state.messages.some(
+    const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
+
+    // Only check for edits after the last user message (not full history)
+    const lastUserIdx = state.messages.lastIndexOf(lastUserMessage!)
+    const currentTurnMessages =
+      lastUserIdx >= 0 ? state.messages.slice(lastUserIdx) : state.messages
+    const hasEdits = currentTurnMessages.some(
       m => m.type === 'tool' && ['file_edit', 'file_write', 'shell'].includes(m.name ?? '')
     )
     if (!hasEdits) return { verifyVerdict: 'PASS' }
-
-    const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
     const prompt = `Verify the implementation. Original task: ${String(lastUserMessage?.content ?? 'unknown')}`
 
     const result = await verifyGraph.invoke({
