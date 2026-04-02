@@ -30,7 +30,10 @@ export default defineConfig({
   target: 'node22',
   outDir: 'dist',
   clean: true,
+  // Only inline the agent workspace package; everything else stays external
+  // and is resolved from node_modules at runtime (avoids CJS-in-ESM issues).
   noExternal: ['@zaga/agent'],
+  external: [/^(?!@zaga\/agent|@\/|\.)/],
   esbuildPlugins: [resolveAgentAliases],
   banner: {
     js: '#!/usr/bin/env node',
