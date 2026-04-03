@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
+import { getToolCallsWithResults } from '@langchain/langgraph-sdk/utils'
 import type { Message, PhaseGroup, ToolInvocationPart } from '@/components/ui/chat-message'
 import type { MessageListItem } from '@/components/ui/message-list'
 import { MessageList } from '@/components/ui/message-list'
@@ -53,35 +54,16 @@ function RouteComponent() {
 
   const items: Array<MessageListItem> = useMemo(() => {
     const result: Array<MessageListItem> = []
-    let currentPhase: PhaseGroup | null = null
+    // Track active phase groups by name — messages with additional_kwargs.phase get grouped
+    const phaseGroups = new Map<string, PhaseGroup>()
+    let lastPhase: string | null = null
 
     for (const message of stream.messages) {
-      // Check for phase marker messages
-      const phaseMarker = message.additional_kwargs?.phase_marker as string | undefined
-      const phaseEvent = message.additional_kwargs?.phase_event as string | undefined
-
-      if (phaseMarker && phaseEvent === 'start') {
-        currentPhase = {
-          type: 'phase-group',
-          phase: { name: phaseMarker as PhaseGroup['phase']['name'], endIdx: null, startIdx: 0 },
-          messages: [],
-        }
-        result.push(currentPhase)
-        continue
-      }
-
-      if (phaseMarker && phaseEvent === 'end') {
-        if (currentPhase) {
-          currentPhase.phase.endIdx = 1 // just mark as completed (non-null)
-        }
-        currentPhase = null
-        continue
-      }
-
-      // Skip tool messages from display
       if (message.type === 'tool') continue
 
-      // Transform message into display format
+      const phase = message.additional_kwargs?.phase as string | undefined
+
+      // Transform message into display messages
       const displayMessages: Array<Message> = []
 
       if (
@@ -101,11 +83,8 @@ function RouteComponent() {
             : message.content,
         })
       } else {
-        // AI message — split into reasoning, text, tool call parts
+        // AI message
         const reasoningContent = message.additional_kwargs?.reasoning_content as string | undefined
-
-        // Skip phase-tagged messages with no visible content (markers without start/end event)
-        if (phaseMarker && !message.content && !reasoningContent) continue
 
         if (reasoningContent) {
           displayMessages.push({
@@ -132,7 +111,7 @@ function RouteComponent() {
           })
         }
 
-        const toolCalls = stream.getToolCalls(message)
+        const toolCalls = getToolCallsWithResults([message])
 
         if (toolCalls.length > 0) {
           for (const toolCall of toolCalls) {
@@ -171,10 +150,27 @@ function RouteComponent() {
         }
       }
 
-      // Add to current phase group or to top-level result
-      if (currentPhase) {
-        currentPhase.messages.push(...displayMessages)
+      if (displayMessages.length === 0) continue
+
+      if (phase) {
+        // This message belongs to a phase
+        if (!phaseGroups.has(phase)) {
+          const group: PhaseGroup = {
+            type: 'phase-group',
+            phase: { name: phase as PhaseGroup['phase']['name'], startIdx: 0, endIdx: null },
+            messages: [],
+          }
+          phaseGroups.set(phase, group)
+          result.push(group)
+        }
+        phaseGroups.get(phase)!.messages.push(...displayMessages)
+        lastPhase = phase
       } else {
+        // Close the previous phase if we moved past it
+        if (lastPhase && phaseGroups.has(lastPhase)) {
+          phaseGroups.get(lastPhase)!.phase.endIdx = 1
+          lastPhase = null
+        }
         result.push(...displayMessages)
       }
     }
@@ -263,7 +259,12 @@ function RouteComponent() {
             {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
             },
-            { streamMode: ['messages', 'values'], context, config: { recursion_limit: 1000 } }
+            {
+              streamMode: ['messages', 'values'],
+              streamSubgraphs: true,
+              context,
+              config: { recursion_limit: 1000 },
+            }
           )
           setInput('')
         }}
@@ -283,11 +284,9 @@ function RouteComponent() {
           )}
 
           {maxTokens != null && maxTokens > 0 && (
-            <div className="ml-auto flex items-center justify-end gap-1 text-xs text-muted-foreground">
-              <span>
-                ~{estimatedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
-              </span>
-              <span>({contextPercent}%)</span>
+            <div className="ml-auto flex items-center justify-end text-xs text-muted-foreground">
+              ~{estimatedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens (
+              {contextPercent}%)
             </div>
           )}
         </div>

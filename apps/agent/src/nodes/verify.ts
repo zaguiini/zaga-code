@@ -1,4 +1,4 @@
-import { AIMessage, HumanMessage } from '@langchain/core/messages'
+import { HumanMessage } from '@langchain/core/messages'
 import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
@@ -6,7 +6,6 @@ export function createVerifyNode(verifyGraph: Runnable) {
   return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
 
-    // Only check for edits after the last user message (not full history)
     const lastUserIdx = state.messages.lastIndexOf(lastUserMessage!)
     const currentTurnMessages =
       lastUserIdx >= 0 ? state.messages.slice(lastUserIdx) : state.messages
@@ -32,17 +31,6 @@ export function createVerifyNode(verifyGraph: Runnable) {
       verifyVerdict: verdict,
       critiqueFeedback: verdict !== 'PASS' ? output : null,
       critiqueAttempts: state.critiqueAttempts + (verdict !== 'PASS' ? 1 : 0),
-      messages: [
-        new AIMessage({
-          content: '',
-          additional_kwargs: { phase_marker: 'verify', phase_event: 'start' },
-        }),
-        ...result.messages.slice(1), // skip the duplicated human prompt
-        new AIMessage({
-          content: '',
-          additional_kwargs: { phase_marker: 'verify', phase_event: 'end' },
-        }),
-      ],
     }
   }
 }

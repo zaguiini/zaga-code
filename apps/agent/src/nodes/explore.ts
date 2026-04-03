@@ -1,4 +1,3 @@
-import { AIMessage } from '@langchain/core/messages'
 import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
@@ -14,19 +13,6 @@ export function createExploreNode(exploreGraph: Runnable) {
       .find((m: { type: string }) => m.type === 'ai')
     const summary = lastMessage ? String(lastMessage.content) : ''
 
-    return {
-      exploreSummary: summary,
-      messages: [
-        new AIMessage({
-          content: '',
-          additional_kwargs: { phase_marker: 'explore', phase_event: 'start' },
-        }),
-        ...result.messages.slice(1), // skip the duplicated user message
-        new AIMessage({
-          content: '',
-          additional_kwargs: { phase_marker: 'explore', phase_event: 'end' },
-        }),
-      ],
-    }
+    return { exploreSummary: summary }
   }
 }

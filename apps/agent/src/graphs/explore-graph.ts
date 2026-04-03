@@ -31,6 +31,7 @@ export function createExploreGraph(
       : [new SystemMessage(EXPLORE_SYSTEM_PROMPT), ...state.messages]
 
     const response = await modelWithTools.invoke(messages)
+    response.additional_kwargs = { ...response.additional_kwargs, phase: 'explore' }
     return { messages: [response] }
   }
 

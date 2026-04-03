@@ -37,16 +37,8 @@ export function createPlanNode(model: BaseChatModel) {
       plan: planText,
       messages: [
         new AIMessage({
-          content: '',
-          additional_kwargs: { phase_marker: 'plan', phase_event: 'start' },
-        }),
-        new AIMessage({
           content: planText,
-          additional_kwargs: { phase_marker: 'plan' },
-        }),
-        new AIMessage({
-          content: '',
-          additional_kwargs: { phase_marker: 'plan', phase_event: 'end' },
+          additional_kwargs: { phase: 'plan' },
         }),
       ],
     }
