@@ -27,7 +27,6 @@ export function MessageList({
     <div className="space-y-4 overflow-visible">
       {messages.map((item, index) => {
         if (isPhaseGroup(item)) {
-          if (item.messages.length === 0) return null
           return <PhaseBlock key={`phase-${item.phase.name}-${index}`} group={item} />
         }
 

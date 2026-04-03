@@ -64,10 +64,6 @@ function RouteComponent() {
   const messagesLengthRef = useRef(0)
 
   useEffect(() => {
-    messagesLengthRef.current = stream.messages.length
-  }, [stream.messages.length])
-
-  useEffect(() => {
     setPhases([])
   }, [threadId])
 
@@ -86,6 +82,9 @@ function RouteComponent() {
   }, [threadId, stream])
 
   const items: Array<MessageListItem> = useMemo(() => {
+    // Sync ref before render so onCustomEvent always reads the current count
+    messagesLengthRef.current = stream.messages.length
+
     const allMessages: Array<{ originalIdx: number; message: Message }> = []
 
     let originalIdx = 0
@@ -216,14 +215,25 @@ function RouteComponent() {
         }
       }
 
-      if (assignedPhase !== null) {
-        if (!insertedPhases.has(assignedPhase)) {
-          insertedPhases.add(assignedPhase)
-          result.push(phaseGroups.get(assignedPhase)!)
+      // Insert any completed phase groups that should appear before this message
+      for (let i = 0; i < phases.length; i++) {
+        if (!insertedPhases.has(i) && phases[i].startIdx <= originalIdx) {
+          insertedPhases.add(i)
+          result.push(phaseGroups.get(i)!)
         }
+      }
+
+      if (assignedPhase !== null) {
         phaseGroups.get(assignedPhase)!.messages.push(message)
       } else {
         result.push(message)
+      }
+    }
+
+    // Insert any remaining phase groups (e.g., phases with no messages like plan)
+    for (let i = 0; i < phases.length; i++) {
+      if (!insertedPhases.has(i)) {
+        result.push(phaseGroups.get(i)!)
       }
     }
 
