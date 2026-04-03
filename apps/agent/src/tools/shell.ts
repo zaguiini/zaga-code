@@ -46,7 +46,7 @@ export const shellTool = tool(
 
     // Bridge spawn events → async iteration via a simple queue
     type QueueItem =
-      | { type: 'data'; text: string }
+      | { type: 'data'; text: string; source: 'stdout' | 'stderr' }
       | { type: 'done'; exitCode: number }
       | { type: 'error'; error: Error }
     const queue: Array<QueueItem> = []
@@ -64,12 +64,18 @@ export const shellTool = tool(
       })
     }
 
-    child.stdout.on('data', (data: Buffer) => push({ type: 'data', text: data.toString() }))
-    child.stderr.on('data', (data: Buffer) => push({ type: 'data', text: data.toString() }))
+    child.stdout.on('data', (data: Buffer) =>
+      push({ type: 'data', text: data.toString(), source: 'stdout' })
+    )
+    child.stderr.on('data', (data: Buffer) =>
+      push({ type: 'data', text: data.toString(), source: 'stderr' })
+    )
     child.on('error', (error: Error) => push({ type: 'error', error }))
     child.on('close', (exitCode: number | null) => push({ type: 'done', exitCode: exitCode ?? 0 }))
 
-    let accumulated = ''
+    let stdout = ''
+    let stderr = ''
+    let combined = ''
 
     for (;;) {
       await waitForItem()
@@ -83,16 +89,26 @@ export const shellTool = tool(
         }
 
         if (item.type === 'done') {
-          const output = accumulated || 'Command executed successfully (no output)'
+          // Format final output with labels (same as original tool)
+          let output = ''
+          if (stdout) output += `STDOUT:\n${stdout}`
+          if (stderr) output += output ? `\n\nSTDERR:\n${stderr}` : `STDERR:\n${stderr}`
+
           if (item.exitCode !== 0) {
-            return `Command failed (exit code ${item.exitCode})${accumulated ? `\n\n${accumulated}` : ''}`
+            let errorMessage = `Command failed (exit code ${item.exitCode})`
+            if (stdout) errorMessage += `\n\nSTDOUT:\n${stdout}`
+            if (stderr) errorMessage += `\n\nSTDERR:\n${stderr}`
+            return errorMessage
           }
-          return output
+
+          return output || 'Command executed successfully (no output)'
         }
 
         // type === 'data'
-        accumulated += item.text
-        yield accumulated
+        if (item.source === 'stdout') stdout += item.text
+        else stderr += item.text
+        combined += item.text
+        yield combined
       }
     }
   },
