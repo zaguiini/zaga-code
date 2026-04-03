@@ -4,11 +4,16 @@ import { resolve } from 'node:path'
 import { z } from 'zod'
 import { tool } from 'langchain'
 import type { ToolRuntime } from '@langchain/core/tools'
+import { checkShellSafety } from '@/utils/shell-safety'
 
 const execAsync = promisify(exec)
 
 const shellSchema = z.object({
   command: z.string().describe('Shell command to execute'),
+  confirmed: z
+    .boolean()
+    .optional()
+    .describe('Set to true to confirm execution of a destructive command'),
 })
 
 const contextSchema = z.object({
@@ -32,6 +37,16 @@ export const shellTool = tool(
     try {
       if (input.command.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
         return `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+      }
+
+      const safety = checkShellSafety(input.command)
+
+      if (safety === 'block') {
+        return `Blocked: "${input.command}" matches a permanently blocked pattern.`
+      }
+
+      if (safety === 'confirm' && !input.confirmed) {
+        return `CONFIRMATION_REQUIRED: "${input.command}" is a destructive command. Re-run with confirmed: true to execute.`
       }
 
       const resolvedProjectPath = resolve(project_path)
@@ -65,7 +80,7 @@ export const shellTool = tool(
   {
     name: 'shell',
     description:
-      'Execute a shell command in the project directory. Captures both stdout and stderr. Commands referencing node_modules are blocked.',
+      'Execute a shell command in the project directory. Captures both stdout and stderr. Commands referencing node_modules are blocked. Destructive commands require confirmation via the confirmed parameter.',
     schema: shellSchema,
   }
 )

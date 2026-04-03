@@ -14,20 +14,7 @@ function RouteComponent() {
 
   const threadRouteParams = routerState({ to: '/$threadId' })
 
-  const threads = useSuspenseQuery({
-    ...threadsSearchQuery(),
-    refetchInterval: query => {
-      if (!query.state.data || !threadRouteParams) {
-        return false
-      }
-
-      // Check if the most recent thread (first in list) doesn't have a title yet
-      const mostRecentThread = query.state.data[0]
-
-      // Poll every 2 seconds if the most recent thread needs a title
-      return !mostRecentThread.metadata?.title ? 2_000 : false
-    },
-  })
+  const threads = useSuspenseQuery(threadsSearchQuery())
 
   return (
     <SidebarProvider defaultOpen={threads.data.length > 0}>

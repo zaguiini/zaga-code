@@ -64,9 +64,14 @@ function NewChat() {
             project_path: data.projectPath,
           }
 
+          const title =
+            data.initialPrompt.length <= 50
+              ? data.initialPrompt
+              : data.initialPrompt.substring(0, 50).trim() + '...'
+
           const { thread_id: threadId } = await client.threads.create({
             graphId: 'agent',
-            metadata: { context },
+            metadata: { context, title },
           })
 
           return client.runs

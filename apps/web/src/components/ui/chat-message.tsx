@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, Loader2 } from 'lucide-react'
+import { ChevronRight, Code2, Loader2, Search, ShieldCheck } from 'lucide-react'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
@@ -85,6 +85,8 @@ type ToolInvocation = PartialToolCall | ToolCall | ToolResult
 interface ReasoningPart {
   type: 'reasoning'
   reasoning: string
+  done?: boolean
+  durationMs?: number
 }
 
 export interface ToolInvocationPart {
@@ -128,6 +130,18 @@ export interface Message {
   createdAt?: Date
   experimental_attachments?: Array<Attachment>
   parts?: Array<MessagePart>
+}
+
+export interface PhaseInfo {
+  name: 'explore' | 'verify'
+  startIdx: number
+  endIdx: number | null
+}
+
+export interface PhaseGroup {
+  type: 'phase-group'
+  phase: PhaseInfo
+  messages: Array<Message>
 }
 
 export interface ChatMessageProps extends Message {
@@ -240,15 +254,17 @@ const CollapsibleBlock = ({
   icon,
   title,
   children,
+  defaultOpen = false,
 }: {
   icon?: React.ReactNode
   title: React.ReactNode
   children: React.ReactNode
+  defaultOpen?: boolean
 }) => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(defaultOpen)
 
-  const rightChevron = (
-    <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+  const chevron = (
+    <ChevronRight className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-90')} />
   )
 
   return (
@@ -256,12 +272,12 @@ const CollapsibleBlock = ({
       <Collapsible
         open={isOpen}
         onOpenChange={setIsOpen}
-        className="group w-full overflow-hidden rounded-lg border bg-muted/50"
+        className="w-full overflow-hidden rounded-lg border bg-muted/50"
       >
         <div className="flex items-center p-2">
           <CollapsibleTrigger asChild>
             <button className="flex w-full cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              {isOpen ? rightChevron : (icon ?? rightChevron)}
+              {isOpen ? chevron : (icon ?? chevron)}
               <span>{title}</span>
             </button>
           </CollapsibleTrigger>
@@ -287,8 +303,54 @@ const CollapsibleBlock = ({
   )
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remaining = seconds % 60
+  return remaining > 0 ? `${minutes}m ${remaining}s` : `${minutes}m`
+}
+
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
-  return <CollapsibleBlock title="Thinking">{part.reasoning}</CollapsibleBlock>
+  const label = part.done ? 'Thought' : 'Thinking'
+  const duration = part.done && part.durationMs ? ` for ${formatDuration(part.durationMs)}` : ''
+
+  return (
+    <CollapsibleBlock title={`${label}${duration}`} defaultOpen={!part.done}>
+      {part.reasoning}
+    </CollapsibleBlock>
+  )
+}
+
+const PHASE_CONFIG = {
+  explore: {
+    runningLabel: 'Exploring codebase',
+    doneLabel: 'Explored codebase and planned implementation',
+    Icon: Search,
+  },
+  verify: { runningLabel: 'Verifying', doneLabel: 'Verified implementation', Icon: ShieldCheck },
+} as const
+
+export function PhaseBlock({ group }: { group: PhaseGroup }) {
+  const config = PHASE_CONFIG[group.phase.name]
+  const isRunning = group.phase.endIdx === null
+  const label = isRunning ? config.runningLabel : config.doneLabel
+  const icon = isRunning ? (
+    <Loader2 className="h-3 w-3 animate-spin" />
+  ) : (
+    <config.Icon className="h-4 w-4" />
+  )
+
+  return (
+    <CollapsibleBlock icon={icon} title={label}>
+      <div className="space-y-3">
+        {group.messages.map((message, index) => (
+          <ChatMessage key={index} {...message} animation="none" />
+        ))}
+      </div>
+    </CollapsibleBlock>
+  )
 }
 
 function ToolCall({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {

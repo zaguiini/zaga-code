@@ -1,12 +1,18 @@
 {
-  "name": "api",
+  "name": "@zaga/agent",
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "exports": {
+    "./setup": "./src/setup.ts",
+    "./graphs/agent": "./src/graphs/agent.ts",
+    "./env": "./src/env.ts",
+    "./utils/token-budget": "./src/utils/token-budget.ts"
+  },
   "scripts": {
     "docker:start": "docker compose up -d",
-    "dev": "pnpx @langchain/langgraph-cli dev --no-browser",
-    "setup-environment": "tsx --env-file .env src/setup.ts",
+    "dev": "./node_modules/@langchain/langgraph-cli/dist/cli/cli.mjs dev --no-browser",
+    "setup-environment": "tsx --env-file .env -e \"import('./src/setup.ts').then(m => m.setup())\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
@@ -14,6 +20,7 @@
     "@langchain/classic": "^1.0.9",
     "@langchain/core": "^1.1.15",
     "@langchain/langgraph": "^1.1.0",
+    "@langchain/langgraph-cli": "^1.1.17",
     "@langchain/langgraph-sdk": "^1.5.4",
     "@langchain/mcp-adapters": "^1.1.1",
     "@langchain/ollama": "^1.2.0",
