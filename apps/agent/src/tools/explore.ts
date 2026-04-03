@@ -62,7 +62,7 @@ export function createExploreTool(model: BaseChatModel) {
       let prevMessageCount = 0
 
       for await (const update of stream) {
-        const allMessages = (update as any).messages ?? []
+        const allMessages = update.messages as any as Array<any>
         // Only process newly added messages
         const newMessages = allMessages.slice(prevMessageCount)
         prevMessageCount = allMessages.length
@@ -70,7 +70,7 @@ export function createExploreTool(model: BaseChatModel) {
         for (const msg of newMessages) {
           // LangChain serialized: { lc: 1, id: ["langchain_core","messages","AIMessage"], kwargs: {...} }
           const kind = msg.id?.[2] ?? ''
-          const kwargs = msg.kwargs ?? msg
+          const kwargs = msg.additional_kwargs
 
           if (kind === 'AIMessage' || kind === 'AIMessageChunk') {
             const content = kwargs.content ?? ''
