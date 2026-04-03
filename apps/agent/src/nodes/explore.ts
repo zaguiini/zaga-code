@@ -4,9 +4,17 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
 import type { AgentState } from '@/graphs/agent'
 
+const MAX_EXPLORE_ITERATIONS = 15
+
 const EXPLORE_SYSTEM_PROMPT = `You are a codebase exploration specialist. Your job is to gather information — not to implement anything.
 
 READ-ONLY MODE: You only have access to file search, file read, and grep tools. Do not attempt to create, edit, or delete files.
+
+Rules:
+- If a file or pattern doesn't exist, note it and move on. Never retry the same search more than once.
+- Prefer grep and file_search over guessing file paths. If file_read fails, the file doesn't exist — don't try variations.
+- You have a limited number of tool calls. Be strategic: search broadly first, then read specific files.
+- Stop exploring once you have enough context to suggest an approach. Perfection is not the goal.
 
 When you have gathered enough information, stop calling tools and write a structured summary:
 - Relevant files and their purposes
@@ -14,7 +22,7 @@ When you have gathered enough information, stop calling tools and write a struct
 - Potential gotchas or constraints
 - Suggested approach (high level only)
 
-Be thorough. The plan node will use your summary to produce an implementation plan.`
+Be thorough but efficient. The plan node will use your summary to produce an implementation plan.`
 
 /** Explore executor node — runs inline in the main graph for real-time streaming. */
 export function createExploreExecutorNode(
@@ -51,6 +59,29 @@ export function createExploreExecutorNode(
     }
     return { messages: [response] }
   }
+}
+
+/** Conditional edge for the explore loop — stops after MAX_EXPLORE_ITERATIONS. */
+export function exploreToolsCondition(state: AgentState): 'explore-tools' | 'explore-cleanup' {
+  const lastMessage = state.messages[state.messages.length - 1]
+
+  // If the last AI message has no tool calls, exploration is done
+  if (lastMessage.type !== 'ai') return 'explore-cleanup'
+  const hasToolCalls =
+    Array.isArray(lastMessage.additional_kwargs.tool_call_chunks) &&
+    lastMessage.additional_kwargs.tool_call_chunks.length > 0
+  if (!hasToolCalls) return 'explore-cleanup'
+
+  // Count explore-phase tool results as a proxy for iterations
+  const exploreToolResults = state.messages.filter(
+    m =>
+      m.type === 'tool' &&
+      state.messages.some(a => a.type === 'ai' && a.additional_kwargs.phase === 'explore')
+  ).length
+
+  if (exploreToolResults >= MAX_EXPLORE_ITERATIONS) return 'explore-cleanup'
+
+  return 'explore-tools'
 }
 
 /** Runs after explore loop ends. Extracts the summary from the last explore AI message. */

@@ -14,7 +14,11 @@ import { systemPromptNode } from '@/nodes/system-prompt'
 import { createMaybeCompactNode } from '@/nodes/maybe-compact'
 import { createCommandNode } from '@/nodes/command'
 import { createShouldPlanNode } from '@/nodes/should-plan'
-import { createExploreCleanupNode, createExploreExecutorNode } from '@/nodes/explore'
+import {
+  createExploreCleanupNode,
+  createExploreExecutorNode,
+  exploreToolsCondition,
+} from '@/nodes/explore'
 import { createPlanNode } from '@/nodes/plan'
 import {
   createVerifyCleanupNode,
@@ -137,11 +141,8 @@ async function buildAgentGraph(maxTokens: number) {
       .addConditionalEdges('should-plan', s =>
         s.shouldPlan ? 'explore-executor' : 'system-prompt'
       )
-      // Explore loop: executor → tools → executor (until no more tool calls)
-      .addConditionalEdges('explore-executor', toolsCondition, {
-        tools: 'explore-tools',
-        __end__: 'explore-cleanup',
-      })
+      // Explore loop: executor → tools → executor (capped at MAX_EXPLORE_ITERATIONS)
+      .addConditionalEdges('explore-executor', exploreToolsCondition)
       .addEdge('explore-tools', 'explore-executor')
       .addEdge('explore-cleanup', 'make-plan')
       .addEdge('make-plan', 'system-prompt')
