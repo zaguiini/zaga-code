@@ -1,12 +1,8 @@
-import type { ChatMessageProps, Message, PhaseGroup } from '@/components/ui/chat-message'
-import { ChatMessage, PhaseBlock } from '@/components/ui/chat-message'
+import type { ChatMessageProps, Message } from '@/components/ui/chat-message'
+import { ChatMessage } from '@/components/ui/chat-message'
 import { TypingIndicator } from '@/components/ui/typing-indicator'
 
-export type MessageListItem = Message | PhaseGroup
-
-function isPhaseGroup(item: MessageListItem): item is PhaseGroup {
-  return 'phase' in item
-}
+export type MessageListItem = Message
 
 type AdditionalMessageOptions = Omit<ChatMessageProps, keyof Message>
 
@@ -25,19 +21,15 @@ export function MessageList({
 }: MessageListProps) {
   return (
     <div className="space-y-4 overflow-visible">
-      {messages.map((item, index) => {
-        if (isPhaseGroup(item)) {
-          return <PhaseBlock key={`phase-${item.phase.name}-${index}`} group={item} />
-        }
-
+      {messages.map((message, index) => {
         const additionalOptions =
-          typeof messageOptions === 'function' ? messageOptions(item) : messageOptions
+          typeof messageOptions === 'function' ? messageOptions(message) : messageOptions
 
         return (
           <ChatMessage
             key={index}
             showTimeStamp={showTimeStamps}
-            {...item}
+            {...message}
             {...additionalOptions}
           />
         )

@@ -3,7 +3,7 @@ import { useStream } from '@langchain/langgraph-sdk/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { getToolCallsWithResults } from '@langchain/langgraph-sdk/utils'
-import type { Message, PhaseGroup, ToolInvocationPart } from '@/components/ui/chat-message'
+import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
 import type { MessageListItem } from '@/components/ui/message-list'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
@@ -46,7 +46,7 @@ function RouteComponent() {
     const resumeRunId = window.sessionStorage.getItem(`resume:${threadId}`)
     if (resumeRunId && joinedThreadId.current !== threadId) {
       stream.joinStream(resumeRunId, undefined, {
-        streamMode: ['messages', 'values'],
+        streamMode: ['messages', 'values', 'tools'],
       })
       joinedThreadId.current = threadId
     }
@@ -54,9 +54,6 @@ function RouteComponent() {
 
   const items: Array<MessageListItem> = useMemo(() => {
     const result: Array<MessageListItem> = []
-    const phaseGroups = new Map<string, PhaseGroup>()
-    // Track which phase is currently active — tool messages inherit this
-    let activePhase: string | null = null
 
     // Pre-compute tool call results using the full messages array.
     // Group by AI message ID so we can match them to their source message.
@@ -71,14 +68,6 @@ function RouteComponent() {
     for (const message of stream.messages) {
       // Skip tool messages — their results are consumed via toolCallMap
       if (message.type === 'tool') continue
-
-      const phase = (message.additional_kwargs?.phase as string | undefined) ?? null
-
-      // When phase changes, mark the previous one as done
-      if (activePhase && phase !== activePhase && phaseGroups.has(activePhase)) {
-        phaseGroups.get(activePhase)!.phase.isDone = true
-      }
-      activePhase = phase
 
       // Transform message into display messages
       const displayMessages: Array<Message> = []
@@ -136,19 +125,10 @@ function RouteComponent() {
         // Get tool calls for this AI message by matching on message ID
         const messageToolCalls = toolCallsByAiId.get(message.id!) ?? []
         for (const toolCall of messageToolCalls) {
-          // if (toolCall.call.name === 'explore') continue
           const parts: Array<ToolInvocationPart> = []
 
-          if (toolCall.state === 'pending') {
-            parts.push({
-              type: 'tool-invocation',
-              toolInvocation: {
-                args: toolCall.call.args,
-                toolName: toolCall.call.name,
-                state: 'call',
-              },
-            })
-          }
+          // Find matching tool progress for this call
+          const progress = stream.toolProgress.find(tp => tp.toolCallId === toolCall.call.id)
 
           if (toolCall.state === 'completed') {
             parts.push({
@@ -158,6 +138,26 @@ function RouteComponent() {
                 state: 'result',
                 args: toolCall.call.args,
                 result: toolCall.result?.content.toString() ?? 'No result',
+              },
+            })
+          } else if (progress?.state === 'running' && progress.data != null) {
+            parts.push({
+              type: 'tool-invocation',
+              toolInvocation: {
+                toolName: toolCall.call.name,
+                state: 'streaming',
+                args: toolCall.call.args,
+                data: progress.data,
+              },
+            })
+          } else {
+            // pending (starting or no data yet)
+            parts.push({
+              type: 'tool-invocation',
+              toolInvocation: {
+                args: toolCall.call.args,
+                toolName: toolCall.call.name,
+                state: 'call',
               },
             })
           }
@@ -173,24 +173,11 @@ function RouteComponent() {
 
       if (displayMessages.length === 0) continue
 
-      if (phase) {
-        if (!phaseGroups.has(phase)) {
-          const group: PhaseGroup = {
-            type: 'phase-group',
-            phase: { name: phase as PhaseGroup['phase']['name'], isDone: false },
-            messages: [],
-          }
-          phaseGroups.set(phase, group)
-          result.push(group)
-        }
-        phaseGroups.get(phase)!.messages.push(...displayMessages)
-      } else {
-        result.push(...displayMessages)
-      }
+      result.push(...displayMessages)
     }
 
     return result
-  }, [stream.messages])
+  }, [stream.messages, stream.toolProgress])
 
   const handleInterrupt = useCallback(() => {
     if (!stream.isLoading) return
@@ -261,7 +248,7 @@ function RouteComponent() {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
             },
             {
-              streamMode: ['messages', 'values'],
+              streamMode: ['messages', 'values', 'tools'],
               streamSubgraphs: true,
               context,
               config: { recursion_limit: 1000 },

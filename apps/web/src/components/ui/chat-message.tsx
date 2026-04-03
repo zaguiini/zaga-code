@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, Loader2, Search } from 'lucide-react'
+import { ChevronRight, Code2, Loader2 } from 'lucide-react'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
@@ -70,7 +70,14 @@ interface ToolResult {
   result: string
 }
 
-type ToolInvocation = ToolCall | ToolResult
+interface ToolStreaming {
+  state: 'streaming'
+  toolName: string
+  args: Record<string, any>
+  data: unknown
+}
+
+type ToolInvocation = ToolCall | ToolResult | ToolStreaming
 
 interface ReasoningPart {
   type: 'reasoning'
@@ -98,12 +105,6 @@ export interface Message {
   createdAt?: Date
   experimental_attachments?: Array<Attachment>
   parts?: Array<MessagePart>
-}
-
-export interface PhaseGroup {
-  type: 'phase-group'
-  phase: { name: 'explore'; isDone: boolean }
-  messages: Array<Message>
 }
 
 export interface ChatMessageProps extends Message {
@@ -284,34 +285,6 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   )
 }
 
-const PHASE_CONFIG = {
-  explore: {
-    runningLabel: 'Exploring codebase',
-    doneLabel: 'Explored codebase and planned implementation',
-    Icon: Search,
-  },
-} as const
-
-export function PhaseBlock({ group }: { group: PhaseGroup }) {
-  const config = PHASE_CONFIG[group.phase.name]
-  const label = group.phase.isDone ? config.doneLabel : config.runningLabel
-  const icon = group.phase.isDone ? (
-    <config.Icon className="h-4 w-4" />
-  ) : (
-    <Loader2 className="h-3 w-3 animate-spin" />
-  )
-
-  return (
-    <CollapsibleBlock icon={icon} title={label}>
-      <div className="space-y-3">
-        {group.messages.map((message, index) => (
-          <ChatMessage key={index} {...message} animation="none" />
-        ))}
-      </div>
-    </CollapsibleBlock>
-  )
-}
-
 function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
   if (!toolInvocations?.length) return null
 
@@ -339,6 +312,127 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 Arguments: {JSON.stringify(invocation.args)}
               </CollapsibleBlock>
             )
+          case 'streaming': {
+            // Shell tool: data is the accumulated stdout/stderr string
+            if (typeof invocation.data === 'string') {
+              return (
+                <CollapsibleBlock
+                  key={index}
+                  icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                  title={
+                    <span>
+                      Running{' '}
+                      <span className="font-mono text-xs">
+                        {'`'}
+                        {invocation.toolName}
+                        {'`'}
+                      </span>
+                      ...
+                    </span>
+                  }
+                  defaultOpen
+                >
+                  <pre className="font-mono whitespace-pre-wrap">{invocation.data}</pre>
+                </CollapsibleBlock>
+              )
+            }
+
+            // Explore tool: data is an array of ExploreStreamEvent objects
+            if (Array.isArray(invocation.data)) {
+              return (
+                <CollapsibleBlock
+                  key={index}
+                  icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                  title={
+                    <span>
+                      Running{' '}
+                      <span className="font-mono text-xs">
+                        {'`'}
+                        {invocation.toolName}
+                        {'`'}
+                      </span>
+                      ...
+                    </span>
+                  }
+                  defaultOpen
+                >
+                  <div className="space-y-2">
+                    {invocation.data.map((event: any, i: number) => {
+                      if (event.type === 'text') {
+                        return (
+                          <div key={i} className="whitespace-pre-wrap">
+                            <MarkdownRenderer>{event.content}</MarkdownRenderer>
+                          </div>
+                        )
+                      }
+                      if (event.type === 'tool-call') {
+                        return (
+                          <CollapsibleBlock
+                            key={i}
+                            icon={<Code2 className="h-4 w-4" />}
+                            title={
+                              <span>
+                                Calling{' '}
+                                <span className="font-mono text-xs">
+                                  {'`'}
+                                  {event.name}
+                                  {'`'}
+                                </span>
+                              </span>
+                            }
+                          >
+                            Arguments: {JSON.stringify(event.args)}
+                          </CollapsibleBlock>
+                        )
+                      }
+                      if (event.type === 'tool-result') {
+                        return (
+                          <CollapsibleBlock
+                            key={i}
+                            icon={<Code2 className="h-4 w-4" />}
+                            title={
+                              <span>
+                                Result from{' '}
+                                <span className="font-mono text-xs">
+                                  {'`'}
+                                  {event.name}
+                                  {'`'}
+                                </span>
+                              </span>
+                            }
+                          >
+                            {event.result}
+                          </CollapsibleBlock>
+                        )
+                      }
+                      return null
+                    })}
+                  </div>
+                </CollapsibleBlock>
+              )
+            }
+
+            // Unknown data shape — fall back to call-style display
+            return (
+              <CollapsibleBlock
+                key={index}
+                icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                title={
+                  <span>
+                    Running{' '}
+                    <span className="font-mono text-xs">
+                      {'`'}
+                      {invocation.toolName}
+                      {'`'}
+                    </span>
+                    ...
+                  </span>
+                }
+              >
+                Arguments: {JSON.stringify(invocation.args)}
+              </CollapsibleBlock>
+            )
+          }
           case 'result':
             return (
               <CollapsibleBlock
