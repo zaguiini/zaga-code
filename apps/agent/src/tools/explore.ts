@@ -49,10 +49,7 @@ export function createExploreTool(model: BaseChatModel) {
 
   return tool(
     async function* ({ prompt }, config) {
-      const stream = await exploreAgent.stream(
-        { messages: [new HumanMessage(prompt)] },
-        { context: (config as any)?.configurable?.context ?? (config as any)?.metadata?.context }
-      )
+      const stream = await exploreAgent.stream({ messages: [new HumanMessage(prompt)] }, config)
 
       // Default stream mode is 'updates': yields { nodeName: { messages: [...] } }
       const events: Array<ExploreStreamEvent> = []
