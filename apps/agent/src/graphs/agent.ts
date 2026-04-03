@@ -14,9 +14,9 @@ import { systemPromptNode } from '@/nodes/system-prompt'
 import { createMaybeCompactNode } from '@/nodes/maybe-compact'
 import { createCommandNode } from '@/nodes/command'
 import { createShouldPlanNode } from '@/nodes/should-plan'
-import { createExploreNode } from '@/nodes/explore'
+import { createExploreCleanupNode } from '@/nodes/explore'
 import { createPlanNode } from '@/nodes/plan'
-import { createVerifyNode } from '@/nodes/verify'
+import { createVerifyCleanupNode, createVerifySetupNode } from '@/nodes/verify'
 import { createExploreGraph } from '@/graphs/explore-graph'
 import { createVerifyGraph } from '@/graphs/verify-graph'
 import { queryModelInfo } from '@/setup'
@@ -103,12 +103,15 @@ async function buildAgentGraph(maxTokens: number) {
     .addNode('command', createCommandNode(maxTokens))
     .addNode('maybe-compact', createMaybeCompactNode(model))
     .addNode('should-plan', createShouldPlanNode(model))
-    .addNode('explore', createExploreNode(exploreGraph))
+    .addNode('explore', exploreGraph)
+    .addNode('explore-cleanup', createExploreCleanupNode())
     .addNode('make-plan', createPlanNode(model))
     .addNode('system-prompt', systemPromptNode)
     .addNode('executor', executorNode)
     .addNode('tools', toolNode)
-    .addNode('verify', createVerifyNode(verifyGraph))
+    .addNode('verify-setup', createVerifySetupNode())
+    .addNode('verify', verifyGraph)
+    .addNode('verify-cleanup', createVerifyCleanupNode())
 
     .addEdge(START, 'command')
     .addConditionalEdges('command', s => {
@@ -118,15 +121,21 @@ async function buildAgentGraph(maxTokens: number) {
     })
     .addConditionalEdges('maybe-compact', s => (s.commandHandled ? END : 'should-plan'))
     .addConditionalEdges('should-plan', s => (s.shouldPlan ? 'explore' : 'system-prompt'))
-    .addEdge('explore', 'make-plan')
+    .addEdge('explore', 'explore-cleanup')
+    .addEdge('explore-cleanup', 'make-plan')
     .addEdge('make-plan', 'system-prompt')
     .addEdge('system-prompt', 'executor')
     .addConditionalEdges('executor', toolsCondition, {
       tools: 'tools',
-      __end__: 'verify',
+      __end__: 'verify-setup',
     })
     .addEdge('tools', 'executor')
-    .addConditionalEdges('verify', s => {
+    .addConditionalEdges('verify-setup', s => {
+      if (s.verifyVerdict === 'PASS') return END
+      return 'verify'
+    })
+    .addEdge('verify', 'verify-cleanup')
+    .addConditionalEdges('verify-cleanup', s => {
       if (s.verifyVerdict === 'PASS') return END
       if (s.critiqueAttempts >= 2) return END
       return 'system-prompt'

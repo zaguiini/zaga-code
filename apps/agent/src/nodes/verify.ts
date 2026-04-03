@@ -1,9 +1,10 @@
 import { HumanMessage } from '@langchain/core/messages'
-import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
+import type { RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
-export function createVerifyNode(verifyGraph: Runnable) {
-  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
+/** Runs before the verify subgraph. Checks if edits were made and prepares the verify prompt. */
+export function createVerifySetupNode() {
+  return (state: AgentState, _config: RunnableConfig): Partial<AgentState> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
 
     const lastUserIdx = state.messages.lastIndexOf(lastUserMessage!)
@@ -16,14 +17,20 @@ export function createVerifyNode(verifyGraph: Runnable) {
     if (!hasEdits) return { verifyVerdict: 'PASS' }
 
     const prompt = `Verify the implementation. Original task: ${String(lastUserMessage?.content ?? 'unknown')}`
+    return { messages: [new HumanMessage(prompt)] }
+  }
+}
 
-    const result = await verifyGraph.invoke({ messages: [new HumanMessage(prompt)] }, config)
-
-    const lastMessage = [...result.messages]
+/** Runs after the verify subgraph. Parses the verdict from the last AI message. */
+export function createVerifyCleanupNode() {
+  return (state: AgentState, _config: RunnableConfig): Partial<AgentState> => {
+    const lastAiMessage = [...state.messages]
       .reverse()
-      .find((m: { type: string }) => m.type === 'ai')
-    const output = String(lastMessage?.content ?? '')
+      .find(m => m.type === 'ai' && m.additional_kwargs.phase === 'verify')
 
+    if (!lastAiMessage) return { verifyVerdict: 'PASS' }
+
+    const output = String(lastAiMessage.content)
     const verdictMatch = output.match(/VERDICT:\s*(PASS|FAIL|PARTIAL)/)
     const verdict = (verdictMatch?.[1] ?? 'PARTIAL') as 'PASS' | 'FAIL' | 'PARTIAL'
 
@@ -31,7 +38,6 @@ export function createVerifyNode(verifyGraph: Runnable) {
       verifyVerdict: verdict,
       critiqueFeedback: verdict !== 'PASS' ? output : null,
       critiqueAttempts: state.critiqueAttempts + (verdict !== 'PASS' ? 1 : 0),
-      messages: result.messages.slice(1),
     }
   }
 }

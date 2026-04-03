@@ -38,10 +38,21 @@ export function createVerifyGraph(
   const toolNode = new ToolNode(verifyTools)
 
   async function verifyExecutor(state: typeof MessagesAnnotation.State) {
-    const hasSystem = state.messages.some(m => m.type === 'system')
-    const messages = hasSystem
-      ? state.messages
-      : [new SystemMessage(VERIFY_SYSTEM_PROMPT), ...state.messages]
+    // When invoked as a subgraph node, we receive the parent's full messages.
+    // Extract the verify prompt (last human message) + any verify-phase messages.
+    const lastHuman = [...state.messages].reverse().find(m => m.type === 'human')
+    const lastHumanIdx = lastHuman ? state.messages.lastIndexOf(lastHuman) : -1
+    const relevantMessages =
+      lastHumanIdx >= 0
+        ? state.messages
+            .slice(lastHumanIdx)
+            .filter(
+              (m: { type: string; additional_kwargs?: Record<string, unknown> }) =>
+                m.type === 'human' || m.additional_kwargs?.phase === 'verify' || m.type === 'tool'
+            )
+        : state.messages
+
+    const messages = [new SystemMessage(VERIFY_SYSTEM_PROMPT), ...relevantMessages]
 
     const response = await modelWithTools.invoke(messages)
     response.additional_kwargs = { ...response.additional_kwargs, phase: 'verify' }
