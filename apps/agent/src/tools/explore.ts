@@ -1,5 +1,27 @@
+import { createAgent, tool } from 'langchain'
 import { z } from 'zod'
-import { tool } from 'langchain'
+import { HumanMessage } from '@langchain/core/messages'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { fileSearchTool } from '@/tools/file-search'
+import { fileReadTool } from '@/tools/file-read'
+import { grepTool } from '@/tools/grep'
+
+const EXPLORE_SYSTEM_PROMPT = `You are a codebase exploration and planning specialist. Your job is to understand the codebase and produce an implementation plan — not to implement anything.
+
+READ-ONLY MODE: You only have access to file search, file read, and grep tools. Do not attempt to create, edit, or delete files.
+
+Rules:
+- Prefer grep and file_search over guessing file paths. If file_read fails, the file doesn't exist — don't try variations.
+- Search broadly first, then read specific files.
+- Stop exploring once you have enough context to produce a plan. Perfection is not the goal.
+
+When you have gathered enough information, write:
+
+1. A brief summary of findings (relevant files, patterns, constraints)
+2. A numbered implementation plan:
+   - Be specific about file paths and what changes
+   - Keep it under 10 steps
+   - No code, just the plan`
 
 const exploreSchema = z.object({
   prompt: z
@@ -9,18 +31,29 @@ const exploreSchema = z.object({
     ),
 })
 
-/**
- * Schema-only tool — never executed directly. When the executor calls this,
- * the graph routes to the explore subgraph instead of the regular tools node.
- */
-export const exploreTool = tool(
-  () => {
-    throw new Error('explore tool is handled as a subgraph, not a direct tool call')
-  },
-  {
+export function createExploreTool(model: BaseChatModel) {
+  const exploreAgent = createAgent({
+    model,
+    tools: [fileSearchTool, fileReadTool, grepTool],
+    systemPrompt: EXPLORE_SYSTEM_PROMPT,
     name: 'explore',
-    description:
-      'Explore the codebase to understand its structure, find relevant files, and produce an implementation plan. Use this for broader codebase exploration and deep research when your task will clearly require reading multiple files across different locations. For simple, directed searches (a specific file, class, or function), use file_search or grep directly instead — they are faster.',
-    schema: exploreSchema,
-  }
-)
+  })
+
+  return tool(
+    async ({ prompt }) => {
+      const result = await exploreAgent.invoke({
+        messages: [new HumanMessage(prompt)],
+      })
+      const lastMessage = result.messages.at(-1)
+      return typeof lastMessage?.content === 'string'
+        ? lastMessage.content
+        : 'Exploration complete — no findings.'
+    },
+    {
+      name: 'explore',
+      description:
+        'Explore the codebase to understand its structure, find relevant files, and produce an implementation plan. Use this for broader codebase exploration and deep research when your task will clearly require reading multiple files across different locations. For simple, directed searches (a specific file, class, or function), use file_search or grep directly instead — they are faster.',
+      schema: exploreSchema,
+    }
+  )
+}
