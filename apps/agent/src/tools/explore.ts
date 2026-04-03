@@ -1,6 +1,6 @@
 import { createAgent, tool } from 'langchain'
 import { z } from 'zod'
-import { HumanMessage } from '@langchain/core/messages'
+import { AIMessageChunk, HumanMessage, ToolMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
@@ -31,6 +31,14 @@ const exploreSchema = z.object({
     ),
 })
 
+interface ExploreStreamEvent {
+  type: 'text' | 'tool-call' | 'tool-result'
+  content?: string
+  name?: string
+  args?: unknown
+  result?: string
+}
+
 export function createExploreTool(model: BaseChatModel) {
   const exploreAgent = createAgent({
     model,
@@ -40,17 +48,58 @@ export function createExploreTool(model: BaseChatModel) {
   })
 
   return tool(
-    async ({ prompt }, config) => {
-      const result = await exploreAgent.invoke(
-        {
-          messages: [new HumanMessage(prompt)],
-        },
-        config
+    async function* ({ prompt }, config) {
+      const stream = await exploreAgent.stream(
+        { messages: [new HumanMessage(prompt)] },
+        { ...config, streamMode: 'messages' }
       )
-      const lastMessage = result.messages.at(-1)
-      return typeof lastMessage?.content === 'string'
-        ? lastMessage.content
-        : 'Exploration complete — no findings.'
+
+      const events: Array<ExploreStreamEvent> = []
+      let lastAiText = ''
+
+      for await (const [chunk] of stream) {
+        // AI message chunks (text from the subagent LLM)
+        if (AIMessageChunk.isInstance(chunk)) {
+          const textContent =
+            typeof chunk.content === 'string'
+              ? chunk.content
+              : Array.isArray(chunk.content)
+                ? chunk.content
+                    .filter((c: any) => c.type === 'text')
+                    .map((c: any) => c.text)
+                    .join('')
+                : ''
+
+          if (textContent) {
+            lastAiText += textContent
+            events.push({ type: 'text', content: textContent })
+            yield [...events]
+          }
+
+          // Tool calls from the AI (the subagent deciding to call a tool)
+          if (chunk.tool_calls?.length) {
+            for (const tc of chunk.tool_calls) {
+              events.push({ type: 'tool-call', name: tc.name, args: tc.args })
+            }
+            yield [...events]
+          }
+        }
+
+        // Tool result messages
+        if (ToolMessage.isInstance(chunk)) {
+          const resultContent =
+            typeof chunk.content === 'string' ? chunk.content : JSON.stringify(chunk.content)
+
+          events.push({
+            type: 'tool-result',
+            name: chunk.name,
+            result: resultContent,
+          })
+          yield [...events]
+        }
+      }
+
+      return lastAiText || 'Exploration complete — no findings.'
     },
     {
       name: 'explore',
