@@ -1,16 +1,11 @@
-import { dispatchCustomEvent } from '@langchain/core/callbacks/dispatch'
+import { AIMessage } from '@langchain/core/messages'
 import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
 export function createExploreNode(exploreGraph: Runnable) {
   return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
-    await dispatchCustomEvent('phase_start', { phase: 'explore' }, config)
-
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
-    if (!lastUserMessage) {
-      await dispatchCustomEvent('phase_end', { phase: 'explore' }, config)
-      return {}
-    }
+    if (!lastUserMessage) return {}
 
     const result = await exploreGraph.invoke({ messages: [lastUserMessage] }, config)
 
@@ -19,7 +14,19 @@ export function createExploreNode(exploreGraph: Runnable) {
       .find((m: { type: string }) => m.type === 'ai')
     const summary = lastMessage ? String(lastMessage.content) : ''
 
-    await dispatchCustomEvent('phase_end', { phase: 'explore' }, config)
-    return { exploreSummary: summary }
+    return {
+      exploreSummary: summary,
+      messages: [
+        new AIMessage({
+          content: '',
+          additional_kwargs: { phase_marker: 'explore', phase_event: 'start' },
+        }),
+        ...result.messages.slice(1), // skip the duplicated user message
+        new AIMessage({
+          content: '',
+          additional_kwargs: { phase_marker: 'explore', phase_event: 'end' },
+        }),
+      ],
+    }
   }
 }

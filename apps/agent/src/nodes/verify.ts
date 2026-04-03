@@ -1,5 +1,4 @@
-import { dispatchCustomEvent } from '@langchain/core/callbacks/dispatch'
-import { HumanMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage } from '@langchain/core/messages'
 import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
@@ -17,8 +16,6 @@ export function createVerifyNode(verifyGraph: Runnable) {
 
     if (!hasEdits) return { verifyVerdict: 'PASS' }
 
-    await dispatchCustomEvent('phase_start', { phase: 'verify' }, config)
-
     const prompt = `Verify the implementation. Original task: ${String(lastUserMessage?.content ?? 'unknown')}`
 
     const result = await verifyGraph.invoke({ messages: [new HumanMessage(prompt)] }, config)
@@ -31,12 +28,21 @@ export function createVerifyNode(verifyGraph: Runnable) {
     const verdictMatch = output.match(/VERDICT:\s*(PASS|FAIL|PARTIAL)/)
     const verdict = (verdictMatch?.[1] ?? 'PARTIAL') as 'PASS' | 'FAIL' | 'PARTIAL'
 
-    await dispatchCustomEvent('phase_end', { phase: 'verify' }, config)
-
     return {
       verifyVerdict: verdict,
       critiqueFeedback: verdict !== 'PASS' ? output : null,
       critiqueAttempts: state.critiqueAttempts + (verdict !== 'PASS' ? 1 : 0),
+      messages: [
+        new AIMessage({
+          content: '',
+          additional_kwargs: { phase_marker: 'verify', phase_event: 'start' },
+        }),
+        ...result.messages.slice(1), // skip the duplicated human prompt
+        new AIMessage({
+          content: '',
+          additional_kwargs: { phase_marker: 'verify', phase_event: 'end' },
+        }),
+      ],
     }
   }
 }

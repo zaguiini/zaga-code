@@ -1,5 +1,4 @@
-import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { dispatchCustomEvent } from '@langchain/core/callbacks/dispatch'
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
@@ -18,14 +17,9 @@ Rules:
 - If the task is a question or doesn't require changes, write "No implementation needed — this is an informational request"`
 
 export function createPlanNode(model: BaseChatModel) {
-  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
-    await dispatchCustomEvent('phase_start', { phase: 'plan' }, config)
-
+  return async (state: AgentState, _config: RunnableConfig): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
-    if (!lastUserMessage) {
-      await dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
-      return {}
-    }
+    if (!lastUserMessage) return {}
 
     const contextParts = [String(lastUserMessage.content)]
     if (state.exploreSummary) {
@@ -37,7 +31,24 @@ export function createPlanNode(model: BaseChatModel) {
       new HumanMessage(contextParts.join(' ')),
     ])
 
-    await dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
-    return { plan: String(response.content) }
+    const planText = String(response.content)
+
+    return {
+      plan: planText,
+      messages: [
+        new AIMessage({
+          content: '',
+          additional_kwargs: { phase_marker: 'plan', phase_event: 'start' },
+        }),
+        new AIMessage({
+          content: planText,
+          additional_kwargs: { phase_marker: 'plan' },
+        }),
+        new AIMessage({
+          content: '',
+          additional_kwargs: { phase_marker: 'plan', phase_event: 'end' },
+        }),
+      ],
+    }
   }
 }
