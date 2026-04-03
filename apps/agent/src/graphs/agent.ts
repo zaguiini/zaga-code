@@ -1,7 +1,6 @@
 import { Annotation, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
-import { ToolNode } from '@langchain/langgraph/prebuilt'
+import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
-import type { AIMessage } from '@langchain/core/messages'
 import { ChatOpenAIWithReasoning } from '@/utils/chat-openai-with-reasoning'
 import { fileWriteTool } from '@/tools/file-write'
 import { shellTool } from '@/tools/shell'
@@ -59,17 +58,6 @@ async function getMcpTools() {
   return mcpToolsCache
 }
 
-/** Route executor output: tools or done. */
-function executorRouting(state: AgentState): 'tools' | '__end__' {
-  const lastMessage = state.messages[state.messages.length - 1]
-  if (lastMessage.type !== 'ai') return '__end__'
-
-  const toolCalls = (lastMessage as AIMessage).tool_calls
-  if (!toolCalls?.length) return '__end__'
-
-  return 'tools'
-}
-
 async function buildAgentGraph(maxTokens: number) {
   const model = createModel()
 
@@ -97,7 +85,7 @@ async function buildAgentGraph(maxTokens: number) {
     .addEdge(START, 'maybe-compact')
     .addEdge('maybe-compact', 'system-prompt')
     .addEdge('system-prompt', 'executor')
-    .addConditionalEdges('executor', executorRouting)
+    .addConditionalEdges('executor', toolsCondition)
     .addEdge('tools', 'executor')
 }
 

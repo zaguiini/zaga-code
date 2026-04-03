@@ -136,7 +136,7 @@ function RouteComponent() {
         // Get tool calls for this AI message by matching on message ID
         const messageToolCalls = toolCallsByAiId.get(message.id!) ?? []
         for (const toolCall of messageToolCalls) {
-          if (toolCall.call.name === 'explore') continue
+          // if (toolCall.call.name === 'explore') continue
           const parts: Array<ToolInvocationPart> = []
 
           if (toolCall.state === 'pending') {

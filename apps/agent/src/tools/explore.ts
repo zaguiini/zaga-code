@@ -40,10 +40,13 @@ export function createExploreTool(model: BaseChatModel) {
   })
 
   return tool(
-    async ({ prompt }) => {
-      const result = await exploreAgent.invoke({
-        messages: [new HumanMessage(prompt)],
-      })
+    async ({ prompt }, config) => {
+      const result = await exploreAgent.invoke(
+        {
+          messages: [new HumanMessage(prompt)],
+        },
+        config
+      )
       const lastMessage = result.messages.at(-1)
       return typeof lastMessage?.content === 'string'
         ? lastMessage.content
