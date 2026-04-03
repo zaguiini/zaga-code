@@ -1,10 +1,9 @@
-import { SystemMessage } from '@langchain/core/messages'
+import { ToolMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { LangGraphRunnableConfig } from '@langchain/langgraph'
+import type { AIMessage, BaseMessage } from '@langchain/core/messages'
 import type { AgentState } from '@/graphs/agent'
-
-const MAX_EXPLORE_ITERATIONS = 15
+import { createPhaseCondition, createPhasedExecutor } from '@/nodes/phased-executor'
 
 const EXPLORE_SYSTEM_PROMPT = `You are a codebase exploration and planning specialist. Your job is to understand the codebase and produce an implementation plan — not to implement anything.
 
@@ -24,80 +23,63 @@ When you have gathered enough information, stop calling tools and write:
    - Keep it under 10 steps
    - No code, just the plan`
 
-/** Explore executor node — runs inline in the main graph for real-time streaming. */
 export function createExploreExecutorNode(
   model: BaseChatModel,
   readOnlyTools: Array<StructuredToolInterface>
 ) {
-  const modelWithTools = model.bindTools!(readOnlyTools)
-
-  return async (
-    state: AgentState,
-    config: LangGraphRunnableConfig
-  ): Promise<Partial<AgentState>> => {
-    const lastHuman = [...state.messages].reverse().find(m => m.type === 'human')
-    const lastHumanIdx = lastHuman ? state.messages.lastIndexOf(lastHuman) : 0
-    const afterHuman = state.messages.slice(lastHumanIdx + 1)
-
-    // Collect explore-phase continuation messages, filtering out empty AI responses
-    // (malformed tool calls) that would confuse the model on retry
-    const phaseMessages = afterHuman.filter(m => {
-      if (m.type === 'tool') return true
-      if (m.additional_kwargs.phase !== 'explore') return false
-      // Skip empty AI messages (no content, no tool calls)
-      const hasContent = String(m.content).trim().length > 0
-      const hasCalls =
-        Array.isArray((m as { tool_calls?: Array<unknown> }).tool_calls) &&
-        ((m as { tool_calls?: Array<unknown> }).tool_calls?.length ?? 0) > 0
-      return hasContent || hasCalls
-    })
-
-    const messages = [new SystemMessage(EXPLORE_SYSTEM_PROMPT), lastHuman!, ...phaseMessages]
-
-    const start = Date.now()
-    const response = await modelWithTools.invoke(messages, config)
-    const durationMs = Date.now() - start
-    const hasReasoning = typeof response.additional_kwargs.reasoning_content === 'string'
-    response.additional_kwargs = {
-      ...response.additional_kwargs,
-      phase: 'explore',
-      ...(hasReasoning && { reasoning_duration_ms: durationMs }),
-    }
-    return { messages: [response] }
-  }
+  return createPhasedExecutor(model, readOnlyTools, {
+    phase: 'explore',
+    systemPrompt: EXPLORE_SYSTEM_PROMPT,
+    buildUserPrompt: (userText, state) => {
+      const exploreCall = findExploreToolCall(state.messages)
+      return exploreCall?.args.prompt ?? userText
+    },
+  })
 }
 
-/** Conditional edge for the explore loop — stops after MAX_EXPLORE_ITERATIONS. */
-export function exploreToolsCondition(
-  state: AgentState
-): 'explore-tools' | 'explore-executor' | 'system-prompt' {
-  const lastMessage = state.messages[state.messages.length - 1]
+export const exploreToolsCondition = createPhaseCondition({
+  phase: 'explore',
+  maxIterations: 15,
+  maxEmptyRetries: 3,
+  toolsNode: 'explore-tools',
+  executorNode: 'explore-executor',
+  exitNode: 'explore-result',
+})
 
-  if (lastMessage.type !== 'ai') return 'system-prompt'
-
-  const exploreToolResults = state.messages.filter(m => m.type === 'tool').length
-  if (exploreToolResults >= MAX_EXPLORE_ITERATIONS) return 'system-prompt'
-
-  // Has tool calls → execute them
-  const rootToolCalls = (lastMessage as { tool_calls?: Array<unknown> }).tool_calls
-  if (Array.isArray(rootToolCalls) && rootToolCalls.length > 0) return 'explore-tools'
-
-  // Has meaningful content (summary/plan) → done
-  const content = String(lastMessage.content).trim()
-  if (content.length > 0) return 'system-prompt'
-
-  // Count consecutive empty explore responses
-  let emptyCount = 0
-  for (let i = state.messages.length - 1; i >= 0; i--) {
-    const m = state.messages[i]
-    if (m.type !== 'ai' || m.additional_kwargs.phase !== 'explore') break
-    if (String(m.content).trim() === '') emptyCount++
-    else break
+/** Find the most recent AI message that contains an explore tool call. */
+function findExploreToolCall(messages: Array<BaseMessage>) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.type !== 'ai') continue
+    const toolCalls = (msg as AIMessage).tool_calls
+    const exploreCall = toolCalls?.find(tc => tc.name === 'explore')
+    if (exploreCall) return exploreCall
   }
+  return undefined
+}
 
-  // Too many empty retries — give up and proceed
-  if (emptyCount >= 3) return 'system-prompt'
+/**
+ * Runs after the explore loop finishes. Takes the explore phase's final output
+ * and wraps it as a ToolMessage so the main executor sees it as a tool result.
+ */
+export function createExploreResultNode() {
+  return (state: AgentState): Partial<AgentState> => {
+    const exploreCall = findExploreToolCall(state.messages)
+    if (!exploreCall?.id) return {}
 
-  // Retry the explore executor
-  return 'explore-executor'
+    // Find the last explore-phase AI message with content (the plan)
+    const lastExploreAi = [...state.messages]
+      .reverse()
+      .find(
+        m => m.type === 'ai' && m.additional_kwargs.phase === 'explore' && String(m.content).trim()
+      )
+
+    const content = lastExploreAi
+      ? String(lastExploreAi.content)
+      : 'Exploration complete — no findings.'
+
+    return {
+      messages: [new ToolMessage({ content, tool_call_id: exploreCall.id })],
+    }
+  }
 }

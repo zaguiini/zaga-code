@@ -74,9 +74,9 @@ function RouteComponent() {
 
       const phase = (message.additional_kwargs?.phase as string | undefined) ?? null
 
-      // When phase changes, close the previous one
+      // When phase changes, mark the previous one as done
       if (activePhase && phase !== activePhase && phaseGroups.has(activePhase)) {
-        phaseGroups.get(activePhase)!.phase.endIdx = 1
+        phaseGroups.get(activePhase)!.phase.isDone = true
       }
       activePhase = phase
 
@@ -136,6 +136,7 @@ function RouteComponent() {
         // Get tool calls for this AI message by matching on message ID
         const messageToolCalls = toolCallsByAiId.get(message.id!) ?? []
         for (const toolCall of messageToolCalls) {
+          if (toolCall.call.name === 'explore') continue
           const parts: Array<ToolInvocationPart> = []
 
           if (toolCall.state === 'pending') {
@@ -176,7 +177,7 @@ function RouteComponent() {
         if (!phaseGroups.has(phase)) {
           const group: PhaseGroup = {
             type: 'phase-group',
-            phase: { name: phase as PhaseGroup['phase']['name'], startIdx: 0, endIdx: null },
+            phase: { name: phase as PhaseGroup['phase']['name'], isDone: false },
             messages: [],
           }
           phaseGroups.set(phase, group)
@@ -237,23 +238,10 @@ function RouteComponent() {
     el.scrollTop = el.scrollHeight
   }, [items, stream.isLoading])
 
-  const maxTokens = (stream.values as Record<string, unknown> | null)?.maxTokens as
-    | number
-    | undefined
-  const estimatedTokens = useMemo(() => {
-    const msgs = stream.messages
-    return msgs.reduce((total, msg) => {
-      const content =
-        typeof msg.content === 'string'
-          ? msg.content
-          : Array.isArray(msg.content)
-            ? msg.content.map(c => ('text' in c ? c.text : '')).join('')
-            : ''
-      return total + Math.ceil(content.length / 4)
-    }, 0)
-  }, [stream.messages])
-
-  const contextPercent = maxTokens ? Math.round((estimatedTokens / maxTokens) * 100) : null
+  const streamValues = stream.values as Record<string, unknown> | null
+  const maxTokens = (streamValues?.maxTokens as number | undefined) ?? 0
+  const usedTokens = (streamValues?.usedTokens as number | undefined) ?? 0
+  const contextPercent = maxTokens > 0 ? Math.round((usedTokens / maxTokens) * 100) : null
 
   return (
     <div className="w-full h-full flex flex-col justify-center items-center gap-8">
@@ -296,10 +284,10 @@ function RouteComponent() {
             </p>
           )}
 
-          {maxTokens != null && maxTokens > 0 && (
+          {maxTokens > 0 && usedTokens > 0 && (
             <div className="ml-auto flex items-center justify-end text-xs text-muted-foreground">
-              ~{estimatedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens (
-              {contextPercent}%)
+              {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens ({contextPercent}
+              %)
             </div>
           )}
         </div>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, Loader2, Search, ShieldCheck } from 'lucide-react'
+import { ChevronRight, Code2, Loader2, Search } from 'lucide-react'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
@@ -57,12 +57,6 @@ interface Attachment {
   url: string
 }
 
-interface PartialToolCall {
-  state: 'partial-call'
-  toolName: string
-  args: Record<string, any>
-}
-
 interface ToolCall {
   state: 'call'
   toolName: string
@@ -74,13 +68,9 @@ interface ToolResult {
   toolName: string
   args: Record<string, any>
   result: string
-  // result: {
-  //   __cancelled?: boolean
-  //   [key: string]: any
-  // }
 }
 
-type ToolInvocation = PartialToolCall | ToolCall | ToolResult
+type ToolInvocation = ToolCall | ToolResult
 
 interface ReasoningPart {
   type: 'reasoning'
@@ -99,29 +89,7 @@ interface TextPart {
   text: string
 }
 
-// For compatibility with AI SDK types, not used
-interface SourcePart {
-  type: 'source'
-  source?: any
-}
-
-interface FilePart {
-  type: 'file'
-  mimeType: string
-  data: string
-}
-
-interface StepStartPart {
-  type: 'step-start'
-}
-
-type MessagePart =
-  | TextPart
-  | ReasoningPart
-  | ToolInvocationPart
-  | SourcePart
-  | FilePart
-  | StepStartPart
+type MessagePart = TextPart | ReasoningPart | ToolInvocationPart
 
 export interface Message {
   id: string
@@ -132,15 +100,9 @@ export interface Message {
   parts?: Array<MessagePart>
 }
 
-export interface PhaseInfo {
-  name: 'explore' | 'verify'
-  startIdx: number
-  endIdx: number | null
-}
-
 export interface PhaseGroup {
   type: 'phase-group'
-  phase: PhaseInfo
+  phase: { name: 'explore'; isDone: boolean }
   messages: Array<Message>
 }
 
@@ -237,10 +199,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       )
     } else if (part.type === 'reasoning') {
       return <ReasoningBlock key={`reasoning-${index}`} part={part} />
-    } else if (part.type === 'tool-invocation') {
-      return <ToolCall key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
+    } else {
+      return <ToolCallBlock key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
     }
-    return null
   })
 }
 
@@ -329,17 +290,15 @@ const PHASE_CONFIG = {
     doneLabel: 'Explored codebase and planned implementation',
     Icon: Search,
   },
-  verify: { runningLabel: 'Verifying', doneLabel: 'Verified implementation', Icon: ShieldCheck },
 } as const
 
 export function PhaseBlock({ group }: { group: PhaseGroup }) {
   const config = PHASE_CONFIG[group.phase.name]
-  const isRunning = group.phase.endIdx === null
-  const label = isRunning ? config.runningLabel : config.doneLabel
-  const icon = isRunning ? (
-    <Loader2 className="h-3 w-3 animate-spin" />
-  ) : (
+  const label = group.phase.isDone ? config.doneLabel : config.runningLabel
+  const icon = group.phase.isDone ? (
     <config.Icon className="h-4 w-4" />
+  ) : (
+    <Loader2 className="h-3 w-3 animate-spin" />
   )
 
   return (
@@ -353,35 +312,13 @@ export function PhaseBlock({ group }: { group: PhaseGroup }) {
   )
 }
 
-function ToolCall({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
+function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
   if (!toolInvocations?.length) return null
 
   return (
     <div className="flex flex-col items-start gap-2">
       {toolInvocations.map((invocation, index) => {
-        // const isCancelled = invocation.state === 'result' && invocation.result.__cancelled === true
-
-        // if (isCancelled) {
-        //   return (
-        //     <div
-        //       key={index}
-        //       className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
-        //     >
-        //       <Ban className="h-4 w-4" />
-        //       <span>
-        //         Cancelled{' '}
-        //         <span className="font-mono">
-        //           {'`'}
-        //           {invocation.toolName}
-        //           {'`'}
-        //         </span>
-        //       </span>
-        //     </div>
-        //   )
-        // }
-
         switch (invocation.state) {
-          case 'partial-call':
           case 'call':
             return (
               <CollapsibleBlock

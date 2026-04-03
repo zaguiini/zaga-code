@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { RemoveMessage, SystemMessage } from '@langchain/core/messages'
+import { SystemMessage } from '@langchain/core/messages'
 import type { BaseMessage, Runtime } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
 
@@ -18,6 +18,14 @@ const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users w
 - Prefer file_edit over file_write for modifying existing files.
 - Use file_write only for creating new files or complete rewrites.
 - When using file_edit, include 2-3 lines of surrounding context in old_string to ensure uniqueness.
+
+**Codebase Exploration:**
+- For simple, directed searches (a specific file, class, or function), use file_search or grep directly — they are faster.
+- For broader codebase exploration and deep research, use the explore tool. This is slower, so use it only when a simple directed search is insufficient or when your task will clearly require reading multiple files across different locations.
+
+**Verification:**
+- If AGENTS.md specifies build, test, lint, or typecheck commands, run them after making changes — without asking. Fix any failures before reporting the task as done.
+- If AGENTS.md does not mention any checks, do not guess or discover them yourself. Just complete the task.
 
 **External Libraries and Documentation:**
 - If the user's question or task involves an external library, package, or framework (e.g. "what are the X classes in tailwind", "how do I use Y in react", "show me Z from lodash"), your FIRST tool call MUST be to Context7 to fetch the documentation. Do NOT search the project files first. Do NOT use your training knowledge. Call Context7 immediately as the very first action.
@@ -44,31 +52,18 @@ const isAgentContext = (context: unknown): context is AgentContext => {
   return typeof context === 'object' && context !== null && 'project_path' in context
 }
 
-function buildSystemPromptContent(base: string, critiqueFeedback: string | null): string {
-  let content = base
-
-  if (critiqueFeedback) {
-    content += `\n\n## Previous Attempt Feedback\n\nA previous attempt was reviewed and found these issues. Fix them:\n\n${critiqueFeedback}`
-  }
-
-  return content
-}
-
-async function buildSystemPrompt(
-  runtime: Runtime,
-  critiqueFeedback: string | null
-): Promise<BaseMessage> {
+async function buildSystemPrompt(runtime: Runtime): Promise<BaseMessage> {
   if (isAgentContext(runtime.context)) {
     try {
       const agentsMd = await readFile(join(runtime.context.project_path, 'AGENTS.md'), 'utf-8')
       const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
-      return new SystemMessage(buildSystemPromptContent(base, critiqueFeedback))
+      return new SystemMessage(base)
     } catch {
       // AGENTS.md not found, fall through to base prompt
     }
   }
 
-  return new SystemMessage(buildSystemPromptContent(BASE_SYSTEM_PROMPT, critiqueFeedback))
+  return new SystemMessage(BASE_SYSTEM_PROMPT)
 }
 
 export async function systemPromptNode(
@@ -77,17 +72,9 @@ export async function systemPromptNode(
 ): Promise<Partial<AgentState>> {
   const existingSystem = state.messages.find(msg => msg.type === 'system')
 
-  // Skip rebuild if system message exists and we're not on a retry path
-  if (existingSystem && !state.critiqueFeedback) return {}
+  // Skip rebuild if system message already exists
+  if (existingSystem) return {}
 
-  const systemMessage = await buildSystemPrompt(runtime, state.critiqueFeedback)
-
-  // MessagesAnnotation uses an additive reducer. To replace the system
-  // message, remove the old one first then add the new one.
-  if (existingSystem) {
-    return {
-      messages: [new RemoveMessage({ id: existingSystem.id! }), systemMessage],
-    }
-  }
+  const systemMessage = await buildSystemPrompt(runtime)
   return { messages: [systemMessage] }
 }
