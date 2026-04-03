@@ -65,19 +65,15 @@ export function createExploreExecutorNode(
 export function exploreToolsCondition(state: AgentState): 'explore-tools' | 'explore-cleanup' {
   const lastMessage = state.messages[state.messages.length - 1]
 
-  // If the last AI message has no tool calls, exploration is done
+  // If the last message isn't an AI message with tool calls, exploration is done
   if (lastMessage.type !== 'ai') return 'explore-cleanup'
-  const hasToolCalls =
-    Array.isArray(lastMessage.additional_kwargs.tool_call_chunks) &&
-    lastMessage.additional_kwargs.tool_call_chunks.length > 0
-  if (!hasToolCalls) return 'explore-cleanup'
 
-  // Count explore-phase tool results as a proxy for iterations
-  const exploreToolResults = state.messages.filter(
-    m =>
-      m.type === 'tool' &&
-      state.messages.some(a => a.type === 'ai' && a.additional_kwargs.phase === 'explore')
-  ).length
+  // Check for tool calls — they live on the message root, not in additional_kwargs
+  const rootToolCalls = (lastMessage as { tool_calls?: Array<unknown> }).tool_calls
+  if (!Array.isArray(rootToolCalls) || rootToolCalls.length === 0) return 'explore-cleanup'
+
+  // Count explore-phase tool result messages as iterations
+  const exploreToolResults = state.messages.filter(m => m.type === 'tool').length
 
   if (exploreToolResults >= MAX_EXPLORE_ITERATIONS) return 'explore-cleanup'
 
