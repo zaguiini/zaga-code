@@ -1,14 +1,34 @@
-import type { RunnableConfig } from '@langchain/core/runnables'
+import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
-/** Runs after the explore subgraph completes. Extracts the summary. */
-export function createExploreCleanupNode() {
-  return (state: AgentState, _config: RunnableConfig): Partial<AgentState> => {
-    const lastAiMessage = [...state.messages]
-      .reverse()
-      .find(m => m.type === 'ai' && m.additional_kwargs.phase === 'explore')
-    const summary = lastAiMessage ? String(lastAiMessage.content) : ''
+/**
+ * Streams the explore subgraph, forwarding config so events propagate
+ * to the parent stream. Returns messages to parent state for grouping.
+ */
+export function createExploreNode(exploreGraph: Runnable) {
+  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
+    const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
+    if (!lastUserMessage) return {}
 
-    return { exploreSummary: summary }
+    // Debug: check if parent stream is in config
+    const configurable = config.configurable as Record<string, unknown> | undefined
+    const hasStream = Boolean(configurable?.__pregel_stream)
+    console.log('[explore] config has __pregel_stream:', hasStream)
+
+    const result = await exploreGraph.invoke({ messages: [lastUserMessage] }, config)
+
+    const lastMessage = [...result.messages]
+      .reverse()
+      .find((m: { type: string }) => m.type === 'ai')
+    const summary = lastMessage ? String(lastMessage.content) : ''
+
+    // Tag messages with phase and return to parent state
+    for (const msg of result.messages.slice(1)) {
+      if (msg.additional_kwargs) {
+        msg.additional_kwargs = { ...msg.additional_kwargs, phase: 'explore' }
+      }
+    }
+
+    return { exploreSummary: summary, messages: result.messages.slice(1) }
   }
 }

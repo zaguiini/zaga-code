@@ -1,10 +1,9 @@
 import { HumanMessage } from '@langchain/core/messages'
-import type { RunnableConfig } from '@langchain/core/runnables'
+import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
-/** Runs before the verify subgraph. Checks if edits were made and prepares the verify prompt. */
-export function createVerifySetupNode() {
-  return (state: AgentState, _config: RunnableConfig): Partial<AgentState> => {
+export function createVerifyNode(verifyGraph: Runnable) {
+  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
 
     const lastUserIdx = state.messages.lastIndexOf(lastUserMessage!)
@@ -17,27 +16,29 @@ export function createVerifySetupNode() {
     if (!hasEdits) return { verifyVerdict: 'PASS' }
 
     const prompt = `Verify the implementation. Original task: ${String(lastUserMessage?.content ?? 'unknown')}`
-    return { messages: [new HumanMessage(prompt)] }
-  }
-}
 
-/** Runs after the verify subgraph. Parses the verdict from the last AI message. */
-export function createVerifyCleanupNode() {
-  return (state: AgentState, _config: RunnableConfig): Partial<AgentState> => {
-    const lastAiMessage = [...state.messages]
+    const result = await verifyGraph.invoke({ messages: [new HumanMessage(prompt)] }, config)
+
+    const lastMessage = [...result.messages]
       .reverse()
-      .find(m => m.type === 'ai' && m.additional_kwargs.phase === 'verify')
+      .find((m: { type: string }) => m.type === 'ai')
+    const output = String(lastMessage?.content ?? '')
 
-    if (!lastAiMessage) return { verifyVerdict: 'PASS' }
-
-    const output = String(lastAiMessage.content)
     const verdictMatch = output.match(/VERDICT:\s*(PASS|FAIL|PARTIAL)/)
     const verdict = (verdictMatch?.[1] ?? 'PARTIAL') as 'PASS' | 'FAIL' | 'PARTIAL'
+
+    // Tag messages with phase and return to parent state
+    for (const msg of result.messages.slice(1)) {
+      if (msg.additional_kwargs) {
+        msg.additional_kwargs = { ...msg.additional_kwargs, phase: 'verify' }
+      }
+    }
 
     return {
       verifyVerdict: verdict,
       critiqueFeedback: verdict !== 'PASS' ? output : null,
       critiqueAttempts: state.critiqueAttempts + (verdict !== 'PASS' ? 1 : 0),
+      messages: result.messages.slice(1),
     }
   }
 }
