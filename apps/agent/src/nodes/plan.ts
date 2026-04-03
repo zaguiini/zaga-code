@@ -18,12 +18,12 @@ Rules:
 - If the task is a question or doesn't require changes, write "No implementation needed — this is an informational request"`
 
 export function createPlanNode(model: BaseChatModel) {
-  return async (state: AgentState, config?: RunnableConfig): Promise<Partial<AgentState>> => {
-    dispatchCustomEvent('phase_start', { phase: 'plan' }, config)
+  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
+    await dispatchCustomEvent('phase_start', { phase: 'plan' }, config)
 
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
     if (!lastUserMessage) {
-      dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
+      await dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
       return {}
     }
 
@@ -37,7 +37,7 @@ export function createPlanNode(model: BaseChatModel) {
       new HumanMessage(contextParts.join(' ')),
     ])
 
-    dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
+    await dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
     return { plan: String(response.content) }
   }
 }
