@@ -1,12 +1,9 @@
-import { exec } from 'node:child_process'
-import { promisify } from 'node:util'
+import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { tool } from 'langchain'
 import type { ToolRuntime } from '@langchain/core/tools'
 import { checkShellSafety } from '@/utils/shell-safety'
-
-const execAsync = promisify(exec)
 
 const shellSchema = z.object({
   command: z.string().describe('Shell command to execute'),
@@ -22,59 +19,81 @@ const contextSchema = z.object({
 
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
-/**
- * Creates a LangGraph tool for executing shell commands.
- * Commands are executed in the project directory context.
- *
- * @param projectPath - The root path of the project directory (used as cwd)
- * @returns A LangGraph tool that executes shell commands
- */
 export const shellTool = tool(
-  async (
+  async function* (
     input: z.infer<typeof shellSchema>,
     { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
-  ) => {
-    try {
-      if (input.command.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
-        return `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
-      }
+  ) {
+    if (input.command.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
+      return `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+    }
 
-      const safety = checkShellSafety(input.command)
+    const safety = checkShellSafety(input.command)
 
-      if (safety === 'block') {
-        return `Blocked: "${input.command}" matches a permanently blocked pattern.`
-      }
+    if (safety === 'block') {
+      return `Blocked: "${input.command}" matches a permanently blocked pattern.`
+    }
 
-      if (safety === 'confirm' && !input.confirmed) {
-        return `CONFIRMATION_REQUIRED: "${input.command}" is a destructive command. Re-run with confirmed: true to execute.`
-      }
+    if (safety === 'confirm' && !input.confirmed) {
+      return `CONFIRMATION_REQUIRED: "${input.command}" is a destructive command. Re-run with confirmed: true to execute.`
+    }
 
-      const resolvedProjectPath = resolve(project_path)
-      const { stdout, stderr } = await execAsync(input.command, {
-        cwd: resolvedProjectPath,
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    const resolvedProjectPath = resolve(project_path)
+    const child = spawn('sh', ['-c', input.command], {
+      cwd: resolvedProjectPath,
+      env: process.env,
+    })
+
+    // Bridge spawn events → async iteration via a simple queue
+    type QueueItem =
+      | { type: 'data'; text: string }
+      | { type: 'done'; exitCode: number }
+      | { type: 'error'; error: Error }
+    const queue: Array<QueueItem> = []
+    let resolve_: (() => void) | null = null
+
+    function push(item: QueueItem) {
+      queue.push(item)
+      resolve_?.()
+    }
+
+    function waitForItem(): Promise<void> {
+      if (queue.length > 0) return Promise.resolve()
+      return new Promise(r => {
+        resolve_ = r
       })
+    }
 
-      // Combine stdout and stderr, indicating which is which
-      let output = ''
-      if (stdout) {
-        output += `STDOUT:\n${stdout}`
-      }
-      if (stderr) {
-        output += output ? `\n\nSTDERR:\n${stderr}` : `STDERR:\n${stderr}`
-      }
+    child.stdout.on('data', (data: Buffer) => push({ type: 'data', text: data.toString() }))
+    child.stderr.on('data', (data: Buffer) => push({ type: 'data', text: data.toString() }))
+    child.on('error', (error: Error) => push({ type: 'error', error }))
+    child.on('close', (exitCode: number | null) => push({ type: 'done', exitCode: exitCode ?? 0 }))
 
-      return output || 'Command executed successfully (no output)'
-    } catch (error: any) {
-      // execAsync throws an error with stdout/stderr properties
-      let errorMessage = `Command failed: ${error.message}`
-      if (error.stdout) {
-        errorMessage += `\n\nSTDOUT:\n${error.stdout}`
+    let accumulated = ''
+
+    for (;;) {
+      await waitForItem()
+
+      // Drain all queued items
+      while (queue.length > 0) {
+        const item = queue.shift()!
+
+        if (item.type === 'error') {
+          return `Command failed: ${item.error.message}`
+        }
+
+        if (item.type === 'done') {
+          const output = accumulated || 'Command executed successfully (no output)'
+          if (item.exitCode !== 0) {
+            return `Command failed (exit code ${item.exitCode})${accumulated ? `\n\n${accumulated}` : ''}`
+          }
+          return output
+        }
+
+        // type === 'data'
+        accumulated += item.text
+        yield accumulated
       }
-      if (error.stderr) {
-        errorMessage += `\n\nSTDERR:\n${error.stderr}`
-      }
-      return errorMessage
     }
   },
   {
