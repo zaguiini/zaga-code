@@ -97,15 +97,6 @@ function RouteComponent() {
         // AI message
         const reasoningContent = message.additional_kwargs?.reasoning_content as string | undefined
 
-        if (reasoningContent) {
-          displayMessages.push({
-            id: message.id!,
-            role: 'assistant',
-            content: reasoningContent,
-            parts: [{ type: 'reasoning', reasoning: reasoningContent }],
-          })
-        }
-
         const messageContent = Array.isArray(message.content)
           ? message.content
               .filter(content => content.type === 'text')
@@ -128,6 +119,17 @@ function RouteComponent() {
           (message.additional_kwargs?.tool_calls as Array<{ id?: string }> | undefined) ??
           []
         const messageTcIds = rawToolCalls.map(tc => tc.id).filter((id): id is string => Boolean(id))
+
+        // Add reasoning block — done if the message also has text or tool calls
+        if (reasoningContent) {
+          const reasoningDone = Boolean(messageContent) || messageTcIds.length > 0
+          displayMessages.unshift({
+            id: message.id!,
+            role: 'assistant',
+            content: reasoningContent,
+            parts: [{ type: 'reasoning', reasoning: reasoningContent, done: reasoningDone }],
+          })
+        }
 
         for (const tcId of messageTcIds) {
           const toolCall = toolCallMap.get(tcId)

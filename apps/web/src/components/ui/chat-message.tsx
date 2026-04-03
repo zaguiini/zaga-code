@@ -85,6 +85,7 @@ type ToolInvocation = PartialToolCall | ToolCall | ToolResult
 interface ReasoningPart {
   type: 'reasoning'
   reasoning: string
+  done?: boolean
 }
 
 export interface ToolInvocationPart {
@@ -303,7 +304,7 @@ const CollapsibleBlock = ({
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   return (
-    <CollapsibleBlock title="Thinking" defaultOpen>
+    <CollapsibleBlock title={part.done ? 'Thought' : 'Thinking'} defaultOpen={!part.done}>
       {part.reasoning}
     </CollapsibleBlock>
   )
