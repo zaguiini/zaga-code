@@ -123,11 +123,14 @@ function RouteComponent() {
         // Add reasoning block — done if the message also has text or tool calls
         if (reasoningContent) {
           const reasoningDone = Boolean(messageContent) || messageTcIds.length > 0
+          const durationMs = message.additional_kwargs?.reasoning_duration_ms as number | undefined
           displayMessages.unshift({
             id: message.id!,
             role: 'assistant',
             content: reasoningContent,
-            parts: [{ type: 'reasoning', reasoning: reasoningContent, done: reasoningDone }],
+            parts: [
+              { type: 'reasoning', reasoning: reasoningContent, done: reasoningDone, durationMs },
+            ],
           })
         }
 

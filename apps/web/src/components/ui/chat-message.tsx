@@ -86,6 +86,7 @@ interface ReasoningPart {
   type: 'reasoning'
   reasoning: string
   done?: boolean
+  durationMs?: number
 }
 
 export interface ToolInvocationPart {
@@ -302,9 +303,21 @@ const CollapsibleBlock = ({
   )
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remaining = seconds % 60
+  return remaining > 0 ? `${minutes}m ${remaining}s` : `${minutes}m`
+}
+
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
+  const label = part.done ? 'Thought' : 'Thinking'
+  const duration = part.done && part.durationMs ? ` for ${formatDuration(part.durationMs)}` : ''
+
   return (
-    <CollapsibleBlock title={part.done ? 'Thought' : 'Thinking'} defaultOpen={!part.done}>
+    <CollapsibleBlock title={`${label}${duration}`} defaultOpen={!part.done}>
       {part.reasoning}
     </CollapsibleBlock>
   )

@@ -40,8 +40,15 @@ export function createExploreExecutorNode(
 
     const messages = [new SystemMessage(EXPLORE_SYSTEM_PROMPT), lastHuman!, ...phaseMessages]
 
+    const start = Date.now()
     const response = await modelWithTools.invoke(messages, config)
-    response.additional_kwargs = { ...response.additional_kwargs, phase: 'explore' }
+    const durationMs = Date.now() - start
+    const hasReasoning = typeof response.additional_kwargs.reasoning_content === 'string'
+    response.additional_kwargs = {
+      ...response.additional_kwargs,
+      phase: 'explore',
+      ...(hasReasoning && { reasoning_duration_ms: durationMs }),
+    }
     return { messages: [response] }
   }
 }

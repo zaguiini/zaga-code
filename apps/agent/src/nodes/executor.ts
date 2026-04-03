@@ -30,12 +30,21 @@ export function createExecutorNode(
     )
 
     // Pass parent config through so streamEvents callbacks are preserved
+    const start = Date.now()
     const response = await modelWithTools.invoke(messages, config)
+    const durationMs = Date.now() - start
 
     const reasoning =
       typeof response.additional_kwargs?.reasoning_content === 'string'
         ? response.additional_kwargs.reasoning_content
         : undefined
+
+    if (reasoning) {
+      response.additional_kwargs = {
+        ...response.additional_kwargs,
+        reasoning_duration_ms: durationMs,
+      }
+    }
 
     const langfuse = getLangfuse()
     const threadId = config.configurable?.thread_id

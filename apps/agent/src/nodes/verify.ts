@@ -81,8 +81,15 @@ export function createVerifyExecutorNode(
       ...phaseMessages,
     ]
 
+    const start = Date.now()
     const response = await modelWithTools.invoke(messages, config)
-    response.additional_kwargs = { ...response.additional_kwargs, phase: 'verify' }
+    const durationMs = Date.now() - start
+    const hasReasoning = typeof response.additional_kwargs.reasoning_content === 'string'
+    response.additional_kwargs = {
+      ...response.additional_kwargs,
+      phase: 'verify',
+      ...(hasReasoning && { reasoning_duration_ms: durationMs }),
+    }
     return { messages: [response] }
   }
 }
