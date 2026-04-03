@@ -261,8 +261,8 @@ const CollapsibleBlock = ({
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
-  const rightChevron = (
-    <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+  const chevron = (
+    <ChevronRight className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-90')} />
   )
 
   return (
@@ -270,12 +270,12 @@ const CollapsibleBlock = ({
       <Collapsible
         open={isOpen}
         onOpenChange={setIsOpen}
-        className="group w-full overflow-hidden rounded-lg border bg-muted/50"
+        className="w-full overflow-hidden rounded-lg border bg-muted/50"
       >
         <div className="flex items-center p-2">
           <CollapsibleTrigger asChild>
             <button className="flex w-full cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              {isOpen ? rightChevron : (icon ?? rightChevron)}
+              {isOpen ? chevron : (icon ?? chevron)}
               <span>{title}</span>
             </button>
           </CollapsibleTrigger>
@@ -310,9 +310,9 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
 }
 
 const PHASE_CONFIG = {
-  explore: { runningLabel: 'Exploring codebase...', doneLabel: 'Explored codebase', Icon: Search },
-  plan: { runningLabel: 'Planning...', doneLabel: 'Planned implementation', Icon: ListChecks },
-  verify: { runningLabel: 'Verifying...', doneLabel: 'Verified implementation', Icon: ShieldCheck },
+  explore: { runningLabel: 'Exploring codebase', doneLabel: 'Explored codebase', Icon: Search },
+  plan: { runningLabel: 'Planning', doneLabel: 'Planned implementation', Icon: ListChecks },
+  verify: { runningLabel: 'Verifying', doneLabel: 'Verified implementation', Icon: ShieldCheck },
 } as const
 
 export function PhaseBlock({ group }: { group: PhaseGroup }) {

@@ -1,4 +1,4 @@
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
@@ -17,7 +17,7 @@ Rules:
 - If the task is a question or doesn't require changes, write "No implementation needed — this is an informational request"`
 
 export function createPlanNode(model: BaseChatModel) {
-  return async (state: AgentState, _config: RunnableConfig): Promise<Partial<AgentState>> => {
+  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
     if (!lastUserMessage) return {}
 
@@ -26,21 +26,14 @@ export function createPlanNode(model: BaseChatModel) {
       contextParts.unshift(`Exploration findings:\n${state.exploreSummary}\n\nUser request:`)
     }
 
-    const response = await model.invoke([
-      new SystemMessage(PLAN_SYSTEM_PROMPT),
-      new HumanMessage(contextParts.join(' ')),
-    ])
+    const response = await model.invoke(
+      [new SystemMessage(PLAN_SYSTEM_PROMPT), new HumanMessage(contextParts.join(' '))],
+      config
+    )
 
+    response.additional_kwargs = { ...response.additional_kwargs, phase: 'plan' }
     const planText = String(response.content)
 
-    return {
-      plan: planText,
-      messages: [
-        new AIMessage({
-          content: planText,
-          additional_kwargs: { phase: 'plan' },
-        }),
-      ],
-    }
+    return { plan: planText, messages: [response] }
   }
 }
