@@ -1,5 +1,7 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { dispatchCustomEvent } from '@langchain/core/callbacks/dispatch'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { RunnableConfig } from '@langchain/core/runnables'
 import type { AgentState } from '@/graphs/agent'
 
 const PLAN_SYSTEM_PROMPT = `You are an implementation planner. Produce a concise, numbered implementation plan.
@@ -16,9 +18,14 @@ Rules:
 - If the task is a question or doesn't require changes, write "No implementation needed — this is an informational request"`
 
 export function createPlanNode(model: BaseChatModel) {
-  return async (state: AgentState): Promise<Partial<AgentState>> => {
+  return async (state: AgentState, config?: RunnableConfig): Promise<Partial<AgentState>> => {
+    dispatchCustomEvent('phase_start', { phase: 'plan' }, config)
+
     const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
-    if (!lastUserMessage) return {}
+    if (!lastUserMessage) {
+      dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
+      return {}
+    }
 
     const contextParts = [String(lastUserMessage.content)]
     if (state.exploreSummary) {
@@ -30,6 +37,7 @@ export function createPlanNode(model: BaseChatModel) {
       new HumanMessage(contextParts.join(' ')),
     ])
 
+    dispatchCustomEvent('phase_end', { phase: 'plan' }, config)
     return { plan: String(response.content) }
   }
 }
