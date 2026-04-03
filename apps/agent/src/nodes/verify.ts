@@ -1,4 +1,4 @@
-import { SystemMessage } from '@langchain/core/messages'
+import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
@@ -77,7 +77,8 @@ export function createVerifyExecutorNode(
     )
 
     const messages = [
-      new SystemMessage(`${VERIFY_SYSTEM_PROMPT}\n\nOriginal task: ${userContent}`),
+      new SystemMessage(VERIFY_SYSTEM_PROMPT),
+      new HumanMessage(`Verify the implementation. Original task: ${userContent}`),
       ...phaseMessages,
     ]
 
