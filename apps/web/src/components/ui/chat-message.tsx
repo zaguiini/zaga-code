@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, Loader2 } from 'lucide-react'
+import { ChevronRight, Code2, ListChecks, Loader2, Search, ShieldCheck } from 'lucide-react'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
@@ -128,6 +128,18 @@ export interface Message {
   createdAt?: Date
   experimental_attachments?: Array<Attachment>
   parts?: Array<MessagePart>
+}
+
+export interface PhaseInfo {
+  name: 'explore' | 'plan' | 'verify'
+  startIdx: number
+  endIdx: number | null
+}
+
+export interface PhaseGroup {
+  type: 'phase-group'
+  phase: PhaseInfo
+  messages: Array<Message>
 }
 
 export interface ChatMessageProps extends Message {
@@ -289,6 +301,33 @@ const CollapsibleBlock = ({
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   return <CollapsibleBlock title="Thinking">{part.reasoning}</CollapsibleBlock>
+}
+
+const PHASE_CONFIG = {
+  explore: { runningLabel: 'Exploring codebase...', doneLabel: 'Explored codebase', Icon: Search },
+  plan: { runningLabel: 'Planning...', doneLabel: 'Planned implementation', Icon: ListChecks },
+  verify: { runningLabel: 'Verifying...', doneLabel: 'Verified implementation', Icon: ShieldCheck },
+} as const
+
+export function PhaseBlock({ group }: { group: PhaseGroup }) {
+  const config = PHASE_CONFIG[group.phase.name]
+  const isRunning = group.phase.endIdx === null
+  const label = isRunning ? config.runningLabel : config.doneLabel
+  const icon = isRunning ? (
+    <Loader2 className="h-3 w-3 animate-spin" />
+  ) : (
+    <config.Icon className="h-4 w-4" />
+  )
+
+  return (
+    <CollapsibleBlock icon={icon} title={label}>
+      <div className="space-y-3">
+        {group.messages.map((message, index) => (
+          <ChatMessage key={index} {...message} animation="none" />
+        ))}
+      </div>
+    </CollapsibleBlock>
+  )
 }
 
 function ToolCall({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
