@@ -19,7 +19,6 @@ import {
   createExploreExecutorNode,
   exploreToolsCondition,
 } from '@/nodes/explore'
-import { createPlanNode } from '@/nodes/plan'
 import {
   createVerifyCleanupNode,
   createVerifyExecutorNode,
@@ -119,8 +118,6 @@ async function buildAgentGraph(maxTokens: number) {
       .addNode('explore-executor', exploreExecutor)
       .addNode('explore-tools', exploreToolNode)
       .addNode('explore-cleanup', createExploreCleanupNode())
-      // Plan
-      .addNode('make-plan', createPlanNode(model))
       // Main execution
       .addNode('system-prompt', systemPromptNode)
       .addNode('executor', executorNode)
@@ -144,8 +141,7 @@ async function buildAgentGraph(maxTokens: number) {
       // Explore loop: executor → tools → executor (capped at MAX_EXPLORE_ITERATIONS)
       .addConditionalEdges('explore-executor', exploreToolsCondition)
       .addEdge('explore-tools', 'explore-executor')
-      .addEdge('explore-cleanup', 'make-plan')
-      .addEdge('make-plan', 'system-prompt')
+      .addEdge('explore-cleanup', 'system-prompt')
       // Main execution loop
       .addEdge('system-prompt', 'executor')
       .addConditionalEdges('executor', toolsCondition, {

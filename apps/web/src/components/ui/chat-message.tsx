@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, ListChecks, Loader2, Search, ShieldCheck } from 'lucide-react'
+import { ChevronRight, Code2, Loader2, Search, ShieldCheck } from 'lucide-react'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
@@ -133,7 +133,7 @@ export interface Message {
 }
 
 export interface PhaseInfo {
-  name: 'explore' | 'plan' | 'verify'
+  name: 'explore' | 'verify'
   startIdx: number
   endIdx: number | null
 }
@@ -324,8 +324,11 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
 }
 
 const PHASE_CONFIG = {
-  explore: { runningLabel: 'Exploring codebase', doneLabel: 'Explored codebase', Icon: Search },
-  plan: { runningLabel: 'Planning', doneLabel: 'Planned implementation', Icon: ListChecks },
+  explore: {
+    runningLabel: 'Exploring codebase',
+    doneLabel: 'Explored codebase and planned implementation',
+    Icon: Search,
+  },
   verify: { runningLabel: 'Verifying', doneLabel: 'Verified implementation', Icon: ShieldCheck },
 } as const
 
