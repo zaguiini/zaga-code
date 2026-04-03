@@ -252,12 +252,14 @@ const CollapsibleBlock = ({
   icon,
   title,
   children,
+  defaultOpen = false,
 }: {
   icon?: React.ReactNode
   title: React.ReactNode
   children: React.ReactNode
+  defaultOpen?: boolean
 }) => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(defaultOpen)
 
   const rightChevron = (
     <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
@@ -300,7 +302,11 @@ const CollapsibleBlock = ({
 }
 
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
-  return <CollapsibleBlock title="Thinking">{part.reasoning}</CollapsibleBlock>
+  return (
+    <CollapsibleBlock title="Thinking" defaultOpen>
+      {part.reasoning}
+    </CollapsibleBlock>
+  )
 }
 
 const PHASE_CONFIG = {

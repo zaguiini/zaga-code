@@ -54,14 +54,25 @@ function RouteComponent() {
 
   const items: Array<MessageListItem> = useMemo(() => {
     const result: Array<MessageListItem> = []
-    // Track active phase groups by name — messages with additional_kwargs.phase get grouped
     const phaseGroups = new Map<string, PhaseGroup>()
-    let lastPhase: string | null = null
+    // Track which phase is currently active — tool messages inherit this
+    let activePhase: string | null = null
+
+    // Pre-compute tool call results using the full messages array
+    const allToolCalls = getToolCallsWithResults(stream.messages)
+    const toolCallMap = new Map(allToolCalls.map(tc => [tc.id, tc]))
 
     for (const message of stream.messages) {
+      // Skip tool messages — their results are consumed via toolCallMap
       if (message.type === 'tool') continue
 
-      const phase = message.additional_kwargs?.phase as string | undefined
+      const phase = (message.additional_kwargs?.phase as string | undefined) ?? null
+
+      // When phase changes, close the previous one
+      if (activePhase && phase !== activePhase && phaseGroups.has(activePhase)) {
+        phaseGroups.get(activePhase)!.phase.endIdx = 1
+      }
+      activePhase = phase
 
       // Transform message into display messages
       const displayMessages: Array<Message> = []
@@ -111,49 +122,54 @@ function RouteComponent() {
           })
         }
 
-        const toolCalls = getToolCallsWithResults([message])
+        // Get tool calls from this AI message and match with results from toolCallMap
+        const rawToolCalls =
+          (message.tool_calls as Array<{ id?: string }> | undefined) ??
+          (message.additional_kwargs?.tool_calls as Array<{ id?: string }> | undefined) ??
+          []
+        const messageTcIds = rawToolCalls.map(tc => tc.id).filter((id): id is string => Boolean(id))
 
-        if (toolCalls.length > 0) {
-          for (const toolCall of toolCalls) {
-            const parts: Array<ToolInvocationPart> = []
+        for (const tcId of messageTcIds) {
+          const toolCall = toolCallMap.get(tcId)
+          if (!toolCall) continue
 
-            if (toolCall.state === 'pending') {
-              parts.push({
-                type: 'tool-invocation',
-                toolInvocation: {
-                  args: toolCall.call.args,
-                  toolName: toolCall.call.name,
-                  state: 'call',
-                },
-              })
-            }
+          const parts: Array<ToolInvocationPart> = []
 
-            if (toolCall.state === 'completed') {
-              parts.push({
-                type: 'tool-invocation',
-                toolInvocation: {
-                  toolName: toolCall.call.name,
-                  state: 'result',
-                  args: toolCall.call.args,
-                  result: toolCall.result?.content.toString() ?? 'No result',
-                },
-              })
-            }
-
-            displayMessages.push({
-              id: toolCall.id,
-              role: 'assistant',
-              content: '',
-              parts,
+          if (toolCall.state === 'pending') {
+            parts.push({
+              type: 'tool-invocation',
+              toolInvocation: {
+                args: toolCall.call.args,
+                toolName: toolCall.call.name,
+                state: 'call',
+              },
             })
           }
+
+          if (toolCall.state === 'completed') {
+            parts.push({
+              type: 'tool-invocation',
+              toolInvocation: {
+                toolName: toolCall.call.name,
+                state: 'result',
+                args: toolCall.call.args,
+                result: toolCall.result?.content.toString() ?? 'No result',
+              },
+            })
+          }
+
+          displayMessages.push({
+            id: toolCall.id,
+            role: 'assistant',
+            content: '',
+            parts,
+          })
         }
       }
 
       if (displayMessages.length === 0) continue
 
       if (phase) {
-        // This message belongs to a phase
         if (!phaseGroups.has(phase)) {
           const group: PhaseGroup = {
             type: 'phase-group',
@@ -164,13 +180,7 @@ function RouteComponent() {
           result.push(group)
         }
         phaseGroups.get(phase)!.messages.push(...displayMessages)
-        lastPhase = phase
       } else {
-        // Close the previous phase if we moved past it
-        if (lastPhase && phaseGroups.has(lastPhase)) {
-          phaseGroups.get(lastPhase)!.phase.endIdx = 1
-          lastPhase = null
-        }
         result.push(...displayMessages)
       }
     }

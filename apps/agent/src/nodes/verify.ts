@@ -1,4 +1,4 @@
-import { HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { SystemMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
@@ -43,8 +43,9 @@ export function createVerifySetupNode() {
 
     if (!hasEdits) return { verifyVerdict: 'PASS' }
 
-    const prompt = `Verify the implementation. Original task: ${String(lastUserMessage?.content ?? 'unknown')}`
-    return { messages: [new HumanMessage(prompt)] }
+    // Just signal that verification should run — no user-visible message needed.
+    // The verify executor builds its own context from state.
+    return {}
   }
 }
 
@@ -60,19 +61,23 @@ export function createVerifyExecutorNode(
     config: LangGraphRunnableConfig
   ): Promise<Partial<AgentState>> => {
     const lastHuman = [...state.messages].reverse().find(m => m.type === 'human')
-    const lastHumanIdx = lastHuman ? state.messages.lastIndexOf(lastHuman) : 0
-    const afterHuman = state.messages.slice(lastHumanIdx)
+    const userContent = Array.isArray(lastHuman?.content)
+      ? lastHuman.content
+          .filter((c): c is { type: 'text'; text: string } => 'text' in c)
+          .map(c => c.text)
+          .join('')
+      : String(lastHuman?.content ?? 'unknown')
 
-    // Collect verify-phase continuation messages
-    const phaseMessages = afterHuman.filter(
+    // Collect verify-phase continuation messages (from previous verify loop iterations)
+    const phaseMessages = state.messages.filter(
       m =>
         m.additional_kwargs.phase === 'verify' ||
-        (m.type === 'tool' && afterHuman.some(a => a.additional_kwargs.phase === 'verify'))
+        (m.type === 'tool' &&
+          state.messages.some(a => a.additional_kwargs.phase === 'verify' && a.type === 'ai'))
     )
 
     const messages = [
-      new SystemMessage(VERIFY_SYSTEM_PROMPT),
-      ...afterHuman.slice(0, 1),
+      new SystemMessage(`${VERIFY_SYSTEM_PROMPT}\n\nOriginal task: ${userContent}`),
       ...phaseMessages,
     ]
 

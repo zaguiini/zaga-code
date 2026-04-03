@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter web dev",
+    "dev": "pnpm -r dev",
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
     "test": "pnpm --filter web test",
