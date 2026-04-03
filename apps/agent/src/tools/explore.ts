@@ -14,7 +14,7 @@ const exploreSchema = z.object({
  * the graph routes to the explore subgraph instead of the regular tools node.
  */
 export const exploreTool = tool(
-  async () => {
+  () => {
     throw new Error('explore tool is handled as a subgraph, not a direct tool call')
   },
   {
