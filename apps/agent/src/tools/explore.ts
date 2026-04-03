@@ -49,49 +49,55 @@ export function createExploreTool(model: BaseChatModel) {
 
   return tool(
     async function* ({ prompt }, config) {
-      const stream = await exploreAgent.stream({ messages: [new HumanMessage(prompt)] }, config)
+      const context = (config as any)?.configurable?.context ?? (config as any)?.metadata?.context
+      const stream = await exploreAgent.stream(
+        { messages: [new HumanMessage(prompt)] },
+        { context }
+      )
 
-      // Default stream mode is 'updates': yields { nodeName: { messages: [...] } }
+      // ReactAgent.stream() yields { messages: [...all messages so far...] }
+      // Messages are LangChain serialized: { lc, type: 'constructor', kwargs: { content, tool_calls, ... } }
       const events: Array<ExploreStreamEvent> = []
       let lastAiText = ''
+      let prevMessageCount = 0
 
       for await (const update of stream) {
-        for (const nodeOutput of Object.values(update as Record<string, any>)) {
-          const messages = nodeOutput?.messages ?? []
-          for (const msg of messages) {
-            if (msg.type === 'ai') {
-              const text =
-                typeof msg.content === 'string'
-                  ? msg.content
-                  : Array.isArray(msg.content)
-                    ? msg.content
-                        .filter((c: any) => c.type === 'text')
-                        .map((c: any) => c.text)
-                        .join('')
-                    : ''
+        const allMessages = (update as any).messages ?? []
+        // Only process newly added messages
+        const newMessages = allMessages.slice(prevMessageCount)
+        prevMessageCount = allMessages.length
 
-              if (text.trim()) {
-                lastAiText = text
-                events.push({ type: 'text', content: text })
-              }
+        for (const msg of newMessages) {
+          // LangChain serialized: { lc: 1, id: ["langchain_core","messages","AIMessage"], kwargs: {...} }
+          const kind = msg.id?.[2] ?? ''
+          const kwargs = msg.kwargs ?? msg
 
-              if (msg.tool_calls?.length) {
-                for (const tc of msg.tool_calls) {
-                  events.push({ type: 'tool-call', name: tc.name, args: tc.args })
-                }
-              }
+          if (kind === 'AIMessage' || kind === 'AIMessageChunk') {
+            const content = kwargs.content ?? ''
+            const text = typeof content === 'string' ? content : ''
+
+            if (text.trim()) {
+              lastAiText = text
+              events.push({ type: 'text', content: text })
             }
 
-            if (msg.type === 'tool') {
-              events.push({
-                type: 'tool-result',
-                name: msg.name,
-                result: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-              })
+            const toolCalls = kwargs.tool_calls ?? kwargs.additional_kwargs?.tool_calls ?? []
+            for (const tc of toolCalls) {
+              events.push({ type: 'tool-call', name: tc.name, args: tc.args })
             }
           }
-          if (events.length > 0) yield [...events]
+
+          if (kind === 'ToolMessage') {
+            const content = kwargs.content ?? ''
+            events.push({
+              type: 'tool-result',
+              name: kwargs.name ?? 'unknown',
+              result: typeof content === 'string' ? content : JSON.stringify(content),
+            })
+          }
         }
+
+        if (events.length > 0) yield [...events]
       }
 
       return lastAiText || 'Exploration complete — no findings.'
