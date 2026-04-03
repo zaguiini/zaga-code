@@ -1,34 +1,58 @@
-import type { Runnable, RunnableConfig } from '@langchain/core/runnables'
+import { SystemMessage } from '@langchain/core/messages'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { LangGraphRunnableConfig } from '@langchain/langgraph'
 import type { AgentState } from '@/graphs/agent'
 
-/**
- * Streams the explore subgraph, forwarding config so events propagate
- * to the parent stream. Returns messages to parent state for grouping.
- */
-export function createExploreNode(exploreGraph: Runnable) {
-  return async (state: AgentState, config: RunnableConfig): Promise<Partial<AgentState>> => {
-    const lastUserMessage = [...state.messages].reverse().find(m => m.type === 'human')
-    if (!lastUserMessage) return {}
+const EXPLORE_SYSTEM_PROMPT = `You are a codebase exploration specialist. Your job is to gather information — not to implement anything.
 
-    // Debug: check if parent stream is in config
-    const configurable = config.configurable as Record<string, unknown> | undefined
-    const hasStream = Boolean(configurable?.__pregel_stream)
-    console.log('[explore] config has __pregel_stream:', hasStream)
+READ-ONLY MODE: You only have access to file search, file read, and grep tools. Do not attempt to create, edit, or delete files.
 
-    const result = await exploreGraph.invoke({ messages: [lastUserMessage] }, config)
+When you have gathered enough information, stop calling tools and write a structured summary:
+- Relevant files and their purposes
+- Existing patterns to follow
+- Potential gotchas or constraints
+- Suggested approach (high level only)
 
-    const lastMessage = [...result.messages]
+Be thorough. The plan node will use your summary to produce an implementation plan.`
+
+/** Explore executor node — runs inline in the main graph for real-time streaming. */
+export function createExploreExecutorNode(
+  model: BaseChatModel,
+  readOnlyTools: Array<StructuredToolInterface>
+) {
+  const modelWithTools = model.bindTools!(readOnlyTools)
+
+  return async (
+    state: AgentState,
+    config: LangGraphRunnableConfig
+  ): Promise<Partial<AgentState>> => {
+    const lastHuman = [...state.messages].reverse().find(m => m.type === 'human')
+    const lastHumanIdx = lastHuman ? state.messages.lastIndexOf(lastHuman) : 0
+    const afterHuman = state.messages.slice(lastHumanIdx + 1)
+
+    // Collect explore-phase continuation messages (previous explore AI + tool results)
+    const phaseMessages = afterHuman.filter(
+      m =>
+        m.additional_kwargs.phase === 'explore' ||
+        (m.type === 'tool' && afterHuman.some(a => a.additional_kwargs.phase === 'explore'))
+    )
+
+    const messages = [new SystemMessage(EXPLORE_SYSTEM_PROMPT), lastHuman!, ...phaseMessages]
+
+    const response = await modelWithTools.invoke(messages, config)
+    response.additional_kwargs = { ...response.additional_kwargs, phase: 'explore' }
+    return { messages: [response] }
+  }
+}
+
+/** Runs after explore loop ends. Extracts the summary from the last explore AI message. */
+export function createExploreCleanupNode() {
+  return (state: AgentState): Partial<AgentState> => {
+    const lastExploreAi = [...state.messages]
       .reverse()
-      .find((m: { type: string }) => m.type === 'ai')
-    const summary = lastMessage ? String(lastMessage.content) : ''
-
-    // Tag messages with phase and return to parent state
-    for (const msg of result.messages.slice(1)) {
-      if (msg.additional_kwargs) {
-        msg.additional_kwargs = { ...msg.additional_kwargs, phase: 'explore' }
-      }
-    }
-
-    return { exploreSummary: summary, messages: result.messages.slice(1) }
+      .find(m => m.type === 'ai' && m.additional_kwargs.phase === 'explore')
+    const summary = lastExploreAi ? String(lastExploreAi.content) : ''
+    return { exploreSummary: summary }
   }
 }

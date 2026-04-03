@@ -14,11 +14,13 @@ import { systemPromptNode } from '@/nodes/system-prompt'
 import { createMaybeCompactNode } from '@/nodes/maybe-compact'
 import { createCommandNode } from '@/nodes/command'
 import { createShouldPlanNode } from '@/nodes/should-plan'
-import { createExploreNode } from '@/nodes/explore'
+import { createExploreCleanupNode, createExploreExecutorNode } from '@/nodes/explore'
 import { createPlanNode } from '@/nodes/plan'
-import { createVerifyNode } from '@/nodes/verify'
-import { createExploreGraph } from '@/graphs/explore-graph'
-import { createVerifyGraph } from '@/graphs/verify-graph'
+import {
+  createVerifyCleanupNode,
+  createVerifyExecutorNode,
+  createVerifySetupNode,
+} from '@/nodes/verify'
 import { queryModelInfo } from '@/setup'
 
 const client = new MultiServerMCPClient({
@@ -93,44 +95,80 @@ async function buildAgentGraph(maxTokens: number) {
   ]
   const verifyTools = [...readOnlyTools, shellTool]
 
-  const exploreGraph = createExploreGraph(model, readOnlyTools)
-  const verifyGraph = createVerifyGraph(model, verifyTools)
-
   const executorNode = createExecutorNode(model.bindTools(allTools), env.MODEL)
   const toolNode = new ToolNode(allTools, { handleToolErrors: true })
 
-  return new StateGraph(agentStateSchema)
-    .addNode('command', createCommandNode(maxTokens))
-    .addNode('maybe-compact', createMaybeCompactNode(model))
-    .addNode('should-plan', createShouldPlanNode(model))
-    .addNode('explore', createExploreNode(exploreGraph))
-    .addNode('make-plan', createPlanNode(model))
-    .addNode('system-prompt', systemPromptNode)
-    .addNode('executor', executorNode)
-    .addNode('tools', toolNode)
-    .addNode('verify', createVerifyNode(verifyGraph))
+  // Explore phase: dedicated executor + tools loop (streams in real-time)
+  const exploreExecutor = createExploreExecutorNode(model, readOnlyTools)
+  const exploreToolNode = new ToolNode(readOnlyTools, { handleToolErrors: true })
 
-    .addEdge(START, 'command')
-    .addConditionalEdges('command', s => {
-      if (!s.commandHandled) return 'maybe-compact'
-      if (s.forceCompact) return 'maybe-compact'
-      return END
-    })
-    .addConditionalEdges('maybe-compact', s => (s.commandHandled ? END : 'should-plan'))
-    .addConditionalEdges('should-plan', s => (s.shouldPlan ? 'explore' : 'system-prompt'))
-    .addEdge('explore', 'make-plan')
-    .addEdge('make-plan', 'system-prompt')
-    .addEdge('system-prompt', 'executor')
-    .addConditionalEdges('executor', toolsCondition, {
-      tools: 'tools',
-      __end__: 'verify',
-    })
-    .addEdge('tools', 'executor')
-    .addConditionalEdges('verify', s => {
-      if (s.verifyVerdict === 'PASS') return END
-      if (s.critiqueAttempts >= 2) return END
-      return 'system-prompt'
-    })
+  // Verify phase: dedicated executor + tools loop (streams in real-time)
+  const verifyExecutor = createVerifyExecutorNode(model, verifyTools)
+  const verifyToolNode = new ToolNode(verifyTools, { handleToolErrors: true })
+
+  return (
+    new StateGraph(agentStateSchema)
+      .addNode('command', createCommandNode(maxTokens))
+      .addNode('maybe-compact', createMaybeCompactNode(model))
+      .addNode('should-plan', createShouldPlanNode(model))
+      // Explore phase (inline executor + tools loop)
+      .addNode('explore-executor', exploreExecutor)
+      .addNode('explore-tools', exploreToolNode)
+      .addNode('explore-cleanup', createExploreCleanupNode())
+      // Plan
+      .addNode('make-plan', createPlanNode(model))
+      // Main execution
+      .addNode('system-prompt', systemPromptNode)
+      .addNode('executor', executorNode)
+      .addNode('tools', toolNode)
+      // Verify phase (inline executor + tools loop)
+      .addNode('verify-setup', createVerifySetupNode())
+      .addNode('verify-executor', verifyExecutor)
+      .addNode('verify-tools', verifyToolNode)
+      .addNode('verify-cleanup', createVerifyCleanupNode())
+
+      .addEdge(START, 'command')
+      .addConditionalEdges('command', s => {
+        if (!s.commandHandled) return 'maybe-compact'
+        if (s.forceCompact) return 'maybe-compact'
+        return END
+      })
+      .addConditionalEdges('maybe-compact', s => (s.commandHandled ? END : 'should-plan'))
+      .addConditionalEdges('should-plan', s =>
+        s.shouldPlan ? 'explore-executor' : 'system-prompt'
+      )
+      // Explore loop: executor → tools → executor (until no more tool calls)
+      .addConditionalEdges('explore-executor', toolsCondition, {
+        tools: 'explore-tools',
+        __end__: 'explore-cleanup',
+      })
+      .addEdge('explore-tools', 'explore-executor')
+      .addEdge('explore-cleanup', 'make-plan')
+      .addEdge('make-plan', 'system-prompt')
+      // Main execution loop
+      .addEdge('system-prompt', 'executor')
+      .addConditionalEdges('executor', toolsCondition, {
+        tools: 'tools',
+        __end__: 'verify-setup',
+      })
+      .addEdge('tools', 'executor')
+      // Verify: setup decides whether to run
+      .addConditionalEdges('verify-setup', s => {
+        if (s.verifyVerdict === 'PASS') return END
+        return 'verify-executor'
+      })
+      // Verify loop: executor → tools → executor (until no more tool calls)
+      .addConditionalEdges('verify-executor', toolsCondition, {
+        tools: 'verify-tools',
+        __end__: 'verify-cleanup',
+      })
+      .addEdge('verify-tools', 'verify-executor')
+      .addConditionalEdges('verify-cleanup', s => {
+        if (s.verifyVerdict === 'PASS') return END
+        if (s.critiqueAttempts >= 2) return END
+        return 'system-prompt'
+      })
+  )
 }
 
 async function queryMaxTokens(): Promise<number> {
