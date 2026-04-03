@@ -2,7 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
+import type {
+  Message,
+  PhaseGroup,
+  PhaseInfo,
+  ToolInvocationPart,
+} from '@/components/ui/chat-message'
+import type { MessageListItem } from '@/components/ui/message-list'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 import { env } from '@/env'
@@ -35,7 +41,35 @@ function RouteComponent() {
         window.sessionStorage.removeItem(`resume:${run.thread_id}`)
       }
     },
+    onCustomEvent: (event: { type: string; phase: PhaseInfo['name'] }) => {
+      if (event.type === 'phase_start') {
+        setPhases(prev => [
+          ...prev,
+          { name: event.phase, startIdx: messagesLengthRef.current, endIdx: null },
+        ])
+      }
+      if (event.type === 'phase_end') {
+        setPhases(prev =>
+          prev.map(p =>
+            p.name === event.phase && p.endIdx === null
+              ? { ...p, endIdx: messagesLengthRef.current }
+              : p
+          )
+        )
+      }
+    },
   })
+
+  const [phases, setPhases] = useState<Array<PhaseInfo>>([])
+  const messagesLengthRef = useRef(0)
+
+  useEffect(() => {
+    messagesLengthRef.current = stream.messages.length
+  }, [stream.messages.length])
+
+  useEffect(() => {
+    setPhases([])
+  }, [threadId])
 
   const joinedThreadId = useRef<string | null>(null)
   useEffect(() => {
@@ -45,115 +79,156 @@ function RouteComponent() {
     if (resumeRunId && joinedThreadId.current !== threadId) {
       stream.joinStream(resumeRunId, undefined, {
         streamMode: ['messages', 'values'],
+        streamSubgraphs: true,
       })
       joinedThreadId.current = threadId
     }
   }, [threadId, stream])
 
-  const messages = useMemo(
-    () =>
-      stream.messages
-        .filter(message => message.type !== 'tool')
-        .map((message): Message | Array<Message> => {
-          if (
-            message.type === 'human' ||
-            message.type === 'system' ||
-            message.type === 'function' ||
-            message.type === 'remove'
-          ) {
-            return {
-              id: message.id!,
-              role: message.type === 'human' ? 'user' : 'assistant',
-              content: Array.isArray(message.content)
-                ? message.content
-                    .filter(content => content.type === 'text')
-                    .map(content => content.text)
-                    .join('')
-                : message.content,
-            }
-          }
+  const items: Array<MessageListItem> = useMemo(() => {
+    const allMessages: Array<{ originalIdx: number; message: Message }> = []
 
-          const result: Array<Message> = []
+    let originalIdx = 0
+    for (const message of stream.messages) {
+      if (message.type === 'tool') {
+        originalIdx++
+        continue
+      }
 
-          const reasoningContent = message.additional_kwargs?.reasoning_content as
-            | string
-            | undefined
-
-          if (reasoningContent) {
-            result.push({
-              id: message.id!,
-              role: 'assistant',
-              content: reasoningContent,
-              parts: [
-                {
-                  type: 'reasoning',
-                  reasoning: reasoningContent,
-                },
-              ],
-            })
-          }
-
-          const messageContent = Array.isArray(message.content)
-            ? message.content
-                .filter(content => content.type === 'text')
-                .map(content => content.text)
-                .join('')
-            : message.content.toString().trim()
-
-          if (messageContent) {
-            result.push({
-              id: message.id!,
-              role: 'assistant',
-              content: messageContent,
-              parts: [{ type: 'text', text: messageContent }],
-            })
-          }
-
-          const toolCalls = stream.getToolCalls(message)
-
-          if (toolCalls.length > 0) {
-            result.push(
-              ...toolCalls.map(toolCall => {
-                const parts: Array<ToolInvocationPart> = []
-
-                if (toolCall.state === 'pending') {
-                  parts.push({
-                    type: 'tool-invocation',
-                    toolInvocation: {
-                      args: toolCall.call.args,
-                      toolName: toolCall.call.name,
-                      state: 'call',
-                    },
-                  })
-                }
-
-                if (toolCall.state === 'completed') {
-                  parts.push({
-                    type: 'tool-invocation',
-                    toolInvocation: {
-                      toolName: toolCall.call.name,
-                      state: 'result',
-                      args: toolCall.call.args,
-                      result: toolCall.result?.content.toString() ?? 'No result',
-                    },
-                  })
-                }
-
-                return {
-                  id: toolCall.id,
-                  role: 'assistant',
-                  content: '',
-                  parts,
-                }
-              })
-            )
-          }
-
-          return result
+      if (
+        message.type === 'human' ||
+        message.type === 'system' ||
+        message.type === 'function' ||
+        message.type === 'remove'
+      ) {
+        allMessages.push({
+          originalIdx,
+          message: {
+            id: message.id!,
+            role: message.type === 'human' ? 'user' : 'assistant',
+            content: Array.isArray(message.content)
+              ? message.content
+                  .filter(content => content.type === 'text')
+                  .map(content => content.text)
+                  .join('')
+              : message.content,
+          },
         })
-        .flat(),
-    [stream.messages]
-  )
+        originalIdx++
+        continue
+      }
+
+      const reasoningContent = message.additional_kwargs?.reasoning_content as string | undefined
+
+      if (reasoningContent) {
+        allMessages.push({
+          originalIdx,
+          message: {
+            id: message.id!,
+            role: 'assistant',
+            content: reasoningContent,
+            parts: [{ type: 'reasoning', reasoning: reasoningContent }],
+          },
+        })
+      }
+
+      const messageContent = Array.isArray(message.content)
+        ? message.content
+            .filter(content => content.type === 'text')
+            .map(content => content.text)
+            .join('')
+        : message.content.toString().trim()
+
+      if (messageContent) {
+        allMessages.push({
+          originalIdx,
+          message: {
+            id: message.id!,
+            role: 'assistant',
+            content: messageContent,
+            parts: [{ type: 'text', text: messageContent }],
+          },
+        })
+      }
+
+      const toolCalls = stream.getToolCalls(message)
+
+      if (toolCalls.length > 0) {
+        for (const toolCall of toolCalls) {
+          const parts: Array<ToolInvocationPart> = []
+
+          if (toolCall.state === 'pending') {
+            parts.push({
+              type: 'tool-invocation',
+              toolInvocation: {
+                args: toolCall.call.args,
+                toolName: toolCall.call.name,
+                state: 'call',
+              },
+            })
+          }
+
+          if (toolCall.state === 'completed') {
+            parts.push({
+              type: 'tool-invocation',
+              toolInvocation: {
+                toolName: toolCall.call.name,
+                state: 'result',
+                args: toolCall.call.args,
+                result: toolCall.result?.content.toString() ?? 'No result',
+              },
+            })
+          }
+
+          allMessages.push({
+            originalIdx,
+            message: {
+              id: toolCall.id,
+              role: 'assistant',
+              content: '',
+              parts,
+            },
+          })
+        }
+      }
+
+      originalIdx++
+    }
+
+    // Group messages into phases
+    const result: Array<MessageListItem> = []
+    const phaseGroups = new Map<number, PhaseGroup>()
+
+    for (let i = 0; i < phases.length; i++) {
+      phaseGroups.set(i, { type: 'phase-group', phase: phases[i], messages: [] })
+    }
+
+    const insertedPhases = new Set<number>()
+
+    for (const { originalIdx, message } of allMessages) {
+      let assignedPhase: number | null = null
+      for (let i = 0; i < phases.length; i++) {
+        const phase = phases[i]
+        const end = phase.endIdx ?? stream.messages.length
+        if (originalIdx >= phase.startIdx && originalIdx < end) {
+          assignedPhase = i
+          break
+        }
+      }
+
+      if (assignedPhase !== null) {
+        if (!insertedPhases.has(assignedPhase)) {
+          insertedPhases.add(assignedPhase)
+          result.push(phaseGroups.get(assignedPhase)!)
+        }
+        phaseGroups.get(assignedPhase)!.messages.push(message)
+      } else {
+        result.push(message)
+      }
+    }
+
+    return result
+  }, [stream.messages, phases])
 
   const handleInterrupt = useCallback(() => {
     if (!stream.isLoading) return
@@ -199,7 +274,7 @@ function RouteComponent() {
     const el = scrollContainerRef.current
     if (!el || !stickToBottomRef.current) return
     el.scrollTop = el.scrollHeight
-  }, [messages, stream.isLoading])
+  }, [items, stream.isLoading])
 
   const maxTokens = (stream.values as Record<string, unknown> | null)?.maxTokens as
     | number
@@ -226,7 +301,7 @@ function RouteComponent() {
         onScroll={updateStickToBottom}
         className="w-full flex-1 min-h-0 overflow-y-auto"
       >
-        <MessageList messages={messages} isTyping={stream.isLoading} />
+        <MessageList messages={items} isTyping={stream.isLoading} />
       </div>
       <form
         onSubmit={e => {
@@ -236,7 +311,12 @@ function RouteComponent() {
             {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
             },
-            { streamMode: ['messages', 'values'], context, config: { recursion_limit: 1000 } }
+            {
+              streamMode: ['messages', 'values'],
+              streamSubgraphs: true,
+              context,
+              config: { recursion_limit: 1000 },
+            }
           )
           setInput('')
         }}
