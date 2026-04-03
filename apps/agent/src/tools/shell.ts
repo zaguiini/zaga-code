@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { PassThrough } from 'node:stream'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { tool } from 'langchain'
@@ -44,73 +45,29 @@ export const shellTool = tool(
       env: process.env,
     })
 
-    // Bridge spawn events → async iteration via a simple queue
-    type QueueItem =
-      | { type: 'data'; text: string; source: 'stdout' | 'stderr' }
-      | { type: 'done'; exitCode: number }
-      | { type: 'error'; error: Error }
-    const queue: Array<QueueItem> = []
-    let resolve_: (() => void) | null = null
+    // Merge stdout + stderr into a single async-iterable stream
+    const merged = new PassThrough()
+    child.stdout.pipe(merged)
+    child.stderr.pipe(merged)
 
-    function push(item: QueueItem) {
-      queue.push(item)
-      resolve_?.()
+    let exitCode = 0
+    child.on('close', code => {
+      exitCode = code ?? 0
+      merged.end()
+    })
+    child.on('error', err => merged.destroy(err))
+
+    let accumulated = ''
+    for await (const chunk of merged) {
+      accumulated += chunk.toString()
+      yield accumulated
     }
 
-    function waitForItem(): Promise<void> {
-      if (queue.length > 0) return Promise.resolve()
-      return new Promise(r => {
-        resolve_ = r
-      })
+    if (exitCode !== 0) {
+      return `Command failed (exit code ${exitCode})${accumulated ? `\n\n${accumulated}` : ''}`
     }
 
-    child.stdout.on('data', (data: Buffer) =>
-      push({ type: 'data', text: data.toString(), source: 'stdout' })
-    )
-    child.stderr.on('data', (data: Buffer) =>
-      push({ type: 'data', text: data.toString(), source: 'stderr' })
-    )
-    child.on('error', (error: Error) => push({ type: 'error', error }))
-    child.on('close', (exitCode: number | null) => push({ type: 'done', exitCode: exitCode ?? 0 }))
-
-    let stdout = ''
-    let stderr = ''
-    let combined = ''
-
-    for (;;) {
-      await waitForItem()
-
-      // Drain all queued items
-      while (queue.length > 0) {
-        const item = queue.shift()!
-
-        if (item.type === 'error') {
-          return `Command failed: ${item.error.message}`
-        }
-
-        if (item.type === 'done') {
-          // Format final output with labels (same as original tool)
-          let output = ''
-          if (stdout) output += `STDOUT:\n${stdout}`
-          if (stderr) output += output ? `\n\nSTDERR:\n${stderr}` : `STDERR:\n${stderr}`
-
-          if (item.exitCode !== 0) {
-            let errorMessage = `Command failed (exit code ${item.exitCode})`
-            if (stdout) errorMessage += `\n\nSTDOUT:\n${stdout}`
-            if (stderr) errorMessage += `\n\nSTDERR:\n${stderr}`
-            return errorMessage
-          }
-
-          return output || 'Command executed successfully (no output)'
-        }
-
-        // type === 'data'
-        if (item.source === 'stdout') stdout += item.text
-        else stderr += item.text
-        combined += item.text
-        yield combined
-      }
-    }
+    return accumulated || 'Command executed successfully (no output)'
   },
   {
     name: 'shell',
