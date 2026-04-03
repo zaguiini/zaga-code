@@ -13,6 +13,8 @@ export function createExploreNode(exploreGraph: Runnable) {
       .find((m: { type: string }) => m.type === 'ai')
     const summary = lastMessage ? String(lastMessage.content) : ''
 
-    return { exploreSummary: summary }
+    // Return subgraph messages to parent state so they appear in the stream.
+    // Skip the first message (duplicated user message from subgraph input).
+    return { exploreSummary: summary, messages: result.messages.slice(1) }
   }
 }

@@ -259,12 +259,7 @@ function RouteComponent() {
             {
               messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
             },
-            {
-              streamMode: ['messages', 'values'],
-              streamSubgraphs: true,
-              context,
-              config: { recursion_limit: 1000 },
-            }
+            { streamMode: ['messages', 'values'], context, config: { recursion_limit: 1000 } }
           )
           setInput('')
         }}

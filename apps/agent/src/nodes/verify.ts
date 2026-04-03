@@ -31,6 +31,7 @@ export function createVerifyNode(verifyGraph: Runnable) {
       verifyVerdict: verdict,
       critiqueFeedback: verdict !== 'PASS' ? output : null,
       critiqueAttempts: state.critiqueAttempts + (verdict !== 'PASS' ? 1 : 0),
+      messages: result.messages.slice(1),
     }
   }
 }
