@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { SystemMessage } from '@langchain/core/messages'
 import type { BaseMessage } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
+import { toolRegistry } from '@/config/registry'
 
 const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
 
@@ -19,16 +20,9 @@ const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users w
 - Use file_write only for creating new files or complete rewrites.
 - When using file_edit, include 2-3 lines of surrounding context in old_string to ensure uniqueness.
 
-**Codebase Exploration:**
-- For simple, directed searches (a specific file, class, or function), use file_search or grep directly — they are faster.
-- For broader codebase exploration and deep research, use the explore tool. This is slower, so use it only when a simple directed search is insufficient or when your task will clearly require reading multiple files across different locations.
-
 **Verification:**
 - If AGENTS.md specifies build, test, lint, or typecheck commands, run them after making changes — without asking. Fix any failures before reporting the task as done.
 - If AGENTS.md does not mention any checks, do not guess or discover them yourself. Just complete the task.
-
-**External Libraries and Documentation:**
-- If the user's question or task involves an external library, package, or framework (e.g. "what are the X classes in tailwind", "how do I use Y in react", "show me Z from lodash"), your FIRST tool call MUST be to Context7 to fetch the documentation. Do NOT search the project files first. Do NOT use your training knowledge. Call Context7 immediately as the very first action.
 
 **Reasoning and Tool Usage:**
 - Think step-by-step about what information you need before making tool calls
@@ -44,18 +38,31 @@ Use the following project-specific instructions to guide your actions:
 {{agentsMd}}
 `
 
-async function buildSystemPrompt(projectPath: string): Promise<BaseMessage> {
+function buildAgentsSection(configHash: string): string {
+  const tools = toolRegistry.get(configHash)
+  if (!tools) return ''
+
+  const agentTools = tools.filter(t => t.name.startsWith('agent-'))
+  if (agentTools.length === 0) return ''
+
+  const lines = agentTools.map(t => `- **${t.name}**: ${t.description}`)
+  return `\n**Specialist Agents:**\nUse these agents instead of doing the work yourself when they match the task:\n${lines.join('\n')}\n`
+}
+
+async function buildSystemPrompt(projectPath: string, configHash: string): Promise<BaseMessage> {
+  const agentsSection = buildAgentsSection(configHash)
+
   if (projectPath) {
     try {
       const agentsMd = await readFile(join(projectPath, 'AGENTS.md'), 'utf-8')
-      const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
+      const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd) + agentsSection
       return new SystemMessage(base)
     } catch {
       // AGENTS.md not found, fall through to base prompt
     }
   }
 
-  return new SystemMessage(BASE_SYSTEM_PROMPT)
+  return new SystemMessage(BASE_SYSTEM_PROMPT + agentsSection)
 }
 
 export async function systemPromptNode(state: AgentState): Promise<Partial<AgentState>> {
@@ -64,6 +71,6 @@ export async function systemPromptNode(state: AgentState): Promise<Partial<Agent
   // Skip rebuild if system message already exists
   if (existingSystem) return {}
 
-  const systemMessage = await buildSystemPrompt(state.projectPath)
+  const systemMessage = await buildSystemPrompt(state.projectPath, state.configHash)
   return { messages: [systemMessage] }
 }
