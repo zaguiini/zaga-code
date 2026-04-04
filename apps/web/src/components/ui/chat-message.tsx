@@ -67,6 +67,7 @@ interface ToolCall {
 }
 
 interface ToolResult {
+  metadata?: Record<string, unknown>
   state: 'result'
   toolName: string
   args: Record<string, any>
@@ -424,7 +425,11 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 }
               >
                 {args}
-                <MarkdownRenderer>{invocation.result}</MarkdownRenderer>
+                {invocation.metadata?.format === 'markdown' ? (
+                  <MarkdownRenderer>{invocation.result}</MarkdownRenderer>
+                ) : (
+                  <pre className="font-mono whitespace-pre-wrap">{invocation.result}</pre>
+                )}
               </CollapsibleBlock>
             )
           default:

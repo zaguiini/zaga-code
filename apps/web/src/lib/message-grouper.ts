@@ -79,6 +79,8 @@ export const messageGrouper = (
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
+                  // @ts-expect-error - TODO: This is not typed
+                  metadata: toolCall.result?.metadata,
                   toolName: toolCall.call.name,
                   state: 'result',
                   args: toolCall.call.args,

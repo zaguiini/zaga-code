@@ -72,6 +72,9 @@ export const fileSearchTool = tool(
   },
   {
     name: 'file_search',
+    metadata: {
+      format: 'markdown',
+    },
     description:
       'Fuzzy search through file NAMES and PATHS. Use this when you need to find files by their name or path. Examples: "find auth files", "search for component.tsx", "locate utils directory". This searches file names/paths, not file contents.',
     schema: fileSearchSchema,
