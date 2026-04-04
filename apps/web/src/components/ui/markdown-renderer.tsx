@@ -26,7 +26,6 @@ interface HighlightedPre extends React.HTMLAttributes<HTMLPreElement> {
   language: string
 }
 
-const shikiImport = import('shiki')
 const highlightCache = new Map<string, Promise<Array<Array<ThemedToken>>>>()
 
 function highlight(code: string, language: string): Promise<Array<Array<ThemedToken>>> {
@@ -34,7 +33,7 @@ function highlight(code: string, language: string): Promise<Array<Array<ThemedTo
   if (!highlightCache.has(key)) {
     highlightCache.set(
       key,
-      shikiImport.then(({ codeToTokens, bundledLanguages }) => {
+      import('shiki').then(({ codeToTokens, bundledLanguages }) => {
         if (!(language in bundledLanguages)) return []
         return codeToTokens(code, {
           lang: language as keyof typeof bundledLanguages,
@@ -183,7 +182,9 @@ const COMPONENTS = {
   hr: withClass('hr', 'border-foreground/20'),
 }
 
-function withClass(Tag: keyof JSX.IntrinsicElements, classes: string) {
+type HtmlTag = Extract<keyof React.JSX.IntrinsicElements, string>
+
+function withClass(Tag: HtmlTag, classes: string) {
   const Component = ({ node, ...props }: any) => <Tag className={classes} {...props} />
   Component.displayName = Tag
   return Component

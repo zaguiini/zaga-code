@@ -2,10 +2,10 @@
 
 ## TODO
 
-- [ ] Make verification its own subagent (just an idea for now)
-- [ ] MCP tools from frontend (allow saving info through IndexedDB)
-- [ ] Subagents from frontend
-- [ ] Commands from the frontend (compact, help, setup)
+- [ ] .zaga folder (user root, project root) for MCPs and agents
+- [ ] Desktop/CLI app (use Tauri, allow multiple instances)
+- [ ] Add vision support
+- [ ] Commands (compact, help, setup for AGENTS.md)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
 - [ ] Review implementation, both frontend and backend
 - [ ] Document the project

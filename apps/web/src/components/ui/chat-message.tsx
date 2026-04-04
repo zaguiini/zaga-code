@@ -313,13 +313,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
-                    Calling{' '}
-                    <span className="font-mono text-xs">
-                      {'`'}
-                      {invocation.toolName}
-                      {'`'}
-                    </span>
-                    ...
+                    Calling <span className="font-mono text-xs">{invocation.toolName}</span>
                   </span>
                 }
               >
@@ -335,13 +329,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                   title={
                     <span>
-                      Running{' '}
-                      <span className="font-mono text-xs">
-                        {'`'}
-                        {invocation.toolName}
-                        {'`'}
-                      </span>
-                      ...
+                      Running <span className="font-mono text-xs">{invocation.toolName}</span>
                     </span>
                   }
                   defaultOpen
@@ -365,11 +353,8 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                     <span>
                       Running{' '}
                       <span className="font-mono text-xs">
-                        {'`'}
                         {invocation.toolName.replace('agent-', '')}
-                        {'`'}
                       </span>
-                      ...
                     </span>
                   }
                   defaultOpen
@@ -392,13 +377,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
-                    Running{' '}
-                    <span className="font-mono text-xs">
-                      {'`'}
-                      {invocation.toolName}
-                      {'`'}
-                    </span>
-                    ...
+                    Running <span className="font-mono text-xs">{invocation.toolName}</span>
                   </span>
                 }
               >
@@ -417,9 +396,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   <span>
                     Result from{' '}
                     <span className="font-mono text-xs">
-                      {'`'}
                       {invocation.toolName.replace('agent-', '')}
-                      {'`'}
                     </span>
                   </span>
                 }
