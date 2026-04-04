@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, use } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -19,26 +19,40 @@ export function MarkdownRenderer({ children }: MarkdownRendererProps) {
   )
 }
 
+type ThemedToken = { content: string; htmlStyle?: string | Record<string, string> }
+
 interface HighlightedPre extends React.HTMLAttributes<HTMLPreElement> {
   children: string
   language: string
 }
 
-const HighlightedPre = React.memo(async ({ children, language, ...props }: HighlightedPre) => {
-  const { codeToTokens, bundledLanguages } = await import('shiki')
+const shikiImport = import('shiki')
+const highlightCache = new Map<string, Promise<Array<Array<ThemedToken>>>>()
 
-  if (!(language in bundledLanguages)) {
+function highlight(code: string, language: string): Promise<Array<Array<ThemedToken>>> {
+  const key = `${language}:${code}`
+  if (!highlightCache.has(key)) {
+    highlightCache.set(
+      key,
+      shikiImport.then(({ codeToTokens, bundledLanguages }) => {
+        if (!(language in bundledLanguages)) return []
+        return codeToTokens(code, {
+          lang: language as keyof typeof bundledLanguages,
+          defaultColor: false,
+          themes: { light: 'github-light', dark: 'github-dark' },
+        }).then(r => r.tokens)
+      })
+    )
+  }
+  return highlightCache.get(key)!
+}
+
+const HighlightedPre = React.memo(({ children, language, ...props }: HighlightedPre) => {
+  const tokens = use(highlight(children, language))
+
+  if (!tokens.length) {
     return <pre {...props}>{children}</pre>
   }
-
-  const { tokens } = await codeToTokens(children, {
-    lang: language as keyof typeof bundledLanguages,
-    defaultColor: false,
-    themes: {
-      light: 'github-light',
-      dark: 'github-dark',
-    },
-  })
 
   return (
     <pre {...props}>
