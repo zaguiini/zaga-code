@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { z } from 'zod'
 import { tool } from '@langchain/core/tools'
+import { ToolMessage } from '@langchain/core/messages/tool'
 import { getCurrentTaskInput } from '@langchain/langgraph'
+import type { ToolRunnableConfig } from '@langchain/core/tools'
 import type { AgentState } from '@/graphs/agent'
 import { validatePath } from '@/utils/validate-path'
 
@@ -14,7 +17,9 @@ const fileReadSchema = z.object({
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
 export const fileReadTool = tool(
-  async (input: z.infer<typeof fileReadSchema>) => {
+  async (input: z.infer<typeof fileReadSchema>, config: ToolRunnableConfig) => {
+    const toolCallId = config.toolCall?.id ?? ''
+
     try {
       if (input.path.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
         return `Path blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
@@ -23,7 +28,16 @@ export const fileReadTool = tool(
       const { projectPath } = getCurrentTaskInput<AgentState>()
       const validatedPath = validatePath(input.path, projectPath)
       const content = await readFile(validatedPath, 'utf-8')
-      return content
+      const extension = path.extname(input.path).replace('.', '')
+
+      return new ToolMessage({
+        content,
+        tool_call_id: toolCallId,
+        metadata: {
+          format: 'code',
+          language: extension,
+        },
+      })
     } catch (error) {
       if (error instanceof Error) {
         return `Error reading file: ${error.message}`
