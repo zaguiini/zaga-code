@@ -80,6 +80,7 @@ export function createAgentTool(definition: AgentDefinition, model: BaseChatMode
       schema: z.object({
         prompt: z
           .string()
+          .optional()
           .describe('What you want the agent to do — be specific about the goal and context'),
       }),
     }

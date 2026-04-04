@@ -8,7 +8,7 @@ const httpMcpServerSchema = z.object({
 const stdioMcpServerSchema = z.object({
   transport: z.literal('stdio'),
   command: z.string(),
-  args: z.array(z.string()).optional(),
+  args: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).optional(),
 })
 
@@ -18,7 +18,7 @@ const mcpServerSchema = z.discriminatedUnion('transport', [
 ])
 
 const settingsSchema = z.object({
-  mcps: z.record(z.string(), mcpServerSchema),
+  mcpServers: z.record(z.string(), mcpServerSchema),
 })
 
 export type Settings = z.infer<typeof settingsSchema>

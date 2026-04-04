@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Zaga Code Settings",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "http://localhost:3000/settings.schema.json"
+    },
+    "mcpServers": {
+      "type": "object",
+      "description": "A map of MCP server configurations keyed by a server name.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "transport": {
+                "type": "string",
+                "const": "http"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": ["transport", "url"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "transport": {
+                "type": "string",
+                "const": "stdio"
+              },
+              "command": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["transport", "command"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": ["mcpServers"],
+  "additionalProperties": false
+}

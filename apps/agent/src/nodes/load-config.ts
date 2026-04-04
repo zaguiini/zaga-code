@@ -28,11 +28,10 @@ async function loadSettingsFromPath(filePath: string): Promise<Settings | null> 
   }
 }
 
-async function connectMcps(mcps: Settings['mcps']) {
-  if (Object.keys(mcps).length === 0) return []
+async function connectMcps(mcpServers: Settings['mcpServers']) {
+  if (Object.keys(mcpServers).length === 0) return []
   try {
-    // @ts-expect-error TODO.
-    const client = new MultiServerMCPClient(mcps)
+    const client = new MultiServerMCPClient(mcpServers)
     return await client.getTools()
   } catch (e) {
     console.warn(`[load-config] MCP connection failed: ${e instanceof Error ? e.message : e}`)
@@ -50,8 +49,8 @@ export function createLoadConfigNode(model: BaseChatModel) {
 
     // Merge MCPs: project overrides global by key
     const mergedMcps = {
-      ...globalSettings?.mcps,
-      ...projectSettings?.mcps,
+      ...globalSettings?.mcpServers,
+      ...projectSettings?.mcpServers,
     }
 
     // Load agents from all three layers
@@ -65,7 +64,7 @@ export function createLoadConfigNode(model: BaseChatModel) {
 
     // Compute hash from effective config
     const configHash = computeConfigHash(
-      JSON.stringify({ mcps: mergedMcps, agents: mergedAgentDefs })
+      JSON.stringify({ mcpServers: mergedMcps, agents: mergedAgentDefs })
     )
 
     // Cache hit — tools already resolved for this config

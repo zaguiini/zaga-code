@@ -2,7 +2,7 @@
 
 ## TODO
 
-- [ ] Desktop/CLI app (use Tauri, allow multiple instances)
+- [ ] Desktop app (use Tauri, allow multiple sessions/projects)
 - [ ] Add vision support
 - [ ] Commands (compact, help, setup for AGENTS.md)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
