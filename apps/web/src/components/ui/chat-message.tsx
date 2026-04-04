@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, Computer, Loader2 } from 'lucide-react'
+import { Bot, ChevronRight, Code2, Loader2 } from 'lucide-react'
 import { MessageList } from './message-list'
 import type { VariantProps } from 'class-variance-authority'
 
@@ -313,7 +313,10 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
-                    Calling <span className="font-mono text-xs">{invocation.toolName}</span>
+                    Calling{' '}
+                    <span className="font-mono text-xs">
+                      {invocation.toolName.replace('agent-', '')}
+                    </span>
                   </span>
                 }
               >
@@ -389,9 +392,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
             return (
               <CollapsibleBlock
                 key={index}
-                icon={
-                  isAgent ? <Computer className="size-3 mx-0.5" /> : <Code2 className="h-4 w-4" />
-                }
+                icon={isAgent ? <Bot className="size-4" /> : <Code2 className="h-4 w-4" />}
                 title={
                   <span>
                     Result from{' '}

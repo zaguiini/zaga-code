@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] .zaga folder (user root, project root) for MCPs and agents
 - [ ] Desktop/CLI app (use Tauri, allow multiple instances)
 - [ ] Add vision support
 - [ ] Commands (compact, help, setup for AGENTS.md)
@@ -10,3 +9,4 @@
 - [ ] Review implementation, both frontend and backend
 - [ ] Document the project
 - [ ] Add actual deployment instructions
+- [ ] Add tests and evals?
