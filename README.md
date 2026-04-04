@@ -2,8 +2,7 @@
 
 ## TODO
 
-- [ ] Move away from context in favor of state (then read state within tool calls)
-- [ ] Make verification its own subagent
+- [ ] Make verification its own subagent (just an idea for now)
 - [ ] MCP tools from frontend (allow saving info through IndexedDB)
 - [ ] Subagents from frontend
 - [ ] Commands from the frontend (compact, help, setup)

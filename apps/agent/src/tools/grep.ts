@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import { tool } from '@langchain/core/tools'
-import type { ToolRuntime } from '@langchain/core/tools'
+import { getCurrentTaskInput } from '@langchain/langgraph'
+import type { AgentState } from '@/graphs/agent'
 
 const execFileAsync = promisify(execFile)
 
@@ -12,13 +13,10 @@ const grepSchema = z.object({
   case_insensitive: z.boolean().optional().default(false),
 })
 
-const contextSchema = z.object({ project_path: z.string() })
-
 export const grepTool = tool(
-  async (
-    input,
-    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
-  ) => {
+  async input => {
+    const { projectPath } = getCurrentTaskInput<AgentState>()
+
     const args = [
       '--line-number',
       '--with-filename',
@@ -44,7 +42,7 @@ export const grepTool = tool(
 
     try {
       const { stdout } = await execFileAsync('rg', args, {
-        cwd: project_path,
+        cwd: projectPath,
         maxBuffer: 2 * 1024 * 1024,
       })
       const lines = stdout.trim().split('\n').filter(Boolean)

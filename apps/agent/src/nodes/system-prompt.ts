@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SystemMessage } from '@langchain/core/messages'
-import type { BaseMessage, Runtime } from 'langchain'
+import type { BaseMessage } from 'langchain'
 import type { AgentState } from '@/graphs/agent'
 
 const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
@@ -44,18 +44,10 @@ Use the following project-specific instructions to guide your actions:
 {{agentsMd}}
 `
 
-type AgentContext = {
-  project_path: string
-}
-
-const isAgentContext = (context: unknown): context is AgentContext => {
-  return typeof context === 'object' && context !== null && 'project_path' in context
-}
-
-async function buildSystemPrompt(runtime: Runtime): Promise<BaseMessage> {
-  if (isAgentContext(runtime.context)) {
+async function buildSystemPrompt(projectPath: string): Promise<BaseMessage> {
+  if (projectPath) {
     try {
-      const agentsMd = await readFile(join(runtime.context.project_path, 'AGENTS.md'), 'utf-8')
+      const agentsMd = await readFile(join(projectPath, 'AGENTS.md'), 'utf-8')
       const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
       return new SystemMessage(base)
     } catch {
@@ -66,15 +58,12 @@ async function buildSystemPrompt(runtime: Runtime): Promise<BaseMessage> {
   return new SystemMessage(BASE_SYSTEM_PROMPT)
 }
 
-export async function systemPromptNode(
-  state: AgentState,
-  runtime: Runtime
-): Promise<Partial<AgentState>> {
+export async function systemPromptNode(state: AgentState): Promise<Partial<AgentState>> {
   const existingSystem = state.messages.find(msg => msg.type === 'system')
 
   // Skip rebuild if system message already exists
   if (existingSystem) return {}
 
-  const systemMessage = await buildSystemPrompt(runtime)
+  const systemMessage = await buildSystemPrompt(state.projectPath)
   return { messages: [systemMessage] }
 }

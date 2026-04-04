@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { tool } from '@langchain/core/tools'
-import type { ToolRuntime } from '@langchain/core/tools'
+import { getCurrentTaskInput } from '@langchain/langgraph'
+import type { AgentState } from '@/graphs/agent'
 import { validatePath } from '@/utils/validate-path'
 
 const fileEditSchema = z.object({
@@ -12,14 +13,10 @@ const fileEditSchema = z.object({
   new_string: z.string().describe('Replacement string'),
 })
 
-const contextSchema = z.object({ project_path: z.string() })
-
 export const fileEditTool = tool(
-  async (
-    input,
-    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
-  ) => {
-    const validatedPath = validatePath(input.path, project_path)
+  async input => {
+    const { projectPath } = getCurrentTaskInput<AgentState>()
+    const validatedPath = validatePath(input.path, projectPath)
     const content = await readFile(validatedPath, 'utf-8')
 
     const occurrences = content.split(input.old_string).length - 1

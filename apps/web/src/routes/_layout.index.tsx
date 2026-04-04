@@ -76,11 +76,11 @@ function NewChat() {
 
           return client.runs
             .create(threadId, 'agent', {
-              context,
               input: {
                 messages: [
                   { type: 'human', content: [{ type: 'text', text: data.initialPrompt }] },
                 ],
+                projectPath: data.projectPath,
               },
               config: { recursion_limit: 1000 },
               streamMode: ['messages', 'values', 'tools'],

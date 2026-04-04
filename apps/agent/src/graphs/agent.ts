@@ -17,6 +17,10 @@ import { queryModelInfo } from '@/setup'
 
 export const agentStateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
+  projectPath: Annotation<string>({
+    reducer: (_, next) => next,
+    default: () => '',
+  }),
   maxTokens: Annotation<number>({
     reducer: (_, next) => next,
     default: () => 0,

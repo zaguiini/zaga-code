@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { glob } from 'glob'
 import Fuse from 'fuse.js'
 import { tool } from 'langchain'
-import type { ToolRuntime } from '@langchain/core/tools'
+import { getCurrentTaskInput } from '@langchain/langgraph'
+import type { AgentState } from '@/graphs/agent'
 
 const fileSearchSchema = z.object({
   query: z
@@ -18,25 +19,20 @@ const fileSearchSchema = z.object({
     .describe('Maximum number of results to return (default: 10)'),
 })
 
-const contextSchema = z.object({
-  project_path: z.string(),
-})
-
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
 export const fileSearchTool = tool(
-  async (
-    input: z.infer<typeof fileSearchSchema>,
-    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
-  ) => {
+  async (input: z.infer<typeof fileSearchSchema>) => {
     try {
       const { query, limit } = input
       if (query.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
         return `Search blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
       }
 
+      const { projectPath } = getCurrentTaskInput<AgentState>()
+
       const filePaths = await glob('**/*', {
-        cwd: project_path,
+        cwd: projectPath,
         nodir: true,
         ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '.next/**'],
       })

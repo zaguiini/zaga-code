@@ -1,11 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 import { env } from '@/env'
-import { threadsSearchQuery } from '@/queries/threads'
 import { messageGrouper } from '@/lib/message-grouper'
 import { StreamProvider } from '@/lib/stream-context'
 
@@ -15,13 +14,6 @@ export const Route = createFileRoute('/_layout/$threadId')({
 
 function RouteComponent() {
   const { threadId } = Route.useParams()
-
-  const thread = useSuspenseQuery({
-    ...threadsSearchQuery(),
-    select: data => data.find(threadCandidate => threadCandidate.thread_id === threadId),
-  })
-
-  const context = thread.data?.metadata?.context as { project_path: string } | undefined
 
   const stream = useStream({
     assistantId: 'agent',
@@ -114,7 +106,7 @@ function RouteComponent() {
           onScroll={updateStickToBottom}
           className="w-full flex-1 min-h-0 overflow-y-auto"
         >
-          <MessageList messages={items} isTyping={stream.isLoading} />
+          <MessageList messages={items} />
         </div>
         <form
           onSubmit={e => {
@@ -127,7 +119,6 @@ function RouteComponent() {
               {
                 streamMode: ['messages', 'values', 'tools'],
                 streamSubgraphs: true,
-                context,
                 config: { recursion_limit: 1000 },
               }
             )
@@ -142,11 +133,17 @@ function RouteComponent() {
           />
           <div className="flex items-center justify-between gap-2">
             {stream.isLoading && (
-              <p className="text-xs text-muted-foreground text-center">
-                Press{' '}
-                <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Esc</kbd> to
-                interrupt
-              </p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-0.5">
+                  <Loader2 className="size-3 mx-0.5 animate-spin" />
+                  <span className="text-xs text-muted-foreground text-center">Working...</span>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Press{' '}
+                  <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Esc</kbd> to
+                  interrupt
+                </p>
+              </div>
             )}
 
             {maxTokens > 0 && usedTokens > 0 && (

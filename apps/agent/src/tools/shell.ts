@@ -3,7 +3,8 @@ import { PassThrough } from 'node:stream'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { tool } from 'langchain'
-import type { ToolRuntime } from '@langchain/core/tools'
+import { getCurrentTaskInput } from '@langchain/langgraph'
+import type { AgentState } from '@/graphs/agent'
 import { checkShellSafety } from '@/utils/shell-safety'
 
 const shellSchema = z.object({
@@ -14,17 +15,10 @@ const shellSchema = z.object({
     .describe('Set to true to confirm execution of a destructive command'),
 })
 
-const contextSchema = z.object({
-  project_path: z.string(),
-})
-
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
 export const shellTool = tool(
-  async function* (
-    input: z.infer<typeof shellSchema>,
-    { context: { project_path } }: ToolRuntime<unknown, z.infer<typeof contextSchema>>
-  ) {
+  async function* (input: z.infer<typeof shellSchema>) {
     if (input.command.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
       return `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
     }
@@ -39,7 +33,8 @@ export const shellTool = tool(
       return `CONFIRMATION_REQUIRED: "${input.command}" is a destructive command. Re-run with confirmed: true to execute.`
     }
 
-    const resolvedProjectPath = resolve(project_path)
+    const { projectPath } = getCurrentTaskInput<AgentState>()
+    const resolvedProjectPath = resolve(projectPath)
     const child = spawn('sh', ['-c', input.command], {
       cwd: resolvedProjectPath,
       env: process.env,

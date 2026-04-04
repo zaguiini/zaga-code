@@ -1,6 +1,8 @@
+import { getCurrentTaskInput } from '@langchain/langgraph'
 import { AIMessage, HumanMessage, createAgent, tool } from 'langchain'
 import { z } from 'zod'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { AgentState } from '@/graphs/agent'
 import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
 import { grepTool } from '@/tools/grep'
@@ -30,19 +32,26 @@ const exploreSchema = z.object({
     ),
 })
 
+const exploreStateSchema = z.object({
+  projectPath: z.string(),
+})
+
 export function createExploreTool(model: BaseChatModel) {
   const exploreAgent = createAgent({
     model,
     tools: [fileSearchTool, fileReadTool, grepTool],
     systemPrompt: EXPLORE_SYSTEM_PROMPT,
+    stateSchema: exploreStateSchema,
     name: 'explore',
   })
 
   return tool(
-    async function* ({ prompt }, config) {
+    async function* ({ prompt }) {
+      const { projectPath } = getCurrentTaskInput<AgentState>()
+
       const stream = await exploreAgent.stream(
-        { messages: [new HumanMessage(prompt)] },
-        { ...config, context: config.metadata.context, streamMode: 'values' }
+        { messages: [new HumanMessage(prompt)], projectPath },
+        { streamMode: 'values' }
       )
 
       let lastAiText = ''
