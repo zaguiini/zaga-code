@@ -18,9 +18,12 @@ const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
 export const fileReadTool = tool(
   async (input: z.infer<typeof fileReadSchema>, config: ToolRunnableConfig) => {
-    const toolCallId = config.toolCall?.id ?? ''
-
     try {
+      const toolCallId = config.toolCall?.id
+      if (!toolCallId) {
+        throw new Error('file_read tool invoked without a tool_call_id in config')
+      }
+
       if (input.path.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
         return `Path blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
       }
@@ -28,14 +31,14 @@ export const fileReadTool = tool(
       const { projectPath } = getCurrentTaskInput<AgentState>()
       const validatedPath = validatePath(input.path, projectPath)
       const content = await readFile(validatedPath, 'utf-8')
-      const extension = path.extname(input.path).replace('.', '')
+      const extension = path.extname(input.path).slice(1) || undefined
 
       return new ToolMessage({
         content,
         tool_call_id: toolCallId,
         metadata: {
           format: 'code',
-          language: extension,
+          ...(extension ? { language: extension } : {}),
         },
       })
     } catch (error) {
