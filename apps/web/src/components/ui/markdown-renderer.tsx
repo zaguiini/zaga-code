@@ -69,13 +69,13 @@ const HighlightedPre = React.memo(async ({ children, language, ...props }: Highl
 })
 HighlightedPre.displayName = 'HighlightedCode'
 
-interface CodeBlockProps extends React.HTMLAttributes<HTMLPreElement> {
+export interface CodeBlockProps extends React.HTMLAttributes<HTMLPreElement> {
   children: React.ReactNode
   className?: string
   language: string
 }
 
-const CodeBlock = ({ children, className, language, ...restProps }: CodeBlockProps) => {
+export const CodeBlock = ({ children, className, language, ...restProps }: CodeBlockProps) => {
   const code = typeof children === 'string' ? children : childrenTakeAllStringContents(children)
 
   const preClass = cn(

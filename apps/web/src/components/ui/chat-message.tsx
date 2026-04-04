@@ -8,7 +8,7 @@ import type { VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { FilePreview } from '@/components/ui/file-preview'
-import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
+import { CodeBlock, MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { messageGrouper } from '@/lib/message-grouper'
 import { useStreamContext } from '@/lib/stream-context'
 
@@ -425,7 +425,11 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 }
               >
                 {args}
-                {invocation.metadata?.format === 'markdown' ? (
+                {invocation.metadata?.format === 'code' ? (
+                  <CodeBlock language={invocation.metadata.language as string}>
+                    {invocation.result}
+                  </CodeBlock>
+                ) : invocation.metadata?.format === 'markdown' ? (
                   <MarkdownRenderer>{invocation.result}</MarkdownRenderer>
                 ) : (
                   <pre className="font-mono whitespace-pre-wrap">{invocation.result}</pre>
