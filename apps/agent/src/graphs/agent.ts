@@ -62,7 +62,6 @@ async function buildAgentGraph(maxTokens: number) {
   const model = createModel()
 
   const readOnlyTools = [fileSearchTool, fileReadTool, grepTool]
-  const mcpTools = await getMcpTools()
   const exploreTool = createExploreTool(model)
   const allTools = [
     ...readOnlyTools,
@@ -70,7 +69,7 @@ async function buildAgentGraph(maxTokens: number) {
     fileWriteTool,
     shellTool,
     exploreTool,
-    ...mcpTools,
+    ...(await getMcpTools()),
   ]
 
   const executorNode = createExecutorNode(model.bindTools(allTools), env.MODEL)

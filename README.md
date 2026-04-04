@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] Tool streaming (long calls like `npx create-next-app`)
 - [ ] Move away from context in favor of state (then read state within tool calls)
 - [ ] Make verification its own subagent
 - [ ] MCP tools from frontend (allow saving info through IndexedDB)

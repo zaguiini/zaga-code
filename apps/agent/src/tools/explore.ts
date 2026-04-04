@@ -1,6 +1,5 @@
-import { createAgent, tool } from 'langchain'
+import { AIMessage, HumanMessage, createAgent, tool } from 'langchain'
 import { z } from 'zod'
-import { HumanMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { fileSearchTool } from '@/tools/file-search'
 import { fileReadTool } from '@/tools/file-read'
@@ -31,14 +30,6 @@ const exploreSchema = z.object({
     ),
 })
 
-interface ExploreStreamEvent {
-  type: 'text' | 'tool-call' | 'tool-result'
-  content?: string
-  name?: string
-  args?: unknown
-  result?: string
-}
-
 export function createExploreTool(model: BaseChatModel) {
   const exploreAgent = createAgent({
     model,
@@ -49,64 +40,30 @@ export function createExploreTool(model: BaseChatModel) {
 
   return tool(
     async function* ({ prompt }, config) {
-      const context = (config as any)?.configurable?.context ?? (config as any)?.metadata?.context
       const stream = await exploreAgent.stream(
         { messages: [new HumanMessage(prompt)] },
-        { context }
+        { ...config, context: config.metadata.context, streamMode: 'values' }
       )
 
-      // ReactAgent.stream() yields { messages: BaseMessage[] } — real class instances
-      const events: Array<ExploreStreamEvent> = []
       let lastAiText = ''
-      let prevMessageCount = 0
 
       for await (const update of stream) {
-        const allMessages = update.messages as any as Array<any>
-        const newMessages = allMessages.slice(prevMessageCount)
-        prevMessageCount = allMessages.length
+        const potentialAIMessage = [...update.messages].reverse().find(AIMessage.isInstance)
 
-        for (const msg of newMessages) {
-          const kind = msg.constructor.name
-
-          if (kind === 'AIMessage' || kind === 'AIMessageChunk') {
-            const text =
-              typeof msg.content === 'string'
-                ? msg.content
-                : Array.isArray(msg.content)
-                  ? msg.content
-                      .filter((c: any) => c.type === 'text')
-                      .map((c: any) => c.text)
-                      .join('')
-                  : ''
-
-            if (text.trim()) {
-              lastAiText = text
-              events.push({ type: 'text', content: text })
-            }
-
-            if (msg.tool_calls?.length) {
-              for (const tc of msg.tool_calls) {
-                events.push({ type: 'tool-call', name: tc.name, args: tc.args })
-              }
-            }
-          }
-
-          if (kind === 'ToolMessage') {
-            events.push({
-              type: 'tool-result',
-              name: msg.name ?? 'unknown',
-              result: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-            })
-          }
+        if (potentialAIMessage) {
+          lastAiText =
+            typeof potentialAIMessage.content === 'string'
+              ? potentialAIMessage.content
+              : potentialAIMessage.content.map(t => t.text).join('')
         }
 
-        if (events.length > 0) yield [...events]
+        yield update.messages
       }
 
       return lastAiText || 'Exploration complete — no findings.'
     },
     {
-      name: 'explore',
+      name: 'agent-explore',
       description:
         'Explore the codebase to understand its structure, find relevant files, and produce an implementation plan. Use this for broader codebase exploration and deep research when your task will clearly require reading multiple files across different locations. For simple, directed searches (a specific file, class, or function), use file_search or grep directly instead — they are faster.',
       schema: exploreSchema,

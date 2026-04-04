@@ -83,6 +83,8 @@ function NewChat() {
                 ],
               },
               config: { recursion_limit: 1000 },
+              streamMode: ['messages', 'values', 'tools'],
+              streamSubgraphs: true,
             })
             .then(run => {
               window.sessionStorage.setItem(`resume:${threadId}`, run.run_id)

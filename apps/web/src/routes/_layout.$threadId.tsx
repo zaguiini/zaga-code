@@ -2,13 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { getToolCallsWithResults } from '@langchain/langgraph-sdk/utils'
-import type { Message, ToolInvocationPart } from '@/components/ui/chat-message'
-import type { MessageListItem } from '@/components/ui/message-list'
 import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 import { env } from '@/env'
 import { threadsSearchQuery } from '@/queries/threads'
+import { messageGrouper } from '@/lib/message-grouper'
+import { StreamProvider } from '@/lib/stream-context'
 
 export const Route = createFileRoute('/_layout/$threadId')({
   component: RouteComponent,
@@ -52,131 +51,8 @@ function RouteComponent() {
     }
   }, [threadId, stream])
 
-  const items: Array<MessageListItem> = useMemo(() => {
-    const result: Array<MessageListItem> = []
-
-    // Pre-compute tool call results using the full messages array.
-    // Group by AI message ID so we can match them to their source message.
-    const allToolCalls = getToolCallsWithResults(stream.messages)
-    const toolCallsByAiId = new Map<string, typeof allToolCalls>()
-    for (const tc of allToolCalls) {
-      const aiId = tc.aiMessage.id ?? ''
-      if (!toolCallsByAiId.has(aiId)) toolCallsByAiId.set(aiId, [])
-      toolCallsByAiId.get(aiId)!.push(tc)
-    }
-
-    for (const message of stream.messages) {
-      // Skip tool messages — their results are consumed via toolCallMap
-      if (message.type === 'tool') continue
-
-      // Transform message into display messages
-      const displayMessages: Array<Message> = []
-
-      if (
-        message.type === 'human' ||
-        message.type === 'system' ||
-        message.type === 'function' ||
-        message.type === 'remove'
-      ) {
-        displayMessages.push({
-          id: message.id!,
-          role: message.type === 'human' ? 'user' : 'assistant',
-          content: Array.isArray(message.content)
-            ? message.content
-                .filter(content => content.type === 'text')
-                .map(content => content.text)
-                .join('')
-            : message.content,
-        })
-      } else {
-        // AI message
-        const reasoningContent = message.additional_kwargs?.reasoning_content as string | undefined
-
-        const messageContent = Array.isArray(message.content)
-          ? message.content
-              .filter(content => content.type === 'text')
-              .map(content => content.text)
-              .join('')
-          : message.content.toString().trim()
-
-        if (messageContent) {
-          displayMessages.push({
-            id: message.id!,
-            role: 'assistant',
-            content: messageContent,
-            parts: [{ type: 'text', text: messageContent }],
-          })
-        }
-
-        // Add reasoning block — skip if reasoning is only whitespace
-        if (reasoningContent?.trim()) {
-          const durationMs = message.additional_kwargs?.reasoning_duration_ms as number | undefined
-          const reasoningDone = durationMs != null
-          displayMessages.unshift({
-            id: message.id!,
-            role: 'assistant',
-            content: reasoningContent,
-            parts: [
-              { type: 'reasoning', reasoning: reasoningContent, done: reasoningDone, durationMs },
-            ],
-          })
-        }
-
-        // Get tool calls for this AI message by matching on message ID
-        const messageToolCalls = toolCallsByAiId.get(message.id!) ?? []
-        for (const toolCall of messageToolCalls) {
-          const parts: Array<ToolInvocationPart> = []
-
-          // Find matching tool progress for this call
-          const progress = stream.toolProgress.find(tp => tp.toolCallId === toolCall.call.id)
-
-          if (toolCall.state === 'completed') {
-            parts.push({
-              type: 'tool-invocation',
-              toolInvocation: {
-                toolName: toolCall.call.name,
-                state: 'result',
-                args: toolCall.call.args,
-                result: toolCall.result?.content.toString() ?? 'No result',
-              },
-            })
-          } else if (progress?.state === 'running' && progress.data != null) {
-            parts.push({
-              type: 'tool-invocation',
-              toolInvocation: {
-                toolName: toolCall.call.name,
-                state: 'streaming',
-                args: toolCall.call.args,
-                data: progress.data,
-              },
-            })
-          } else {
-            // pending (starting or no data yet)
-            parts.push({
-              type: 'tool-invocation',
-              toolInvocation: {
-                args: toolCall.call.args,
-                toolName: toolCall.call.name,
-                state: 'call',
-              },
-            })
-          }
-
-          displayMessages.push({
-            id: toolCall.id,
-            role: 'assistant',
-            content: '',
-            parts,
-          })
-        }
-      }
-
-      if (displayMessages.length === 0) continue
-
-      result.push(...displayMessages)
-    }
-
-    return result
+  const items = useMemo(() => {
+    return messageGrouper(stream.messages, stream.toolProgress)
   }, [stream.messages, stream.toolProgress])
 
   const handleInterrupt = useCallback(() => {
@@ -231,54 +107,58 @@ function RouteComponent() {
   const contextPercent = maxTokens > 0 ? Math.round((usedTokens / maxTokens) * 100) : null
 
   return (
-    <div className="w-full h-full flex flex-col justify-center items-center gap-8">
-      <div
-        ref={scrollContainerRef}
-        onScroll={updateStickToBottom}
-        className="w-full flex-1 min-h-0 overflow-y-auto"
-      >
-        <MessageList messages={items} isTyping={stream.isLoading} />
-      </div>
-      <form
-        onSubmit={e => {
-          e.preventDefault()
-          stickToBottomRef.current = true
-          stream.submit(
-            {
-              messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
-            },
-            {
-              streamMode: ['messages', 'values', 'tools'],
-              streamSubgraphs: true,
-              context,
-              config: { recursion_limit: 1000 },
-            }
-          )
-          setInput('')
-        }}
-        className="shrink-0 w-full"
-      >
-        <MessageInput
-          isGenerating={stream.isLoading}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-        />
-        <div className="flex items-center justify-between gap-2">
-          {stream.isLoading && (
-            <p className="text-xs text-muted-foreground text-center">
-              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Esc</kbd>{' '}
-              to interrupt
-            </p>
-          )}
-
-          {maxTokens > 0 && usedTokens > 0 && (
-            <div className="ml-auto flex items-center justify-end text-xs text-muted-foreground">
-              {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens ({contextPercent}
-              %)
-            </div>
-          )}
+    <StreamProvider toolProgress={stream.toolProgress}>
+      <div className="w-full h-full flex flex-col justify-center items-center gap-8">
+        <div
+          ref={scrollContainerRef}
+          onScroll={updateStickToBottom}
+          className="w-full flex-1 min-h-0 overflow-y-auto"
+        >
+          <MessageList messages={items} isTyping={stream.isLoading} />
         </div>
-      </form>
-    </div>
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            stickToBottomRef.current = true
+            stream.submit(
+              {
+                messages: [{ type: 'human', content: [{ type: 'text', text: input }] }],
+              },
+              {
+                streamMode: ['messages', 'values', 'tools'],
+                streamSubgraphs: true,
+                context,
+                config: { recursion_limit: 1000 },
+              }
+            )
+            setInput('')
+          }}
+          className="shrink-0 w-full"
+        >
+          <MessageInput
+            isGenerating={stream.isLoading}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+          />
+          <div className="flex items-center justify-between gap-2">
+            {stream.isLoading && (
+              <p className="text-xs text-muted-foreground text-center">
+                Press{' '}
+                <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Esc</kbd> to
+                interrupt
+              </p>
+            )}
+
+            {maxTokens > 0 && usedTokens > 0 && (
+              <div className="ml-auto flex items-center justify-end text-xs text-muted-foreground">
+                {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens (
+                {contextPercent}
+                %)
+              </div>
+            )}
+          </div>
+        </form>
+      </div>
+    </StreamProvider>
   )
 }

@@ -1,13 +1,16 @@
 import React, { useMemo, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { ChevronRight, Code2, Loader2 } from 'lucide-react'
+import { ChevronRight, Code2, Computer, Loader2 } from 'lucide-react'
+import { MessageList } from './message-list'
 import type { VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { FilePreview } from '@/components/ui/file-preview'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
+import { messageGrouper } from '@/lib/message-grouper'
+import { useStreamContext } from '@/lib/stream-context'
 
 const chatBubbleVariants = cva(
   'group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]',
@@ -226,7 +229,7 @@ const CollapsibleBlock = ({
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   const chevron = (
-    <ChevronRight className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-90')} />
+    <ChevronRight className={cn('size-4 transition-transform', isOpen && 'rotate-90')} />
   )
 
   return (
@@ -253,10 +256,10 @@ const CollapsibleBlock = ({
               closed: { height: 0, opacity: 0 },
             }}
             transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
-            className="border-t"
+            className="border-t w-full max-w-full max-h-80 overflow-y-auto"
           >
             <div className="p-2">
-              <div className="whitespace-pre-wrap text-xs">{children}</div>
+              <div className="text-xs">{children}</div>
             </div>
           </motion.div>
         </CollapsibleContent>
@@ -286,17 +289,27 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
 }
 
 function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
+  const { toolProgress } = useStreamContext()
+
   if (!toolInvocations?.length) return null
 
   return (
     <div className="flex flex-col items-start gap-2">
       {toolInvocations.map((invocation, index) => {
+        const isAgent = invocation.toolName.startsWith('agent-')
+
+        const args = (
+          <pre className="mb-2 whitespace-pre-wrap">
+            Arguments: {JSON.stringify(invocation.args)}
+          </pre>
+        )
+
         switch (invocation.state) {
           case 'call':
             return (
               <CollapsibleBlock
                 key={index}
-                icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
                     Calling{' '}
@@ -309,7 +322,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   </span>
                 }
               >
-                Arguments: {JSON.stringify(invocation.args)}
+                {args}
               </CollapsibleBlock>
             )
           case 'streaming': {
@@ -318,7 +331,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
               return (
                 <CollapsibleBlock
                   key={index}
-                  icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                  icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                   title={
                     <span>
                       Running{' '}
@@ -332,6 +345,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   }
                   defaultOpen
                 >
+                  {args}
                   <pre className="font-mono whitespace-pre-wrap">{invocation.data}</pre>
                 </CollapsibleBlock>
               )
@@ -339,16 +353,19 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
 
             // Explore tool: data is an array of ExploreStreamEvent objects
             if (Array.isArray(invocation.data)) {
+              const messages = messageGrouper(invocation.data, toolProgress).filter(
+                message => message.role !== 'user'
+              )
               return (
                 <CollapsibleBlock
                   key={index}
-                  icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                  icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                   title={
                     <span>
                       Running{' '}
                       <span className="font-mono text-xs">
                         {'`'}
-                        {invocation.toolName}
+                        {invocation.toolName.replace('agent-', '')}
                         {'`'}
                       </span>
                       ...
@@ -357,56 +374,11 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   defaultOpen
                 >
                   <div className="space-y-2">
-                    {invocation.data.map((event: any, i: number) => {
-                      if (event.type === 'text') {
-                        return (
-                          <div key={i} className="whitespace-pre-wrap">
-                            <MarkdownRenderer>{event.content}</MarkdownRenderer>
-                          </div>
-                        )
-                      }
-                      if (event.type === 'tool-call') {
-                        return (
-                          <CollapsibleBlock
-                            key={i}
-                            icon={<Code2 className="h-4 w-4" />}
-                            title={
-                              <span>
-                                Calling{' '}
-                                <span className="font-mono text-xs">
-                                  {'`'}
-                                  {event.name}
-                                  {'`'}
-                                </span>
-                              </span>
-                            }
-                          >
-                            Arguments: {JSON.stringify(event.args)}
-                          </CollapsibleBlock>
-                        )
-                      }
-                      if (event.type === 'tool-result') {
-                        return (
-                          <CollapsibleBlock
-                            key={i}
-                            icon={<Code2 className="h-4 w-4" />}
-                            title={
-                              <span>
-                                Result from{' '}
-                                <span className="font-mono text-xs">
-                                  {'`'}
-                                  {event.name}
-                                  {'`'}
-                                </span>
-                              </span>
-                            }
-                          >
-                            {event.result}
-                          </CollapsibleBlock>
-                        )
-                      }
-                      return null
-                    })}
+                    {messages.length > 0 ? (
+                      <MessageList messages={messages} />
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No messages yet...</div>
+                    )}
                   </div>
                 </CollapsibleBlock>
               )
@@ -416,7 +388,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
             return (
               <CollapsibleBlock
                 key={index}
-                icon={<Loader2 className="h-3 w-3 animate-spin" />}
+                icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
                     Running{' '}
@@ -429,7 +401,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   </span>
                 }
               >
-                Arguments: {JSON.stringify(invocation.args)}
+                {args}
               </CollapsibleBlock>
             )
           }
@@ -437,20 +409,22 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
             return (
               <CollapsibleBlock
                 key={index}
-                icon={<Code2 className="h-4 w-4" />}
+                icon={
+                  isAgent ? <Computer className="size-3 mx-0.5" /> : <Code2 className="h-4 w-4" />
+                }
                 title={
                   <span>
                     Result from{' '}
                     <span className="font-mono text-xs">
                       {'`'}
-                      {invocation.toolName}
+                      {invocation.toolName.replace('agent-', '')}
                       {'`'}
                     </span>
                   </span>
                 }
               >
-                <pre className="mb-2">Arguments: {JSON.stringify(invocation.args)}</pre>
-                {invocation.result}
+                {args}
+                <MarkdownRenderer>{invocation.result}</MarkdownRenderer>
               </CollapsibleBlock>
             )
           default:
