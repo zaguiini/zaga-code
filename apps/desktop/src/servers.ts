@@ -1,5 +1,6 @@
 import http from 'node:http'
 import { join } from 'node:path'
+import { app } from 'electron'
 import { startAgentServer } from '@zaga/agent/server'
 import sirv from 'sirv'
 
@@ -16,10 +17,8 @@ export async function startServers(webDistPath: string) {
 }
 
 export function getWebDistPath(): string {
-  if (process.env.ELECTRON_IS_PACKAGED) {
-    // process.resourcesPath is set by Electron in packaged apps
-    const resourcesPath = (process as unknown as { resourcesPath: string }).resourcesPath
-    return join(resourcesPath, 'web')
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'web')
   }
   return join(__dirname, '../../web/dist')
 }
