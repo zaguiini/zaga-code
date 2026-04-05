@@ -16,13 +16,13 @@ function RouteComponent() {
   const threads = useSuspenseQuery(threadsSearchQuery())
 
   return (
-    <SidebarProvider defaultOpen={threads.data.length > 0}>
+    <SidebarProvider defaultOpen={threads.data.threads.length > 0}>
       <AppSidebar
         activeThreadId={threadRouteParams ? threadRouteParams.threadId : undefined}
-        threads={threads.data.map(thread => ({
-          id: thread.thread_id,
-          title: thread.metadata?.title as string | undefined,
-          isActive: threadRouteParams ? thread.thread_id === threadRouteParams.threadId : false,
+        threads={threads.data.threads.map(thread => ({
+          id: thread.threadId,
+          title: thread.lastMessage as string | undefined,
+          isActive: threadRouteParams ? thread.threadId === threadRouteParams.threadId : false,
         }))}
       />
       <main className="w-full min-w-0 h-screen relative p-4">
