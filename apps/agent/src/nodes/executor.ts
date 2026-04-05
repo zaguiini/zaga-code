@@ -27,7 +27,7 @@ export function createExecutorNode(model: BaseChatModel, modelName?: string) {
     const messages = conversationMessages.map((msg: BaseMessage) =>
       msg.type === 'generic'
         ? new AIMessage({
-            content: msg.content,
+            content: msg.text,
             id: msg.id,
             additional_kwargs: msg.additional_kwargs,
           })

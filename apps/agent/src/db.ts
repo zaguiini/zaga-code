@@ -14,9 +14,7 @@ db.pragma('journal_mode = WAL')
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS threads (
-    thread_id    TEXT PRIMARY KEY,
-    project_path TEXT NOT NULL,
-    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-    last_message TEXT
+    thread_id     TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `)

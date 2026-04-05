@@ -1,31 +1,45 @@
-import { useCallback, useReducer, useState } from 'react'
+import { useCallback, useLayoutEffect, useReducer, useState } from 'react'
 import { initialStreamState, streamReducer } from './streamReducer'
-import type { RawLangGraphEvent, ToolProgress } from './streamReducer'
+import type { StreamState } from './streamReducer'
 import { trpc } from '@/lib/trpc'
 
-export type AgentStream = {
-  streamingContent: string
-  toolProgress: Record<string, ToolProgress>
-  values: { usedTokens: number; maxTokens: number }
+export interface AgentStream extends StreamState {
   isLoading: boolean
-  error: string | null
   submit: (input: string) => void
   stop: () => void
 }
 
 type PendingRun = { input: string }
 
-export function useAgentStream(threadId: string): AgentStream {
+export function useAgentStream(
+  threadId: string,
+  historicalState?: StreamState['values']
+): AgentStream {
+  const threadsQuery = trpc.threads.list.useQuery()
+  const utils = trpc.useUtils()
   const [pending, setPending] = useState<PendingRun | null>(null)
   const [state, dispatch] = useReducer(streamReducer, initialStreamState)
   const cancelMutation = trpc.runs.cancel.useMutation()
   const cancelMutate = cancelMutation.mutate
 
-  trpc.runs.stream.useSubscription(
+  useLayoutEffect(() => {
+    if (!historicalState) return
+
+    dispatch({
+      type: 'reset',
+      state: historicalState,
+    })
+  }, [historicalState])
+
+  const stream = trpc.runs.stream.useSubscription(
     pending ? { threadId, input: pending.input } : { threadId, input: '' },
     {
       enabled: pending !== null,
-      onData(event: RawLangGraphEvent) {
+      onData(event) {
+        const thread = threadsQuery.data?.threads.find(t => t.threadId === threadId)
+        if (!thread?.firstMessage) {
+          utils.threads.list.invalidate()
+        }
         dispatch({ type: 'event', event })
       },
       onComplete() {
@@ -38,7 +52,7 @@ export function useAgentStream(threadId: string): AgentStream {
   )
 
   const submit = useCallback((input: string) => {
-    dispatch({ type: 'reset' })
+    dispatch({ type: 'prepare' })
     setPending({ input })
   }, [])
 
@@ -48,10 +62,9 @@ export function useAgentStream(threadId: string): AgentStream {
   }, [threadId, cancelMutate])
 
   return {
-    streamingContent: state.streamingContent,
     toolProgress: state.toolProgress,
     values: state.values,
-    isLoading: pending !== null,
+    isLoading: stream.status === 'pending',
     error: state.error,
     submit,
     stop,

@@ -1,6 +1,0 @@
-{
-  "graphs": {
-    "agent": "./src/graphs/agent.ts:createAgent"
-  },
-  "env": ".env"
-}

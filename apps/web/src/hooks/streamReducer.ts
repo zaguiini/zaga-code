@@ -1,62 +1,86 @@
-export type ToolProgress = {
-  toolCallId: string
-  name: string
-  input: unknown
-  output: unknown
-  status: 'running' | 'done'
-}
+import type { ToolProgress } from '@langchain/langgraph-sdk'
+import type { AgentState, StreamEvent } from '@/lib/trpc'
+import { extractText } from '@/lib/message-grouper'
+
+export type { ToolProgress }
 
 export type StreamState = {
-  streamingContent: string
   toolProgress: Record<string, ToolProgress>
-  values: { usedTokens: number; maxTokens: number }
+  values: AgentState
   error: string | null
 }
 
-// Raw LangGraph streamEvents v2 shape after JSON serialization
-export type RawLangGraphEvent = {
-  event: string
-  name: string
-  run_id: string
-  data: Record<string, unknown>
-  tags?: Array<string>
-  metadata?: Record<string, unknown>
-}
-
-export type StreamAction = { type: 'event'; event: RawLangGraphEvent } | { type: 'reset' }
+export type StreamAction =
+  | { type: 'event'; event: StreamEvent }
+  | { type: 'reset'; state?: AgentState }
+  | { type: 'prepare' }
 
 export const initialStreamState: StreamState = {
-  streamingContent: '',
   toolProgress: {},
-  values: { usedTokens: 0, maxTokens: 0 },
+  values: {
+    configHash: '',
+    maxTokens: 0,
+    usedTokens: 0,
+    messages: [],
+    projectPath: '',
+  },
   error: null,
 }
 
-function extractTextContent(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (c): c is { type: 'text'; text: string } =>
-          typeof c === 'object' && c !== null && (c as { type: string }).type === 'text'
-      )
-      .map(c => c.text)
-      .join('')
-  }
-  return ''
-}
-
 export function streamReducer(state: StreamState, action: StreamAction): StreamState {
-  if (action.type === 'reset') return initialStreamState
+  if (action.type === 'reset') {
+    if (action.state) {
+      return {
+        ...initialStreamState,
+        values: action.state,
+      }
+    }
+    return initialStreamState
+  }
+
+  if (action.type === 'prepare') {
+    return { ...state, toolProgress: {}, error: null }
+  }
 
   const { event } = action
 
   switch (event.event) {
     case 'on_chat_model_stream': {
-      const chunk = event.data.chunk as { content?: unknown } | undefined
-      const content = extractTextContent(chunk?.content)
-      if (!content) return state
-      return { ...state, streamingContent: state.streamingContent + content }
+      const message = event.data.chunk as AgentState['messages'][number]
+
+      if (!message.id) {
+        return state
+      }
+
+      const existing = state.values.messages.find(m => m.id === message.id)
+      if (existing) {
+        return {
+          ...state,
+          values: {
+            ...state.values,
+            messages: state.values.messages.map(m =>
+              m.id === message.id
+                ? {
+                    ...m,
+                    content: `${m.content}${extractText(message.content)}`,
+                    additional_kwargs: {
+                      ...m.additional_kwargs,
+                      reasoning_content: `${m.additional_kwargs?.reasoning_content ?? ''}${message.additional_kwargs?.reasoning_content ?? ''}`,
+                    },
+                  }
+                : m
+            ),
+          },
+        }
+      }
+
+      return {
+        ...state,
+        values: {
+          ...state.values,
+          messages: [...state.values.messages, message],
+        },
+      }
     }
 
     case 'on_tool_start': {
@@ -69,8 +93,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
             toolCallId,
             name: event.name,
             input: event.data.input,
-            output: undefined,
-            status: 'running',
+            state: 'running',
           },
         },
       }
@@ -84,19 +107,33 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
         ...state,
         toolProgress: {
           ...state.toolProgress,
-          [toolCallId]: { ...existing, output: event.data.output, status: 'done' },
+          [toolCallId]: { ...existing, result: event.data.output, state: 'completed' },
         },
       }
     }
 
-    case 'on_chain_end': {
-      const output = event.data.output as Record<string, unknown> | undefined
-      if (output !== undefined && output.usedTokens !== undefined) {
+    case 'on_chain_start': {
+      const input = event.data.input as Record<string, unknown> | undefined
+      if (input !== undefined) {
         return {
           ...state,
           values: {
-            usedTokens: output.usedTokens as number,
-            maxTokens: (output.maxTokens as number | undefined) ?? state.values.maxTokens,
+            ...state.values,
+            ...input,
+          },
+        }
+      }
+      return state
+    }
+
+    case 'on_chain_end': {
+      const output = event.data.output as Record<string, unknown> | undefined
+      if (output !== undefined) {
+        return {
+          ...state,
+          values: {
+            ...state.values,
+            ...output,
           },
         }
       }

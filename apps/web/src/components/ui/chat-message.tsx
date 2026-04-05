@@ -179,7 +179,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return parts.map((part, index) => {
     if (part.type === 'text') {
       return (
-        <div className="flex flex-col items-start" key={`text-${index}`}>
+        <div className="flex flex-col items-start" key="text">
           <div className={cn(chatBubbleVariants({ isUser, animation }))}>
             <MarkdownRenderer>{part.text}</MarkdownRenderer>
             {actions ? (
@@ -203,7 +203,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )
     } else if (part.type === 'reasoning') {
-      return <ReasoningBlock key={`reasoning-${index}`} part={part} />
+      return <ReasoningBlock key="reasoning" part={part} />
     } else {
       return <ToolCallBlock key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
     }
@@ -282,11 +282,7 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   const label = part.done ? 'Thought' : 'Thinking'
   const duration = part.done && part.durationMs ? ` for ${formatDuration(part.durationMs)}` : ''
 
-  return (
-    <CollapsibleBlock title={`${label}${duration}`} defaultOpen={!part.done}>
-      {part.reasoning}
-    </CollapsibleBlock>
-  )
+  return <CollapsibleBlock title={`${label}${duration}`}>{part.reasoning}</CollapsibleBlock>
 }
 
 function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {

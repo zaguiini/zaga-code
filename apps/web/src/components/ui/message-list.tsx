@@ -21,13 +21,13 @@ export function MessageList({
 }: MessageListProps) {
   return (
     <div className="space-y-4 overflow-visible">
-      {messages.map((message, index) => {
+      {messages.map(message => {
         const additionalOptions =
           typeof messageOptions === 'function' ? messageOptions(message) : messageOptions
 
         return (
           <ChatMessage
-            key={index}
+            key={`${message.id}-${message.parts?.[0]?.type ?? 'user'}`}
             showTimeStamp={showTimeStamps}
             {...message}
             {...additionalOptions}

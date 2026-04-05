@@ -14,8 +14,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { client } from '@/lib/ai-client'
 import { cn } from '@/lib/utils'
+import { trpcClient } from '@/lib/trpc'
 
 export function AppSidebar({
   activeThreadId,
@@ -28,7 +28,7 @@ export function AppSidebar({
   const navigate = useNavigate()
 
   const deleteThread = useMutation({
-    mutationFn: (threadId: string) => client.threads.delete(threadId),
+    mutationFn: (threadId: string) => trpcClient.threads.delete.mutate({ threadId }),
     onSuccess: (_, threadId) => {
       window.sessionStorage.removeItem(`resume:${threadId}`)
       queryClient.invalidateQueries({ queryKey: ['threads'] })
@@ -54,7 +54,7 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               {threads.map(item => (
-                <SidebarMenuItem key={item.id} title={item.title || item.id}>
+                <SidebarMenuItem key={item.id} title={item.title}>
                   <SidebarMenuButton asChild isActive={item.isActive}>
                     <Link
                       to="/$threadId"
@@ -64,7 +64,7 @@ export function AppSidebar({
                         !item.title && 'text-muted-foreground italic'
                       )}
                     >
-                      <span>{item.title || item.id}</span>
+                      <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                   <SidebarMenuAction

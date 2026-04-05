@@ -67,7 +67,7 @@ export function createAgentTool(definition: AgentDefinition, model: BaseChatMode
       }
 
       return new ToolMessage({
-        content: lastMessages.at(-1)?.content ?? 'No output',
+        content: lastMessages.at(-1)?.text ?? 'No output',
         tool_call_id: toolCallId,
         metadata: {
           format: 'markdown',

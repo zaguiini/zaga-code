@@ -1,18 +1,11 @@
-import { resolve } from 'node:path'
 import { BrowserWindow, app } from 'electron'
 import { setup } from '@zaga/agent/setup'
 import { AGENT_PORT, WEB_PORT, getWebDistPath, startServers } from './servers.js'
 
 const IS_DEV = !app.isPackaged
 
-function getProjectPathFromArgs(argv: Array<string>): string | null {
-  // Skip electron binary and main script; find the first non-flag argument
-  const arg = argv.slice(IS_DEV ? 2 : 1).find(a => !a.startsWith('--'))
-  return arg ? resolve(arg) : null // resolve() handles relative and absolute paths
-}
-
 function buildUrl(projectPath: string | null): string {
-  const base = IS_DEV ? `http://localhost:5173` : `http://localhost:${WEB_PORT}`
+  const base = `http://localhost:${WEB_PORT}`
   return projectPath ? `${base}/?projectPath=${encodeURIComponent(projectPath)}` : base
 }
 
@@ -31,7 +24,7 @@ function createWindow(url: string) {
 }
 
 async function main() {
-  const projectPath = getProjectPathFromArgs(process.argv)
+  const projectPath = process.cwd()
 
   const gotLock = app.requestSingleInstanceLock({ projectPath })
   if (!gotLock) {

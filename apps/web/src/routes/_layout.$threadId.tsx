@@ -14,8 +14,8 @@ export const Route = createFileRoute('/_layout/$threadId')({
 
 function RouteComponent() {
   const { threadId } = Route.useParams()
-  const stream = useAgentStream(threadId)
   const threadQuery = trpc.threads.get.useQuery({ threadId })
+  const stream = useAgentStream(threadId, threadQuery.data)
   const [input, setInput] = useState('')
 
   // Kick off graph if index route left a pending prompt in sessionStorage
@@ -50,7 +50,7 @@ function RouteComponent() {
     const el = scrollContainerRef.current
     if (!el || !stickToBottomRef.current) return
     el.scrollTop = el.scrollHeight
-  }, [threadQuery.data, stream.streamingContent, stream.isLoading])
+  }, [threadQuery.data, stream.isLoading, stream.values.messages])
 
   const handleInterrupt = useCallback(() => {
     if (stream.isLoading) stream.stop()
@@ -64,21 +64,12 @@ function RouteComponent() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [handleInterrupt])
 
-  const historicalMessages = threadQuery.data?.messages ?? []
-  const streamingMessage = stream.streamingContent
-    ? [{ type: 'ai', content: stream.streamingContent }]
-    : []
-  const allMessages = [...historicalMessages, ...streamingMessage]
-
   const items = useMemo(
-    () => messageGrouper(allMessages, stream.toolProgress),
-    [allMessages, stream.toolProgress]
+    () => messageGrouper(stream.values.messages, stream.toolProgress),
+    [stream.values.messages, stream.toolProgress]
   )
 
-  const usedTokens = stream.isLoading
-    ? stream.values.usedTokens
-    : (threadQuery.data?.usedTokens ?? 0)
-  const maxTokens = stream.isLoading ? stream.values.maxTokens : (threadQuery.data?.maxTokens ?? 0)
+  const { usedTokens, maxTokens } = stream.values
   const contextPercent = maxTokens > 0 ? Math.round((usedTokens / maxTokens) * 100) : null
 
   return (

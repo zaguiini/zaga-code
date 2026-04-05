@@ -9,6 +9,10 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router
   }
+
+  interface HistoryState {
+    initialPrompt?: string
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

@@ -23,6 +23,7 @@ function NewChat() {
     urlProjectPath ?? localStorage.getItem(STORAGE_KEY) ?? ''
   )
   const [prompt, setPrompt] = useState('')
+  const invalidateThreads = trpc.useUtils().threads.list.invalidate
 
   return (
     <div className="w-full h-full flex flex-col gap-10 justify-center items-center">
@@ -34,6 +35,8 @@ function NewChat() {
           localStorage.setItem(STORAGE_KEY, projectPath)
 
           const { threadId } = await createThread.mutateAsync({ projectPath })
+
+          invalidateThreads()
 
           // Hand off prompt to thread route via sessionStorage.
           // Thread route reads it on mount and calls stream.submit automatically.

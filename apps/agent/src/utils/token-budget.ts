@@ -8,10 +8,7 @@ export function estimateTokens(text: string): number {
 const TOOL_SCHEMA_OVERHEAD = 1500
 
 function estimateMessageTokens(msg: BaseMessage): number {
-  // Main content
-  const content =
-    typeof msg.content === 'string' ? msg.content : msg.content.map(c => c.text ?? '').join('')
-  let tokens = estimateTokens(content)
+  let tokens = estimateTokens(msg.text)
 
   // Reasoning content (extended thinking)
   const reasoning = msg.additional_kwargs.reasoning_content

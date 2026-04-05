@@ -3,6 +3,7 @@ import { AIMessageChunk } from '@langchain/core/messages'
 
 export class ChatOpenAIWithReasoning extends ChatOpenAI {
   private shouldUseApproximateTokenCount(): boolean {
+    // @ts-expect-error - modelName is not typed
     const modelName = this.modelName
     return modelName.includes('/') || modelName.startsWith('qwen')
   }
@@ -27,6 +28,7 @@ export class ChatOpenAIWithReasoning extends ChatOpenAI {
   }
 
   _convertOpenAIDeltaToBaseMessageChunk(delta: any, rawResponse: any, defaultRole: any) {
+    // @ts-expect-error - _convertOpenAIDeltaToBaseMessageChunk is not typed
     const chunk = super._convertOpenAIDeltaToBaseMessageChunk(
       delta,
       rawResponse,
