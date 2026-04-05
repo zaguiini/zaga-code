@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "electron --import tsx/esm src/main.ts",
+    "dev": "NODE_OPTIONS='--import tsx/esm' electron src/main.ts",
     "build": "tsc && electron-builder",
     "rebuild": "electron-rebuild"
   },
