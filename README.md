@@ -8,5 +8,4 @@
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
 - [ ] Review implementation, both frontend and backend
 - [ ] Document the project
-- [ ] Add actual deployment instructions
 - [ ] Add tests and evals?

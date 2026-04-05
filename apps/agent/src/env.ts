@@ -3,7 +3,6 @@ import z from 'zod'
 const envSchema = z.object({
   MODEL_API_BASE_URL: z.url(),
   MODEL: z.string(),
-  LANGGRAPH_API_URL: z.url().optional(),
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),
   LANGFUSE_BASE_URL: z.url().optional(),
