@@ -1,9 +1,12 @@
 import { Langfuse } from 'langfuse'
 import { CallbackHandler } from 'langfuse-langchain'
-import { env } from '@/env'
 
 function isConfigured(): boolean {
-  return !!(env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY && env.LANGFUSE_BASE_URL)
+  return !!(
+    process.env.LANGFUSE_PUBLIC_KEY &&
+    process.env.LANGFUSE_SECRET_KEY &&
+    process.env.LANGFUSE_BASE_URL
+  )
 }
 
 let langfuseInstance: Langfuse | undefined
@@ -14,9 +17,9 @@ export function getLangfuse(): Langfuse | undefined {
     langfuseInitialized = true
     if (isConfigured()) {
       langfuseInstance = new Langfuse({
-        publicKey: env.LANGFUSE_PUBLIC_KEY!,
-        secretKey: env.LANGFUSE_SECRET_KEY!,
-        baseUrl: env.LANGFUSE_BASE_URL!,
+        publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
+        secretKey: process.env.LANGFUSE_SECRET_KEY!,
+        baseUrl: process.env.LANGFUSE_BASE_URL!,
       })
       process.on('beforeExit', async () => {
         await langfuseInstance!.flushAsync()
@@ -30,9 +33,9 @@ export function createCallbackHandler(sessionId: string | undefined): CallbackHa
   if (!isConfigured()) return undefined
 
   return new CallbackHandler({
-    publicKey: env.LANGFUSE_PUBLIC_KEY!,
-    secretKey: env.LANGFUSE_SECRET_KEY!,
-    baseUrl: env.LANGFUSE_BASE_URL!,
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY!,
+    secretKey: process.env.LANGFUSE_SECRET_KEY!,
+    baseUrl: process.env.LANGFUSE_BASE_URL!,
     ...(sessionId !== undefined && { sessionId }),
   })
 }

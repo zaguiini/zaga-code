@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { env } from '@/env'
+import { isExternalProvider, settings } from '@/settings'
 
 type LogLevel = 'verbose' | 'silent'
 
@@ -56,7 +56,7 @@ async function getLmsModelKeys(command: 'ls' | 'ps'): Promise<Set<string>> {
 async function setupLmStudioModel() {
   log('Setting up LM Studio model...\n')
 
-  const modelName = env.MODEL
+  const modelName = settings.model
 
   const localModels = await getLmsModelKeys('ls')
 
@@ -89,7 +89,7 @@ async function setupLmStudioModel() {
   log('\nStarting LM Studio server...')
   try {
     await runLms(['server', 'start'])
-    log(`✓ LM Studio server started at ${env.MODEL_API_BASE_URL}\n`)
+    log(`✓ LM Studio server started at ${settings.apiBase}\n`)
   } catch {
     log('⚠ Server may already be running')
   }
@@ -121,11 +121,16 @@ export type SetupResult = {
 
 export async function setup(options: SetupOptions = {}): Promise<SetupResult> {
   logLevel = options.logLevel ?? 'silent'
+
+  if (isExternalProvider(settings)) {
+    return { model: { id: settings.model, maxTokens: 128_000 } }
+  }
+
   try {
     await setupLmStudioModel()
     log('✓ Setup complete!')
 
-    const model = await queryModelInfo(env.MODEL)
+    const model = await queryModelInfo(settings.model)
 
     return { model }
   } catch (error) {
