@@ -1,6 +1,6 @@
 # Desktop App Design
 
-**Date:** 2026-04-05  
+**Date:** 2026-04-05
 **Status:** Approved
 
 ## Goals
@@ -13,13 +13,12 @@
 
 ## Architecture Overview
 
-A monorepo with three apps and one shared package:
+A monorepo with three apps:
 
 ```
-apps/agent      — LangGraph graph + tools + Hono RPC HTTP server
+apps/agent      — LangGraph graph + tools + tRPC server
 apps/web        — React SPA (TanStack Router, Vite, no SSR)
 apps/desktop    — Electron shell
-packages/types  — Shared StreamEvent types (server + client)
 ```
 
 At runtime, a single Electron process does everything:
@@ -27,12 +26,12 @@ At runtime, a single Electron process does everything:
 ```
 Electron main process
 │
-├── :2024  Agent API (Hono RPC)
-│   ├── POST /threads
-│   ├── POST /threads/:id/runs/stream   (SSE)
-│   ├── DELETE /threads/:id/runs/current
-│   ├── GET  /threads
-│   └── GET  /threads/:id
+├── :2024  Agent API (tRPC over HTTP)
+│   ├── threads.create
+│   ├── threads.list
+│   ├── threads.get
+│   ├── runs.stream     (tRPC subscription → SSE)
+│   └── runs.cancel
 │
 ├── :3000  Web UI
 │   └── Static Vite build (or Vite dev server in development)
@@ -46,12 +45,50 @@ Electron main process
 
 The web UI is identical whether opened in the Electron webview or a browser on the LAN. No Electron-specific APIs appear in component code.
 
-## Package: `packages/types`
+## Package: `apps/agent`
 
-A minimal shared package imported by both `apps/agent` and `apps/web`. Contains the SSE event discriminated union and request/response types for all API endpoints.
+### Changes from current `main`
+
+- Add a tRPC router (`src/router.ts`) as an adapter over the existing graph. The graph itself is unchanged.
+- Add SQLite checkpointer (`@langchain/langgraph-checkpoint-sqlite`) at `~/.zaga/history.db`. Thread IDs are UUIDs created at `threads.create`.
+- Remove dependency on `langgraph-cli` and the LangGraph dev server entirely.
+- Add provider initialization at startup (see Provider Config section).
+- Export `AppRouter` type — this is the shared contract, imported directly by `apps/web`. No separate types package needed.
+
+### tRPC router
 
 ```ts
-export type StreamEvent =
+export const appRouter = router({
+  threads: router({
+    create: procedure
+      .input(z.object({ projectPath: z.string() }))
+      .mutation(/* → { threadId: string } */),
+
+    list: procedure.query(/* → { threads: Thread[] } */),
+
+    get: procedure
+      .input(z.object({ threadId: z.string() }))
+      .query(/* → { messages: Message[], usedTokens: number, maxTokens: number } */),
+  }),
+
+  runs: router({
+    stream: procedure
+      .input(z.object({ threadId: z.string(), input: z.string() }))
+      .subscription(/* → AsyncIterable<StreamEvent> via SSE */),
+
+    cancel: procedure
+      .input(z.object({ threadId: z.string() }))
+      .mutation(/* interrupts running stream */),
+  }),
+})
+
+export type AppRouter = typeof appRouter
+```
+
+Stream events emitted by the subscription:
+
+```ts
+type StreamEvent =
   | { type: 'message_chunk'; content: string; role: 'assistant' }
   | { type: 'tool_start'; toolCallId: string; name: string; input: unknown }
   | { type: 'tool_end'; toolCallId: string; output: unknown }
@@ -61,38 +98,6 @@ export type StreamEvent =
 ```
 
 TypeScript enforces the contract. Any server-side event shape change breaks the web client at compile time.
-
-## Package: `apps/agent`
-
-### Changes from current `main`
-
-- Add a Hono RPC HTTP server (`src/server.ts`) as an adapter over the existing graph. The graph itself is unchanged.
-- Add SQLite checkpointer (`@langchain/langgraph-checkpoint-sqlite`) at `~/.zaga/history.db`. Thread IDs are UUIDs, created at `POST /threads`.
-- Remove dependency on `langgraph-cli` and the LangGraph dev server entirely.
-- Add provider initialization at startup (see Provider Config section).
-
-### Hono RPC endpoints
-
-```
-POST /threads
-  body: { projectPath: string }
-  returns: { threadId: string }
-
-POST /threads/:id/runs/stream
-  body: { input: string }
-  returns: SSE stream of StreamEvent
-
-DELETE /threads/:id/runs/current
-  interrupts the running stream for this thread
-
-GET /threads
-  returns: { threads: { threadId, projectPath, createdAt, lastMessage }[] }
-
-GET /threads/:id
-  returns: { messages: Message[], usedTokens: number, maxTokens: number }
-```
-
-The Hono app type is exported and consumed by `apps/web` via Hono's `hc<AppType>()` typed client.
 
 ### Provider configuration
 
@@ -106,11 +111,11 @@ Read once at server startup from `~/.zaga/settings.json`:
 {
   "apiKey": "sk-...",
   "model": "gpt-4o",
-  "apiBase": "https://api.openai.com/v1"  // optional, defaults to OpenAI
+  "apiBase": "https://api.openai.com/v1"
 }
 ```
 
-If `apiKey` and `model` are present, skip all `lms` CLI checks and instantiate the model directly. If not, run the existing LM Studio setup flow from the refactor branch. This covers OpenAI, Groq, Together, and any other OpenAI-compatible provider without additional SDK work. Anthropic support (different client) is deferred to a future iteration.
+If `apiKey` and `model` are present, skip all `lms` CLI checks and instantiate the model directly. If not, run the existing LM Studio setup flow from the refactor branch. This covers OpenAI, Groq, Together, and any other OpenAI-compatible provider. Anthropic support (different client) is deferred.
 
 ## Package: `apps/web`
 
@@ -123,24 +128,38 @@ If `apiKey` and `model` are present, skip all `lms` CLI checks and instantiate t
 
 ### Drop LangGraph SDK
 
-Remove `@langchain/langgraph-sdk` entirely. Replace `useStream` with a custom `useAgentStream` hook.
-
-**`useAgentStream` hook:**
+Remove `@langchain/langgraph-sdk` entirely. Replace with `@trpc/react-query` pointing at our tRPC server.
 
 ```ts
-const stream = useAgentStream({ threadId })
+import type { AppRouter } from '@zaga/agent'
 
+const trpc = createTRPCReact<AppRouter>()
+```
+
+Streaming is handled via tRPC's `useSubscription`:
+
+```ts
+trpc.runs.stream.useSubscription(
+  { threadId, input },
+  {
+    onData(event) {
+      /* update local state via reducer */
+    },
+    onError(err) {
+      /* handle error */
+    },
+  }
+)
+```
+
+Local state shape (mirrors the existing UI surface):
+
+```ts
 stream.messages // Message[]
 stream.toolProgress // Record<toolCallId, ToolCall>
 stream.values // { usedTokens, maxTokens }
 stream.isLoading // boolean
-stream.submit(input) // send message, opens SSE connection
-stream.stop() // interrupt current run
 ```
-
-The hook opens an SSE connection to `POST /threads/:id/runs/stream`, reads typed `StreamEvent`s from `packages/types`, and feeds them through a reducer into the state above. On mount it checks `GET /threads/:id` — if a run is in progress it reconnects automatically, replacing `reconnectOnMount` behavior.
-
-The typed Hono client (`hc<AppType>`) is the only place HTTP calls are made. No raw `fetch` elsewhere in the frontend.
 
 ### `platform.ts`
 
@@ -160,7 +179,7 @@ No component touches `window.electronAPI` or any Electron API directly.
 
 1. Acquire single-instance lock (see CLI section).
 2. Read `~/.zaga/settings.json` and run provider/model setup.
-3. Start agent HTTP server on `:2024`.
+3. Start agent tRPC server on `:2024`.
 4. Start web UI server on `:3000` (static files in prod, proxy to Vite on `:5173` in dev).
 5. Open `BrowserWindow` pointing to `http://localhost:3000[?projectPath=...]`.
 
@@ -208,18 +227,18 @@ if (!gotLock) {
 User runs: zaga /projects/foo
   → Electron opens /new?projectPath=/projects/foo
   → User enters prompt, submits
-  → POST /threads { projectPath } → { threadId: "uuid" }
+  → trpc.threads.create({ projectPath }) → { threadId: "uuid" }
   → Navigate to /:threadId
-  → POST /threads/uuid/runs/stream { input }
-  → SSE stream → useAgentStream reducer → UI updates
+  → trpc.runs.stream.useSubscription({ threadId, input })
+  → StreamEvents → local reducer → UI updates
   → On done: SQLite checkpoint saved
 ```
 
 ## Implementation notes
 
 - The `refactor` branch contains working implementations of the SQLite checkpointer, the streaming state reducer, and the lms model setup flow. These should be ported/adapted rather than rebuilt from scratch.
-- `packages/types` is a pnpm workspace package imported by both `apps/agent` and `apps/web`.
 - In development, `apps/desktop` proxies `:3000` to the Vite dev server running on `:5173` so hot reload works normally.
+- tRPC v11 is required for SSE subscription support.
 
 ## Out of scope (deferred)
 
