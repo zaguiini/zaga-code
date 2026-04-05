@@ -59,6 +59,9 @@ importers:
       '@langchain/openai':
         specifier: ^1.4.1
         version: 1.4.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(ws@8.19.0)
+      '@trpc/server':
+        specifier: ^11.13.0
+        version: 11.13.0(typescript@5.9.3)
       better-sqlite3:
         specifier: ^12.8.0
         version: 12.8.0
@@ -2261,6 +2264,11 @@ packages:
         optional: true
       '@types/react-dom':
         optional: true
+
+  '@trpc/server@11.13.0':
+    resolution: {integrity: sha512-Iv3tWeFdb9d1UQwCPFtOcf63mF/6HD0FRDnzLmFIKWDBfKUvHUfU3yNr2pYiGs0Ctljc991Wh8xbuyAPRkdqyA==}
+    peerDependencies:
+      typescript: '>=5.7.2'
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -7551,6 +7559,10 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.8
       '@types/react-dom': 19.2.3(@types/react@19.2.8)
+
+  '@trpc/server@11.13.0(typescript@5.9.3)':
+    dependencies:
+      typescript: 5.9.3
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
