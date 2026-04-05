@@ -14,7 +14,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "present": "pnpx serve -l 8766 presentations/zaga-code"
+    "present": "pnpx serve -l 8766 presentations/zaga-code",
+    "desktop:dev": "pnpm --filter @zaga/desktop dev",
+    "desktop:build": "pnpm --filter @zaga/web build && pnpm --filter @zaga/desktop build"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.4",

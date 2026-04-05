@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Usage: zaga [path/to/project]
+# Both absolute and relative paths are supported.
+DESKTOP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+exec npx electron --import tsx/esm "$DESKTOP_DIR/src/main.ts" "$@"
