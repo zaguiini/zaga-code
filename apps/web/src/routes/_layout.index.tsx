@@ -17,7 +17,6 @@ const createThreadInputValidator = z.object({
 
 export const Route = createFileRoute('/_layout/')({
   component: NewChat,
-  ssr: false,
 })
 
 const STORAGE_KEY = 'agent-project-path'

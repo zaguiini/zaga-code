@@ -6,7 +6,6 @@ import { threadsSearchQuery } from '@/queries/threads'
 
 export const Route = createFileRoute('/_layout')({
   component: RouteComponent,
-  ssr: false,
 })
 
 function RouteComponent() {
