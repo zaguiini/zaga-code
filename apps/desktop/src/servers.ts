@@ -1,8 +1,11 @@
 import http from 'node:http'
-import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { app } from 'electron'
 import { startAgentServer } from '@zaga/agent/server'
 import sirv from 'sirv'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export const AGENT_PORT = 2024
 export const WEB_PORT = 3000
