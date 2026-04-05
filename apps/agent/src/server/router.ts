@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { procedure, router } from '@/server/trpc'
 import { db } from '@/db'
@@ -23,7 +24,9 @@ const threadsRouter = router({
 
   list: procedure.query(() => {
     const rows = db
-      .prepare('SELECT * FROM threads ORDER BY created_at DESC')
+      .prepare(
+        'SELECT thread_id, project_path, created_at, last_message FROM threads ORDER BY created_at DESC'
+      )
       .all() as Array<ThreadRow>
     return {
       threads: rows.map(r => ({
@@ -36,6 +39,8 @@ const threadsRouter = router({
   }),
 
   get: procedure.input(z.object({ threadId: z.string() })).query(async ({ input, ctx }) => {
+    const row = db.prepare('SELECT thread_id FROM threads WHERE thread_id = ?').get(input.threadId)
+    if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' })
     const state = await ctx.graph.getState({
       configurable: { thread_id: input.threadId },
     })
@@ -69,14 +74,13 @@ const runsRouter = router({
         for await (const event of eventStream) {
           yield event
         }
-
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') throw err
+      } finally {
         db.prepare('UPDATE threads SET last_message = ? WHERE thread_id = ?').run(
           input.input.slice(0, 100),
           input.threadId
         )
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') throw err
-      } finally {
         abortControllers.delete(input.threadId)
       }
     }),
