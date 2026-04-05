@@ -1,9 +1,12 @@
 import { initTRPC } from '@trpc/server'
-import type { CompiledStateGraph } from '@langchain/langgraph'
-import type { AgentState } from '@/graphs/agent'
+import type { createAgent } from '@/graphs/agent'
+
+// Derive the graph type directly from createAgent's return type to avoid
+// manual parameterisation of CompiledStateGraph generics
+type Graph = Awaited<ReturnType<typeof createAgent>>
 
 export type Context = {
-  graph: CompiledStateGraph<AgentState, Partial<AgentState>, '__start__'>
+  graph: Graph
 }
 
 const t = initTRPC.context<Context>().create()
