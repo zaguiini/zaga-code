@@ -1,9 +1,9 @@
 import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { ToolProgress } from '@langchain/langgraph-sdk'
+import type { ToolProgress } from '@/hooks/streamReducer'
 
 export type StreamContextValue = {
-  toolProgress: Array<ToolProgress>
+  toolProgress: Record<string, ToolProgress>
 }
 
 const StreamContext = createContext<StreamContextValue | null>(null)
@@ -13,7 +13,7 @@ export function StreamProvider({
   toolProgress,
 }: {
   children: ReactNode
-  toolProgress: Array<ToolProgress>
+  toolProgress: Record<string, ToolProgress>
 }) {
   const value = useMemo(() => ({ toolProgress }), [toolProgress])
 
@@ -22,5 +22,5 @@ export function StreamProvider({
 
 export function useStreamContext(): StreamContextValue {
   const ctx = useContext(StreamContext)
-  return ctx ?? { toolProgress: [] }
+  return ctx ?? { toolProgress: {} }
 }
