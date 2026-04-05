@@ -13,12 +13,13 @@ export type AgentStream = {
   stop: () => void
 }
 
-type PendingRun = { input: string; key: number }
+type PendingRun = { input: string }
 
 export function useAgentStream(threadId: string): AgentStream {
   const [pending, setPending] = useState<PendingRun | null>(null)
   const [state, dispatch] = useReducer(streamReducer, initialStreamState)
   const cancelMutation = trpc.runs.cancel.useMutation()
+  const cancelMutate = cancelMutation.mutate
 
   trpc.runs.stream.useSubscription(
     pending ? { threadId, input: pending.input } : { threadId, input: '' },
@@ -38,13 +39,13 @@ export function useAgentStream(threadId: string): AgentStream {
 
   const submit = useCallback((input: string) => {
     dispatch({ type: 'reset' })
-    setPending({ input, key: Date.now() })
+    setPending({ input })
   }, [])
 
   const stop = useCallback(() => {
-    cancelMutation.mutate({ threadId })
+    cancelMutate({ threadId })
     setPending(null)
-  }, [threadId, cancelMutation])
+  }, [threadId, cancelMutate])
 
   return {
     streamingContent: state.streamingContent,
