@@ -1,0 +1,23 @@
+{
+  "name": "@zaga/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "electron --import tsx/esm src/main.ts",
+    "build": "tsc && electron-builder",
+    "rebuild": "electron-rebuild"
+  },
+  "dependencies": {
+    "@zaga/agent": "workspace:*",
+    "sirv": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-rebuild": "^3.2.9",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}
