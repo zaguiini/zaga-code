@@ -44,6 +44,9 @@ importers:
       '@langchain/langgraph':
         specifier: ^1.2.6
         version: 1.2.6(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.1(zod@4.3.5))(zod@4.3.5)
+      '@langchain/langgraph-checkpoint-sqlite':
+        specifier: ^1.0.1
+        version: 1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(@langchain/langgraph-checkpoint@1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0)))
       '@langchain/langgraph-cli':
         specifier: ^1.1.17
         version: 1.1.17(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(@langchain/langgraph-checkpoint@1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0)))(@langchain/langgraph-sdk@1.8.4(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@langchain/langgraph@1.2.6(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.1(zod@4.3.5))(zod@4.3.5))(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(typescript@5.9.3)
@@ -56,6 +59,9 @@ importers:
       '@langchain/openai':
         specifier: ^1.4.1
         version: 1.4.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(ws@8.19.0)
+      better-sqlite3:
+        specifier: ^12.8.0
+        version: 12.8.0
       fuse.js:
         specifier: ^7.1.0
         version: 7.1.0
@@ -78,6 +84,9 @@ importers:
         specifier: ^4.3.5
         version: 4.3.5
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.7
@@ -161,7 +170,7 @@ importers:
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       nitro:
         specifier: npm:nitro-nightly@latest
-        version: nitro-nightly@3.0.1-20260119-111705-26241d6b(better-sqlite3@12.6.2)(chokidar@4.0.3)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8))(lru-cache@11.2.4)(rollup@4.55.1)(vite@7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
+        version: nitro-nightly@3.0.1-20260119-111705-26241d6b(better-sqlite3@12.8.0)(chokidar@4.0.3)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8))(lru-cache@11.2.4)(rollup@4.55.1)(vite@7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
       react:
         specifier: ^19.2.0
         version: 19.2.3
@@ -886,6 +895,13 @@ packages:
     peerDependenciesMeta:
       '@langchain/langgraph-sdk':
         optional: true
+
+  '@langchain/langgraph-checkpoint-sqlite@1.0.1':
+    resolution: {integrity: sha512-zGKqa4QpKMi2ntffoGVrkpDg5cnYtXYoFphyhTquZv+ys+sFxwfQTzf4dQu21TwCC1IpVDmYsPifJueKb1ARdQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@langchain/core': ^1.0.1
+      '@langchain/langgraph-checkpoint': ^1.0.0
 
   '@langchain/langgraph-checkpoint@1.0.1':
     resolution: {integrity: sha512-HM0cJLRpIsSlWBQ/xuDC67l52SqZ62Bh2Y61DX+Xorqwoh5e1KxYvfCD7GnSTbWWhjBOutvnR0vPhu4orFkZfw==}
@@ -2639,8 +2655,8 @@ packages:
     resolution: {integrity: sha512-kX8h7K2srmDyYnXRIppo4AH/wYgzWVCs+eKr3RusRSQ5PvRYoEFmR/I0PbdTjKFAoKqp5+kbxnNTFO9jOfSVJg==}
     hasBin: true
 
-  better-sqlite3@12.6.2:
-    resolution: {integrity: sha512-8VYKM3MjCa9WcaSAI3hzwhmyHVlH8tiGFwf0RlTsZPWJ1I5MkzjiudCo4KC4DxOaL/53A5B1sI/IbldNFDbsKA==}
+  better-sqlite3@12.8.0:
+    resolution: {integrity: sha512-RxD2Vd96sQDjQr20kdP+F+dK/1OUNiVOl200vKBZY8u0vTwysfolF6Hq+3ZK2+h8My9YvZhHsF+RSGZW2VYrPQ==}
     engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x}
 
   bidi-js@1.0.3:
@@ -6247,6 +6263,12 @@ snapshots:
       - openai
       - supports-color
 
+  '@langchain/langgraph-checkpoint-sqlite@1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))(@langchain/langgraph-checkpoint@1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0)))':
+    dependencies:
+      '@langchain/core': 1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0)
+      '@langchain/langgraph-checkpoint': 1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))
+      better-sqlite3: 12.8.0
+
   '@langchain/langgraph-checkpoint@1.0.1(@langchain/core@1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0))':
     dependencies:
       '@langchain/core': 1.1.38(openai@6.33.0(ws@8.19.0)(zod@4.3.5))(ws@8.19.0)
@@ -7561,7 +7583,6 @@ snapshots:
   '@types/better-sqlite3@7.6.13':
     dependencies:
       '@types/node': 22.19.7
-    optional: true
 
   '@types/chai@5.2.3':
     dependencies:
@@ -7939,11 +7960,10 @@ snapshots:
 
   baseline-browser-mapping@2.9.15: {}
 
-  better-sqlite3@12.6.2:
+  better-sqlite3@12.8.0:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.3
-    optional: true
 
   bidi-js@1.0.3:
     dependencies:
@@ -7954,14 +7974,12 @@ snapshots:
   bindings@1.5.0:
     dependencies:
       file-uri-to-path: 1.0.0
-    optional: true
 
   bl@4.1.0:
     dependencies:
       buffer: 5.7.1
       inherits: 2.0.4
       readable-stream: 3.6.2
-    optional: true
 
   body-parser@2.2.2:
     dependencies:
@@ -8006,7 +8024,6 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
-    optional: true
 
   bundle-name@4.1.0:
     dependencies:
@@ -8100,8 +8117,7 @@ snapshots:
     dependencies:
       readdirp: 4.1.2
 
-  chownr@1.1.4:
-    optional: true
+  chownr@1.1.4: {}
 
   chownr@3.0.0: {}
 
@@ -8235,10 +8251,10 @@ snapshots:
       whatwg-mimetype: 4.0.0
       whatwg-url: 15.1.0
 
-  db0@0.3.4(better-sqlite3@12.6.2)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8)):
+  db0@0.3.4(better-sqlite3@12.8.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8)):
     optionalDependencies:
-      better-sqlite3: 12.6.2
-      drizzle-orm: 0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8)
+      better-sqlite3: 12.8.0
+      drizzle-orm: 0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8)
 
   debug@4.4.3:
     dependencies:
@@ -8255,14 +8271,12 @@ snapshots:
   decompress-response@6.0.0:
     dependencies:
       mimic-response: 3.1.0
-    optional: true
 
   dedent@1.7.2: {}
 
   deep-eql@5.0.2: {}
 
-  deep-extend@0.6.0:
-    optional: true
+  deep-extend@0.6.0: {}
 
   deep-is@0.1.4: {}
 
@@ -8311,11 +8325,11 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-  drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8):
+  drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8):
     optionalDependencies:
       '@types/better-sqlite3': 7.6.13
       '@types/pg': 8.16.0
-      better-sqlite3: 12.6.2
+      better-sqlite3: 12.8.0
       pg: 8.17.1
       postgres: 3.4.8
     optional: true
@@ -8623,8 +8637,7 @@ snapshots:
 
   exit-hook@4.0.0: {}
 
-  expand-template@2.0.3:
-    optional: true
+  expand-template@2.0.3: {}
 
   expect-type@1.3.0: {}
 
@@ -8715,8 +8728,7 @@ snapshots:
     dependencies:
       flat-cache: 4.0.1
 
-  file-uri-to-path@1.0.0:
-    optional: true
+  file-uri-to-path@1.0.0: {}
 
   fill-range@7.1.1:
     dependencies:
@@ -8762,8 +8774,7 @@ snapshots:
 
   fresh@2.0.0: {}
 
-  fs-constants@1.0.0:
-    optional: true
+  fs-constants@1.0.0: {}
 
   fsevents@2.3.3:
     optional: true
@@ -8813,8 +8824,7 @@ snapshots:
     dependencies:
       resolve-pkg-maps: 1.0.0
 
-  github-from-package@0.0.0:
-    optional: true
+  github-from-package@0.0.0: {}
 
   glob-parent@5.1.2:
     dependencies:
@@ -8979,8 +8989,7 @@ snapshots:
     dependencies:
       postcss: 8.5.6
 
-  ieee754@1.2.1:
-    optional: true
+  ieee754@1.2.1: {}
 
   ignore@5.3.2: {}
 
@@ -8995,8 +9004,7 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  ini@1.3.8:
-    optional: true
+  ini@1.3.8: {}
 
   inline-style-parser@0.2.7: {}
 
@@ -9733,8 +9741,7 @@ snapshots:
 
   mimic-function@5.0.1: {}
 
-  mimic-response@3.1.0:
-    optional: true
+  mimic-response@3.1.0: {}
 
   minimatch@10.1.1:
     dependencies:
@@ -9756,8 +9763,7 @@ snapshots:
     dependencies:
       minipass: 7.1.2
 
-  mkdirp-classic@0.5.3:
-    optional: true
+  mkdirp-classic@0.5.3: {}
 
   motion-dom@11.18.1:
     dependencies:
@@ -9773,8 +9779,7 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  napi-build-utils@2.0.0:
-    optional: true
+  napi-build-utils@2.0.0: {}
 
   napi-postinstall@0.3.4: {}
 
@@ -9791,11 +9796,11 @@ snapshots:
 
   nf3@0.3.4: {}
 
-  nitro-nightly@3.0.1-20260119-111705-26241d6b(better-sqlite3@12.6.2)(chokidar@4.0.3)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8))(lru-cache@11.2.4)(rollup@4.55.1)(vite@7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)):
+  nitro-nightly@3.0.1-20260119-111705-26241d6b(better-sqlite3@12.8.0)(chokidar@4.0.3)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8))(lru-cache@11.2.4)(rollup@4.55.1)(vite@7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.1(srvx@0.10.0)
-      db0: 0.3.4(better-sqlite3@12.6.2)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8))
+      db0: 0.3.4(better-sqlite3@12.8.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8))
       h3: 2.0.1-rc.8(crossws@0.4.1(srvx@0.10.0))
       jiti: 2.6.1
       nf3: 0.3.4
@@ -9806,7 +9811,7 @@ snapshots:
       srvx: 0.10.0
       undici: 7.18.2
       unenv: 2.0.0-rc.24
-      unstorage: 2.0.0-alpha.5(chokidar@4.0.3)(db0@0.3.4(better-sqlite3@12.6.2)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8)))(lru-cache@11.2.4)(ofetch@2.0.0-alpha.3)
+      unstorage: 2.0.0-alpha.5(chokidar@4.0.3)(db0@0.3.4(better-sqlite3@12.8.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8)))(lru-cache@11.2.4)(ofetch@2.0.0-alpha.3)
     optionalDependencies:
       rollup: 4.55.1
       vite: 7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)
@@ -9842,7 +9847,6 @@ snapshots:
   node-abi@3.86.0:
     dependencies:
       semver: 7.7.3
-    optional: true
 
   node-releases@2.0.27: {}
 
@@ -10173,7 +10177,6 @@ snapshots:
       simple-get: 4.0.1
       tar-fs: 2.1.4
       tunnel-agent: 0.6.0
-    optional: true
 
   prelude-ls@1.2.1: {}
 
@@ -10226,7 +10229,6 @@ snapshots:
       ini: 1.3.8
       minimist: 1.2.8
       strip-json-comments: 2.0.1
-    optional: true
 
   react-dom@19.2.3(react@19.2.3):
     dependencies:
@@ -10524,15 +10526,13 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  simple-concat@1.0.1:
-    optional: true
+  simple-concat@1.0.1: {}
 
   simple-get@4.0.1:
     dependencies:
       decompress-response: 6.0.0
       once: 1.4.0
       simple-concat: 1.0.1
-    optional: true
 
   simple-wcswidth@1.1.2: {}
 
@@ -10615,8 +10615,7 @@ snapshots:
 
   strip-final-newline@4.0.0: {}
 
-  strip-json-comments@2.0.1:
-    optional: true
+  strip-json-comments@2.0.1: {}
 
   strip-json-comments@3.1.1: {}
 
@@ -10660,7 +10659,6 @@ snapshots:
       mkdirp-classic: 0.5.3
       pump: 3.0.3
       tar-stream: 2.2.0
-    optional: true
 
   tar-stream@2.2.0:
     dependencies:
@@ -10669,7 +10667,6 @@ snapshots:
       fs-constants: 1.0.0
       inherits: 2.0.4
       readable-stream: 3.6.2
-    optional: true
 
   tar@7.5.13:
     dependencies:
@@ -10751,7 +10748,6 @@ snapshots:
   tunnel-agent@0.6.0:
     dependencies:
       safe-buffer: 5.2.1
-    optional: true
 
   tw-animate-css@1.4.0: {}
 
@@ -10861,10 +10857,10 @@ snapshots:
       '@unrs/resolver-binding-win32-ia32-msvc': 1.11.1
       '@unrs/resolver-binding-win32-x64-msvc': 1.11.1
 
-  unstorage@2.0.0-alpha.5(chokidar@4.0.3)(db0@0.3.4(better-sqlite3@12.6.2)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8)))(lru-cache@11.2.4)(ofetch@2.0.0-alpha.3):
+  unstorage@2.0.0-alpha.5(chokidar@4.0.3)(db0@0.3.4(better-sqlite3@12.8.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8)))(lru-cache@11.2.4)(ofetch@2.0.0-alpha.3):
     optionalDependencies:
       chokidar: 4.0.3
-      db0: 0.3.4(better-sqlite3@12.6.2)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.6.2)(pg@8.17.1)(postgres@3.4.8))
+      db0: 0.3.4(better-sqlite3@12.8.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@12.8.0)(pg@8.17.1)(postgres@3.4.8))
       lru-cache: 11.2.4
       ofetch: 2.0.0-alpha.3
 
