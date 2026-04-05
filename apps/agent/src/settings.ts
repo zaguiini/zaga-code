@@ -7,7 +7,7 @@ const settingsSchema = z.object({
   // If apiKey is present, uses this provider directly (any OpenAI-compatible API).
   // Otherwise, lmStudio is assumed: model is the lms model key, apiBase is the local server.
   apiKey: z.string().optional(),
-  model: z.string().default('qwen3.5-35b-a3b@6bit'),
+  model: z.string().default('lmstudio-community/gemma-3-12b-it'),
   apiBase: z.string().default('http://localhost:1234/v1'),
 })
 
