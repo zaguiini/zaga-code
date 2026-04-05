@@ -161,18 +161,6 @@ stream.values // { usedTokens, maxTokens }
 stream.isLoading // boolean
 ```
 
-### `platform.ts`
-
-The only Electron-aware module in `apps/web`. Abstracts the two ways a project path can arrive:
-
-```ts
-// In Electron: listens for ipcRenderer 'open-project' message
-// In browser: reads ?projectPath= from URL query param
-export function onOpenProject(cb: (path: string) => void): void
-```
-
-No component touches `window.electronAPI` or any Electron API directly.
-
 ## Package: `apps/desktop`
 
 ### Startup sequence
@@ -196,7 +184,7 @@ apps/desktop/
 
 ### CLI invocation
 
-A small `zaga` launcher script (installed globally via electron-builder or `npm link`) passes the project path to the Electron process:
+A small `zaga` launcher script (installed globally via electron-builder or `pnpm link`) passes the project path to the Electron process:
 
 ```sh
 zaga /path/to/project
@@ -212,14 +200,16 @@ if (!gotLock) {
 } else {
   app.on('second-instance', (_, __, ___, { projectPath }) => {
     win.focus()
-    win.webContents.send('open-project', projectPath)
+    win.loadURL(`http://localhost:3000/new?projectPath=${encodeURIComponent(projectPath)}`)
   })
 }
 ```
 
-- **App already running:** `second-instance` fires → main process sends `open-project` IPC to renderer → `platform.ts` calls the registered callback → React navigates to `/new?projectPath=...`.
-- **Cold start with path:** after window is ready, navigate to `/new?projectPath=...` from the launch args.
-- **Cold start without path:** open normally to the session list / home screen.
+- **App already running:** `second-instance` fires → main process navigates the window to `/new?projectPath=...` directly.
+- **Cold start with path:** after window is ready, load `http://localhost:3000/new?projectPath=...`.
+- **Cold start without path:** load `http://localhost:3000` normally.
+
+No IPC involved. The web app reads `?projectPath=` from the URL in all cases — identical behavior in Electron and browser. `platform.ts` is not needed.
 
 ## Data flow: new session
 
