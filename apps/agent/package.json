@@ -11,6 +11,7 @@
     "./server/router": "./src/server/router.ts"
   },
   "scripts": {
+    "dev": "tsx --watch src/server/start.ts",
     "docker:start": "docker compose up -d",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
