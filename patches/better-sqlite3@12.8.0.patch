@@ -1,0 +1,16 @@
+diff --git a/lib/database.js b/lib/database.js
+--- a/lib/database.js
++++ b/lib/database.js
+@@ -45,5 +45,11 @@
+ 	// Load the native addon
+ 	let addon;
+ 	if (nativeBinding == null) {
+-		addon = DEFAULT_ADDON || (DEFAULT_ADDON = require('bindings')('better_sqlite3.node'));
++		const _rt = process.versions.electron ? 'electron' : 'node';
++		const _rtBin = path.join(__dirname, '..', 'build', 'Release', _rt + '.' + process.versions.modules + '.better_sqlite3.node');
++		if (fs.existsSync(_rtBin)) {
++			addon = DEFAULT_ADDON || (DEFAULT_ADDON = require(_rtBin));
++		} else {
++			addon = DEFAULT_ADDON || (DEFAULT_ADDON = require('bindings')('better_sqlite3.node'));
++		}
+ 	} else if (typeof nativeBinding === 'string') {

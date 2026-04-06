@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "pnpm setup:native",
     "dev": "pnpm -r dev",
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
@@ -13,7 +14,8 @@
     "lint:fix": "pnpm --filter web lint:fix && pnpm --filter @zaga/agent lint:fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "setup:native": "node scripts/setup-sqlite-prebuilds.mjs"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.4",
@@ -24,6 +26,11 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.0",
     "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "better-sqlite3@12.8.0": "patches/better-sqlite3@12.8.0.patch"
+    }
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
