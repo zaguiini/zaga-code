@@ -3,6 +3,8 @@ import { appRouter } from '@/server/router'
 import { checkpointer } from '@/checkpointer'
 import { createAgent } from '@/graphs/agent'
 
+export const AGENT_PORT = 2024
+
 export async function startAgentServer(port: number) {
   const graph = await createAgent({ checkpointer })
 
