@@ -1,6 +1,5 @@
 import type { ToolProgress } from '@langchain/langgraph-sdk'
 import type { AgentState, StreamEvent } from '@/lib/trpc'
-import { extractText } from '@/lib/message-grouper'
 
 export type { ToolProgress }
 
@@ -62,7 +61,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
               m.id === message.id
                 ? {
                     ...m,
-                    content: `${m.content}${extractText(message.content)}`,
+                    content: `${m.content}${message.content}`,
                     additional_kwargs: {
                       ...m.additional_kwargs,
                       reasoning_content: `${m.additional_kwargs?.reasoning_content ?? ''}${message.additional_kwargs?.reasoning_content ?? ''}`,

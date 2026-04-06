@@ -3,6 +3,12 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "exports": {
+    "./vite.config": {
+      "types": "./vite.port.d.ts",
+      "default": "./vite.port.mjs"
+    }
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

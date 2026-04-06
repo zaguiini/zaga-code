@@ -4,13 +4,34 @@
   "type": "module",
   "version": "0.0.0",
   "exports": {
-    "./setup": "./src/setup.ts",
-    "./graphs/agent": "./src/graphs/agent.ts",
-    "./utils/token-budget": "./src/utils/token-budget.ts",
-    "./server": "./src/server/index.ts",
-    "./server/router": "./src/server/router.ts"
+    "./setup": {
+      "types": "./dist/setup.d.ts",
+      "development": "./src/setup.ts",
+      "default": "./dist/setup.js"
+    },
+    "./graphs/agent": {
+      "types": "./dist/graphs/agent.d.ts",
+      "development": "./src/graphs/agent.ts",
+      "default": "./dist/graphs/agent.js"
+    },
+    "./utils/token-budget": {
+      "types": "./dist/utils/token-budget.d.ts",
+      "development": "./src/utils/token-budget.ts",
+      "default": "./dist/utils/token-budget.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "development": "./src/server/index.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./server/router": {
+      "types": "./dist/server/router.d.ts",
+      "development": "./src/server/router.ts",
+      "default": "./dist/server/router.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "dev": "tsx --watch src/server/start.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -38,6 +59,8 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.2",
-    "tsx": "^4.21.0"
+    "tsc-alias": "^1.8.10",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2"
   }
 }

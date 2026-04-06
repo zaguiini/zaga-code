@@ -1,5 +1,16 @@
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { isExternalProvider, settings } from '@/settings'
+
+/** Finder / Dock launches use a minimal PATH; Homebrew `lms` is usually missing without this. */
+function pathWithCommonBins(): string {
+  const extras = [join(homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
+  const prefix = extras.filter(p => existsSync(p)).join(':')
+  const base = process.env.PATH ?? ''
+  return prefix ? `${prefix}:${base}` : base
+}
 
 type LogLevel = 'verbose' | 'silent'
 
@@ -16,6 +27,7 @@ function runLms(args: Array<string>, { silent = false } = {}): Promise<string> {
     const shouldPipe = silent || logLevel === 'silent'
     const child = spawn('lms', args, {
       stdio: ['inherit', shouldPipe ? 'pipe' : 'inherit', 'pipe'],
+      env: { ...process.env, PATH: pathWithCommonBins() },
     })
     let stdout = ''
     let stderr = ''
@@ -126,15 +138,10 @@ export async function setup(options: SetupOptions = {}): Promise<SetupResult> {
     return { model: { id: settings.model, maxTokens: 128_000 } }
   }
 
-  try {
-    await setupLmStudioModel()
-    log('✓ Setup complete!')
+  await setupLmStudioModel()
+  log('✓ Setup complete!')
 
-    const model = await queryModelInfo(settings.model)
+  const model = await queryModelInfo(settings.model)
 
-    return { model }
-  } catch (error) {
-    console.error('Setup failed:', error)
-    process.exit(1)
-  }
+  return { model }
 }

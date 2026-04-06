@@ -8,7 +8,7 @@ mkdirSync(dbDir, { recursive: true })
 
 export const dbPath = join(dbDir, 'history.db')
 
-export const db = new Database(dbPath)
+export const db: InstanceType<typeof Database> = new Database(dbPath)
 
 db.pragma('journal_mode = WAL')
 

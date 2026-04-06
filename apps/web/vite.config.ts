@@ -3,8 +3,9 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
+import { WEB_PORT } from './vite.port.mjs'
 
-export const WEB_PORT = 2025
+export { WEB_PORT }
 
 export default defineConfig({
   envDir: '../../',

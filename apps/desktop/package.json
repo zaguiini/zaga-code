@@ -5,8 +5,9 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "NODE_OPTIONS='--import tsx/esm' electron src/main.ts",
-    "build": "tsc && electron-builder",
+    "dev": "NODE_OPTIONS='--import tsx/esm --conditions=development' electron src/main.ts",
+    "prebuild": "pnpm --filter @zaga/web build && pnpm --filter @zaga/agent build",
+    "build": "tsc && electron-builder --config electron-builder.config.cjs",
     "rebuild": "electron-rebuild"
   },
   "dependencies": {

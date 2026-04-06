@@ -1,8 +1,21 @@
-import { BrowserWindow, app } from 'electron'
+import { homedir } from 'node:os'
+import { BrowserWindow, app, dialog } from 'electron'
 import { setup } from '@zaga/agent/setup'
 import { WEB_PORT, getWebDistPath, startServers } from './servers.js'
 
 const IS_DEV = !app.isPackaged
+
+function isUnusableStartupCwd(cwd: string): boolean {
+  if (!cwd || cwd === '/') return true
+  const n = cwd.replace(/\\/g, '/')
+  if (n.includes('.app/Contents/')) return true
+  return false
+}
+
+function getInitialProjectPath(): string {
+  const cwd = process.cwd()
+  return isUnusableStartupCwd(cwd) ? homedir() : cwd
+}
 
 function buildUrl(projectPath: string | null): string {
   const base = `http://localhost:${WEB_PORT}`
@@ -24,7 +37,7 @@ function createWindow(url: string) {
 }
 
 async function main() {
-  const projectPath = process.cwd()
+  const projectPath = getInitialProjectPath()
 
   const gotLock = app.requestSingleInstanceLock({ projectPath })
   if (!gotLock) {
@@ -62,5 +75,9 @@ app.on('window-all-closed', () => {
 
 main().catch(err => {
   console.error('Startup error:', err)
+  const message = err instanceof Error ? err.message : String(err)
+  if (app.isReady()) {
+    dialog.showErrorBox('Zaga Code failed to start', message)
+  }
   app.quit()
 })
