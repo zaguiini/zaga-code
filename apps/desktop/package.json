@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@zaga/agent": "workspace:*",
+    "@zaga/web": "workspace:*",
     "sirv": "^3.0.0"
   },
   "devDependencies": {

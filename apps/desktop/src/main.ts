@@ -1,6 +1,6 @@
 import { BrowserWindow, app } from 'electron'
 import { setup } from '@zaga/agent/setup'
-import { AGENT_PORT, WEB_PORT, getWebDistPath, startServers } from './servers.js'
+import { WEB_PORT, getWebDistPath, startServers } from './servers.js'
 
 const IS_DEV = !app.isPackaged
 
@@ -45,10 +45,7 @@ async function main() {
 
   await setup({ logLevel: 'verbose' })
 
-  if (IS_DEV) {
-    const { startAgentServer } = await import('@zaga/agent/server')
-    await startAgentServer(AGENT_PORT)
-  } else {
+  if (!IS_DEV) {
     await startServers(getWebDistPath())
   }
 

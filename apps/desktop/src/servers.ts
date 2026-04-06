@@ -4,11 +4,13 @@ import { dirname, join } from 'node:path'
 import { app } from 'electron'
 import { startAgentServer } from '@zaga/agent/server'
 import sirv from 'sirv'
+import { WEB_PORT } from '@zaga/web/vite.config'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export const AGENT_PORT = 2024
-export const WEB_PORT = 3000
+
+export { WEB_PORT }
 
 export async function startServers(webDistPath: string) {
   await startAgentServer(AGENT_PORT)

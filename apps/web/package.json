@@ -1,10 +1,10 @@
 {
-  "name": "web",
+  "name": "@zaga/web",
   "private": true,
   "type": "module",
   "version": "0.0.0",
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",

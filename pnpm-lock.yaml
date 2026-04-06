@@ -105,6 +105,9 @@ importers:
       '@zaga/agent':
         specifier: workspace:*
         version: link:../agent
+      '@zaga/web':
+        specifier: workspace:*
+        version: link:../web
       sirv:
         specifier: ^3.0.0
         version: 3.0.2
