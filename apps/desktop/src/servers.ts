@@ -2,13 +2,13 @@ import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
-import { startAgentServer } from '@zaga/agent/server'
+import { AGENT_PORT, startAgentServer } from '@zaga/agent/server'
 import sirv from 'sirv'
 import { WEB_PORT } from '@zaga/web/vite.config'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-export const AGENT_PORT = 2024
+export { AGENT_PORT }
 
 export { WEB_PORT }
 
