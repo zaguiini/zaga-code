@@ -12,7 +12,7 @@ export type StreamState = {
 export type StreamAction =
   | { type: 'event'; event: StreamEvent }
   | { type: 'reset'; state?: AgentState }
-  | { type: 'prepare' }
+  | { type: 'prepare'; userText?: string }
 
 export const initialStreamState: StreamState = {
   toolProgress: {},
@@ -38,7 +38,21 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
   }
 
   if (action.type === 'prepare') {
-    return { ...state, toolProgress: {}, error: null }
+    const text = action.userText?.trim()
+    const base = { ...state, toolProgress: {}, error: null }
+    if (!text) return base
+    const optimisticHuman = {
+      id: `local-human-${crypto.randomUUID()}`,
+      type: 'human' as const,
+      content: [{ type: 'text' as const, text }],
+    }
+    return {
+      ...base,
+      values: {
+        ...state.values,
+        messages: [...state.values.messages, optimisticHuman],
+      },
+    }
   }
 
   const { event } = action

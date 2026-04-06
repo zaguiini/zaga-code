@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useReducer, useState } from 'react'
+import { useCallback, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { initialStreamState, streamReducer } from './streamReducer'
 import type { StreamState } from './streamReducer'
 import { trpc } from '@/lib/trpc'
@@ -21,15 +21,16 @@ export function useAgentStream(
   const [state, dispatch] = useReducer(streamReducer, initialStreamState)
   const cancelMutation = trpc.runs.cancel.useMutation()
   const cancelMutate = cancelMutation.mutate
+  const prevThreadIdRef = useRef(threadId)
 
   useLayoutEffect(() => {
-    if (!historicalState) return
+    if (prevThreadIdRef.current !== threadId) {
+      setPending(null)
+      prevThreadIdRef.current = threadId
+    }
+  }, [threadId])
 
-    dispatch({
-      type: 'reset',
-      state: historicalState,
-    })
-  }, [historicalState])
+  const lastSyncedThreadIdRef = useRef<string | null>(null)
 
   const stream = trpc.runs.stream.useSubscription(
     pending ? { threadId, input: pending.input } : { threadId, input: '' },
@@ -44,16 +45,38 @@ export function useAgentStream(
       },
       onComplete() {
         setPending(null)
+        void utils.threads.get.invalidate({ threadId })
       },
       onError() {
         setPending(null)
+        void utils.threads.get.invalidate({ threadId })
       },
     }
   )
 
+  useLayoutEffect(() => {
+    const threadSwitched = lastSyncedThreadIdRef.current !== threadId
+    if (threadSwitched) {
+      lastSyncedThreadIdRef.current = threadId
+      if (historicalState) {
+        dispatch({ type: 'reset', state: historicalState })
+      } else {
+        dispatch({ type: 'reset' })
+      }
+      return
+    }
+
+    if (!historicalState) return
+    if (stream.status === 'pending') return
+    if (state.values.messages.length > historicalState.messages.length) return
+
+    dispatch({ type: 'reset', state: historicalState })
+  }, [threadId, historicalState, stream.status, state.values.messages.length])
+
   const submit = useCallback((input: string) => {
-    dispatch({ type: 'prepare' })
-    setPending({ input })
+    const trimmed = input.trim()
+    dispatch({ type: 'prepare', userText: trimmed })
+    setPending({ input: trimmed })
   }, [])
 
   const stop = useCallback(() => {

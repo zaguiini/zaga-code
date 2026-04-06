@@ -5,7 +5,7 @@
 - [ ] Desktop app (use Tauri, allow multiple sessions/projects)
   - [ ] Nested messages (agents)
   - [ ] Final message (agents)
-  - [ ] Tool highlighting
+  - [ ] Tool syntax highlighting
   - [ ] Directory picker if running desktop
   - [ ] Type streamReducer properly
 - [ ] Settings management (desktop-only)

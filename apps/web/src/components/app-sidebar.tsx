@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { trpcClient } from '@/lib/trpc'
+import { trpc, trpcClient } from '@/lib/trpc'
 
 export function AppSidebar({
   activeThreadId,
@@ -24,14 +24,16 @@ export function AppSidebar({
   activeThreadId?: string
   threads: Array<{ id: string; title?: string; isActive?: boolean }>
 }) {
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const invalidateThreads = trpc.useUtils().threads.list.invalidate
 
   const deleteThread = useMutation({
     mutationFn: (threadId: string) => trpcClient.threads.delete.mutate({ threadId }),
     onSuccess: (_, threadId) => {
       window.sessionStorage.removeItem(`resume:${threadId}`)
-      queryClient.invalidateQueries({ queryKey: ['threads'] })
+
+      invalidateThreads()
+
       if (threadId === activeThreadId) {
         navigate({ to: '/' })
       }
