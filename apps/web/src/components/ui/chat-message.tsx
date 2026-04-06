@@ -309,7 +309,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
-                    Calling{' '}
+                    {isAgent ? 'Running' : 'Calling'}{' '}
                     <span className="font-mono text-xs">
                       {invocation.toolName.replace('agent-', '')}
                     </span>

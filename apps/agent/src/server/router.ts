@@ -137,6 +137,7 @@ const runsRouter = router({
             messages: [{ type: 'human', content: [{ type: 'text', text: input.input }] }],
           },
           {
+            subgraphs: true,
             version: 'v2',
             configurable: { thread_id: input.threadId },
             signal: ac.signal,
