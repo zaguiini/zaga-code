@@ -1,10 +1,10 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { BaseMessage, HumanMessage, filterMessages } from '@langchain/core/messages'
+import { procedure, router } from './trpc'
 import type { Message } from '@langchain/langgraph-sdk'
 import type { AgentState } from '@/graphs/agent'
 import type { StreamEvent } from '@langchain/core/types/stream'
-import { procedure, router } from '@/server/trpc'
 import { db } from '@/db'
 
 const toMessageUnion = (message: BaseMessage) => {

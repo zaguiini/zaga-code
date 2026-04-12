@@ -3,7 +3,7 @@
 ## TODO
 
 - [ ] Desktop app (use Tauri, allow multiple sessions/projects)
-  - [ ] Continue on refresh
+  - [ ] Resumable streams
   - [ ] Nested messages (agents)
   - [ ] Syntax highlighting in tools and agents
   - [ ] Directory picker if running desktop
