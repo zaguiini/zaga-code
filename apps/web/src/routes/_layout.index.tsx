@@ -1,8 +1,17 @@
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
+import { FolderOpen } from 'lucide-react'
 import { z } from 'zod'
 import { useState } from 'react'
 import { trpc } from '@/lib/trpc'
 import { MessageInput } from '@/components/ui/message-input'
+
+declare global {
+  interface Window {
+    zaga?: {
+      pickDirectory: () => Promise<string | null>
+    }
+  }
+}
 
 const searchSchema = z.object({
   projectPath: z.string().optional(),
@@ -24,6 +33,8 @@ function NewChat() {
   )
   const [prompt, setPrompt] = useState('')
   const invalidateThreads = trpc.useUtils().threads.list.invalidate
+
+  const { zaga } = window
 
   return (
     <div className="w-full h-full flex flex-col gap-10 justify-center items-center">
@@ -50,14 +61,29 @@ function NewChat() {
           <label htmlFor="projectPath" className="text-sm font-medium">
             Project Path
           </label>
-          <input
-            id="projectPath"
-            type="text"
-            placeholder="/path/to/your/project"
-            value={projectPath}
-            onChange={e => setProjectPath(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              id="projectPath"
+              type="text"
+              placeholder="/path/to/your/project"
+              value={projectPath}
+              onChange={e => setProjectPath(e.target.value)}
+              className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            {zaga && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const picked = await zaga.pickDirectory()
+                  if (picked) setProjectPath(picked)
+                }}
+                className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-accent"
+                title="Browse…"
+              >
+                <FolderOpen className="size-4" />
+              </button>
+            )}
+          </div>
         </div>
         <MessageInput
           placeholder="Ask Zaga Code"

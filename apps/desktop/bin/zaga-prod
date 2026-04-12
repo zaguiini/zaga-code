@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# CLI wrapper bundled inside Zaga Code.app/Contents/Resources/bin/zaga
+REAL_PATH="$(readlink -f "$0" 2>/dev/null || python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$0")"
+CONTENTS_DIR="$(cd "$(dirname "$REAL_PATH")/../.." && pwd)"
+exec "$CONTENTS_DIR/MacOS/Zaga Code" "$@"
