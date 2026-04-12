@@ -5,7 +5,6 @@
 - [ ] Desktop app (use Tauri, allow multiple sessions/projects)
   - [ ] Directory picker if running desktop
   - [ ] Fix initial path when running CLI and desktop
-  - [ ] Fix lms ENOENT
   - [ ] Type streamReducer properly
 - [ ] Unreliable tool calls (https://chatgpt.com/share/69d3f1d1-8668-83e9-8d33-97bcccd97c0b)
 - [ ] Settings management (desktop-only)

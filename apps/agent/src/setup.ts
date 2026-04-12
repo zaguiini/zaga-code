@@ -6,7 +6,12 @@ import { isExternalProvider, settings } from '@/settings'
 
 /** Finder / Dock launches use a minimal PATH; Homebrew `lms` is usually missing without this. */
 function pathWithCommonBins(): string {
-  const extras = [join(homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
+  const extras = [
+    join(homedir(), '.lmstudio', 'bin'),
+    join(homedir(), '.local', 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+  ]
   const prefix = extras.filter(p => existsSync(p)).join(':')
   const base = process.env.PATH ?? ''
   return prefix ? `${prefix}:${base}` : base
