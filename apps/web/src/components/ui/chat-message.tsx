@@ -295,7 +295,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
       {toolInvocations.map((invocation, index) => {
         const isAgent = invocation.toolName.startsWith('agent-')
 
-        const args = (
+        const args = !isAgent && (
           <pre className="mb-2 whitespace-pre-wrap">
             Arguments: {JSON.stringify(invocation.args)}
           </pre>

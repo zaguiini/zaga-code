@@ -91,6 +91,7 @@ export function useAgentStream(
 
   return {
     toolProgress: state.toolProgress,
+    _agentToolScopes: state._agentToolScopes,
     values: state.values,
     isLoading: stream.status === 'pending',
     error: state.error,

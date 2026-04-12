@@ -83,6 +83,8 @@ function createRunBuffer(ac: AbortController): RunBuffer {
 }
 
 const runBuffers = new Map<string, RunBuffer>()
+// Maps threadId → active runId to guard against duplicate mode='new' subscriptions
+const threadRunMap = new Map<string, string>()
 
 const threadsRouter = router({
   delete: procedure.input(z.object({ threadId: z.string() })).mutation(({ input }) => {
@@ -174,47 +176,60 @@ const runsRouter = router({
       let buffer: RunBuffer
 
       if (input.mode === 'new') {
-        runId = crypto.randomUUID()
-        db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
-          runId,
-          threadId,
-          'running'
-        )
+        // Guard against double-invocation (React Strict Mode, reconnects, etc.)
+        const existingRunId = threadRunMap.get(threadId)
+        const existingBuffer = existingRunId ? runBuffers.get(existingRunId) : undefined
+        if (existingBuffer && !existingBuffer.isComplete && !existingBuffer.ac.signal.aborted) {
+          // Attach to the already-running execution instead of starting a second one
+          runId = existingRunId!
+          buffer = existingBuffer
+        } else {
+          runId = crypto.randomUUID()
+          db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
+            runId,
+            threadId,
+            'running'
+          )
 
-        const ac = new AbortController()
-        buffer = createRunBuffer(ac)
-        runBuffers.set(runId, buffer)
+          const ac = new AbortController()
+          buffer = createRunBuffer(ac)
+          runBuffers.set(runId, buffer)
+          threadRunMap.set(threadId, runId)
 
-        // Run LangGraph as a detached background task — NOT tied to the SSE connection.
-        // This keeps the run alive across page refreshes.
-        void (async () => {
-          try {
-            const eventStream = ctx.graph.streamEvents(
-              { messages: [{ type: 'human', content: [{ type: 'text', text: input.input }] }] },
-              {
-                subgraphs: true,
-                version: 'v2',
-                configurable: { thread_id: threadId },
-                signal: ac.signal,
+          // Run LangGraph as a detached background task — NOT tied to the SSE connection.
+          // This keeps the run alive across page refreshes.
+          void (async () => {
+            try {
+              const eventStream = ctx.graph.streamEvents(
+                { messages: [{ type: 'human', content: [{ type: 'text', text: input.input }] }] },
+                {
+                  subgraphs: true,
+                  version: 'v2',
+                  configurable: { thread_id: threadId },
+                  signal: ac.signal,
+                }
+              )
+              for await (const event of eventStream) {
+                buffer.events.push(serializeEvent(event))
+                buffer.notify()
               }
-            )
-            for await (const event of eventStream) {
-              buffer.events.push(serializeEvent(event))
+              db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
+            } catch {
+              db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
+            } finally {
+              buffer.isComplete = true
               buffer.notify()
+              threadRunMap.delete(threadId)
+              setTimeout(() => runBuffers.delete(runId), 60_000)
             }
-            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
-          } catch {
-            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
-          } finally {
-            buffer.isComplete = true
-            buffer.notify()
-            setTimeout(() => runBuffers.delete(runId), 60_000)
-          }
-        })()
+          })()
+        }
       } else {
         runId = input.runId
         const existing = runBuffers.get(runId)
-        if (!existing) return
+        // If the buffer is gone or already finished, nothing to replay — the client
+        // already received all events during the original subscription.
+        if (!existing || existing.isComplete) return
         buffer = existing
       }
 

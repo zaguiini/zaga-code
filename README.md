@@ -3,7 +3,6 @@
 ## TODO
 
 - [ ] Desktop app (use Tauri, allow multiple sessions/projects)
-  - [ ] Nested messages (agents)
   - [ ] Directory picker if running desktop
   - [ ] Fix initial path when running CLI and desktop
   - [ ] Fix lms ENOENT
