@@ -31,7 +31,6 @@ export const initialStreamState: StreamState = {
     usedTokens: 0,
     messages: [],
     projectPath: '',
-    activeRunId: null,
   },
   error: null,
 }

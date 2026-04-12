@@ -13,10 +13,10 @@ type PendingRun = { input: string }
 
 export function useAgentStream(
   threadId: string,
-  historicalState?: StreamState['values'],
-  activeRunId?: string | null
+  historicalState?: StreamState['values']
 ): AgentStream {
   const threadsQuery = trpc.threads.list.useQuery()
+  const runsQuery = trpc.runs.get.useQuery({ threadId })
   const utils = trpc.useUtils()
   const [pending, setPending] = useState<PendingRun | null>(null)
   const [state, dispatch] = useReducer(streamReducer, initialStreamState)
@@ -33,6 +33,7 @@ export function useAgentStream(
 
   const lastSyncedThreadIdRef = useRef<string | null>(null)
 
+  const activeRunId = runsQuery.data?.activeRunId ?? null
   const isResuming = pending === null && !!activeRunId
 
   const subscriptionInput =

@@ -12,7 +12,7 @@ export function extractText(content: string | Array<{ type: string; text?: strin
 
 export const messageGrouper = (
   messages: Array<Message>,
-  toolProgress: Record<string, ToolProgress>
+  toolProgress: Record<string, ToolProgress | undefined>
 ): Array<MessageType> => {
   // Build a map of tool results keyed by tool_call_id
   const toolResults = new Map<string, { content: string; metadata?: Record<string, unknown> }>()

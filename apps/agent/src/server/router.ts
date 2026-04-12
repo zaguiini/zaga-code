@@ -204,19 +204,21 @@ const threadsRouter = router({
 
     const messages = filteredMessages.map(toMessageUnion)
 
-    const activeRun = db
-      .prepare('SELECT run_id FROM runs WHERE thread_id = ? AND status = ? LIMIT 1')
-      .get(input.threadId, 'running') as RunRow | undefined
-
     return {
       ...values,
       messages,
-      activeRunId: activeRun?.run_id ?? null,
     }
   }),
 })
 
 const runsRouter = router({
+  get: procedure.input(z.object({ threadId: z.string() })).query(({ input }) => {
+    const row = db
+      .prepare('SELECT run_id FROM runs WHERE thread_id = ? AND status = ? LIMIT 1')
+      .get(input.threadId, 'running') as RunRow | undefined
+    return { activeRunId: row?.run_id ?? null }
+  }),
+
   stream: procedure
     .input(
       z.discriminatedUnion('mode', [

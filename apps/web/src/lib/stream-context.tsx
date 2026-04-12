@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { ToolProgress } from '@/hooks/stream-reducer'
 
 export type StreamContextValue = {
-  toolProgress: Record<string, ToolProgress>
+  toolProgress: Record<string, ToolProgress | undefined>
 }
 
 const StreamContext = createContext<StreamContextValue | null>(null)
@@ -13,7 +13,7 @@ export function StreamProvider({
   toolProgress,
 }: {
   children: ReactNode
-  toolProgress: Record<string, ToolProgress>
+  toolProgress: Record<string, ToolProgress | undefined>
 }) {
   const value = useMemo(() => ({ toolProgress }), [toolProgress])
 
