@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useReducer, useRef, useState } from 'react'
-import { initialStreamState, streamReducer } from './streamReducer'
-import type { StreamState } from './streamReducer'
+import { initialStreamState, streamReducer } from './stream-reducer'
+import type { StreamState } from './stream-reducer'
 import { trpc } from '@/lib/trpc'
 
 export interface AgentStream extends StreamState {

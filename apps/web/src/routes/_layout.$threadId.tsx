@@ -5,7 +5,7 @@ import { MessageList } from '@/components/ui/message-list'
 import { MessageInput } from '@/components/ui/message-input'
 import { messageGrouper } from '@/lib/message-grouper'
 import { StreamProvider } from '@/lib/stream-context'
-import { useAgentStream } from '@/hooks/useAgentStream'
+import { useAgentStream } from '@/hooks/use-agent-stream'
 import { trpc } from '@/lib/trpc'
 
 export const Route = createFileRoute('/_layout/$threadId')({

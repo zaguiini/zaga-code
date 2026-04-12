@@ -5,7 +5,6 @@ export type { ToolProgress }
 
 export type StreamState = {
   toolProgress: Record<string, ToolProgress>
-  /** Maps checkpoint_ns of an agent tool → its tool_call_id in toolProgress */
   _agentToolScopes: Record<string, string>
   values: AgentState
   error: string | null
@@ -118,8 +117,6 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
   }
 
   const { event } = action
-
-  console.log(event.event, event.name)
 
   const meta = getMeta(event)
   const isSub = isSubagentEvent(event)

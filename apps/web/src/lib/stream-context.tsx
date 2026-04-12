@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { ToolProgress } from '@/hooks/streamReducer'
+import type { ToolProgress } from '@/hooks/stream-reducer'
 
 export type StreamContextValue = {
   toolProgress: Record<string, ToolProgress>
