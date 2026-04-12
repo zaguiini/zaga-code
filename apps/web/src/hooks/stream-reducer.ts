@@ -1,10 +1,17 @@
-import type { ToolProgress } from '@langchain/langgraph-sdk'
 import type { AgentState, StreamEvent } from '@/lib/trpc'
 
-export type { ToolProgress }
+// ── Tool progress type (replaces @langchain/langgraph-sdk ToolProgress) ──
+
+export type ToolProgress = {
+  toolCallId: string
+  name: string
+  state: 'running' | 'completed'
+  input: AgentState['messages'] | Record<string, unknown>
+  result?: Record<string, unknown>
+}
 
 export type StreamState = {
-  toolProgress: Record<string, ToolProgress>
+  toolProgress: Record<string, ToolProgress | undefined>
   _agentToolScopes: Record<string, string>
   values: AgentState
   error: string | null
@@ -29,20 +36,23 @@ export const initialStreamState: StreamState = {
   error: null,
 }
 
-type EventMeta = Record<string, unknown>
-
-function getMeta(event: StreamEvent): EventMeta {
-  return event.metadata
+function isSubagentEvent(event: StreamEvent) {
+  return event.metadata.langgraph_checkpoint_ns?.includes('|') ?? false
 }
 
-function isSubagentEvent(event: StreamEvent): boolean {
-  const ns = getMeta(event).langgraph_checkpoint_ns as string | undefined
-  return ns?.includes('|') ?? false
-}
-
-function getParentToolCallId(event: StreamEvent, state: StreamState): string | undefined {
-  const ns = getMeta(event).checkpoint_ns as string | undefined
+function getParentToolCallId(event: StreamEvent, state: StreamState) {
+  const ns = event.metadata.checkpoint_ns
   return ns ? state._agentToolScopes[ns] : undefined
+}
+
+function isMessages(
+  input: AgentState['messages'] | Record<string, unknown>
+): input is AgentState['messages'] {
+  return Array.isArray(input)
+}
+
+function asString(v: unknown): string {
+  return typeof v === 'string' ? v : ''
 }
 
 function appendToAgentMessages(
@@ -50,28 +60,25 @@ function appendToAgentMessages(
   parentToolCallId: string,
   message: AgentState['messages'][number]
 ): StreamState {
-  const parent = state.toolProgress[parentToolCallId] as ToolProgress | undefined
+  const parent = state.toolProgress[parentToolCallId]
   if (!parent) return state
-  const messages = Array.isArray(parent.input)
-    ? (parent.input as AgentState['messages'])
-    : ([] as AgentState['messages'])
+  const messages = isMessages(parent.input) ? parent.input : []
 
-  type ToolCall = { name: string; args: unknown; id?: string; type?: string }
-  const incomingToolCalls = (message as unknown as { tool_calls?: Array<ToolCall> }).tool_calls
+  const incomingToolCalls = message.type === 'ai' ? message.tool_calls : undefined
 
   const existing = messages.find(m => m.id === message.id)
   const updatedMessages = existing
     ? messages.map(m => {
         if (m.id !== message.id) return m
-        const prev = (m as unknown as { tool_calls?: Array<ToolCall> }).tool_calls ?? []
+        const prev = m.type === 'ai' ? (m.tool_calls ?? []) : []
         const prevIds = new Set(prev.map(tc => tc.id))
         const novel = (incomingToolCalls ?? []).filter(tc => tc.id && !prevIds.has(tc.id))
         return {
           ...m,
-          content: `${m.content}${message.content}`,
+          content: `${asString(m.content)}${asString(message.content)}`,
           additional_kwargs: {
             ...m.additional_kwargs,
-            reasoning_content: `${m.additional_kwargs?.reasoning_content ?? ''}${message.additional_kwargs?.reasoning_content ?? ''}`,
+            reasoning_content: `${asString(m.additional_kwargs?.reasoning_content)}${asString(message.additional_kwargs?.reasoning_content)}`,
           },
           ...(novel.length > 0 ? { tool_calls: [...prev, ...novel] } : {}),
         }
@@ -117,13 +124,11 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
   }
 
   const { event } = action
-
-  const meta = getMeta(event)
   const isSub = isSubagentEvent(event)
 
   switch (event.event) {
     case 'on_chat_model_stream': {
-      const message = event.data.chunk as AgentState['messages'][number]
+      const message = event.data.chunk
 
       if (!message.id) {
         return state
@@ -146,10 +151,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
               m.id === message.id
                 ? {
                     ...m,
-                    content: `${m.content}${message.content}`,
+                    content: `${asString(m.content)}${asString(message.content)}`,
                     additional_kwargs: {
                       ...m.additional_kwargs,
-                      reasoning_content: `${m.additional_kwargs?.reasoning_content ?? ''}${message.additional_kwargs?.reasoning_content ?? ''}`,
+                      reasoning_content: `${asString(m.additional_kwargs?.reasoning_content)}${asString(message.additional_kwargs?.reasoning_content)}`,
                     },
                   }
                 : m
@@ -168,9 +173,9 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     }
 
     case 'on_tool_start': {
-      const toolCallId = (meta.tool_call_id as string | undefined) ?? event.run_id
+      const toolCallId = event.metadata.tool_call_id ?? event.run_id
       const isAgent = event.name.startsWith('agent-')
-      const checkpointNs = meta.checkpoint_ns as string | undefined
+      const checkpointNs = event.metadata.checkpoint_ns
 
       // Subagent inner tool — don't track
       if (isSub) return state
@@ -202,20 +207,22 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       if (isSub) {
         const parentId = getParentToolCallId(event, state)
         if (!parentId) return state
-        const parent = state.toolProgress[parentId] as ToolProgress | undefined
+        const parent = state.toolProgress[parentId]
         if (!parent) return state
-        const messages = Array.isArray(parent.input)
-          ? (parent.input as AgentState['messages'])
-          : ([] as AgentState['messages'])
+        const messages = isMessages(parent.input) ? parent.input : []
 
-        const output = event.data.output as { kwargs?: Record<string, unknown> } | undefined
-        const kwargs = output?.kwargs ?? (output as Record<string, unknown> | undefined)
-        const toolMessage = {
-          type: 'tool' as const,
-          content: (kwargs?.content as string | undefined) ?? '',
-          tool_call_id: (kwargs?.tool_call_id as string | undefined) ?? '',
+        const output = event.data.output
+        const rawKwargs: Record<string, unknown> =
+          typeof output['kwargs'] === 'object' && output['kwargs'] !== null
+            ? (output['kwargs'] as Record<string, unknown>)
+            : output
+        const toolMessage: AgentState['messages'][number] = {
+          type: 'tool',
+          content: typeof rawKwargs['content'] === 'string' ? rawKwargs['content'] : '',
+          tool_call_id:
+            typeof rawKwargs['tool_call_id'] === 'string' ? rawKwargs['tool_call_id'] : '',
           name: event.name,
-          id: kwargs?.id as string | undefined,
+          id: typeof rawKwargs['id'] === 'string' ? rawKwargs['id'] : undefined,
         }
 
         return {
@@ -227,9 +234,9 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
         }
       }
 
-      const toolCallId = (meta.tool_call_id as string | undefined) ?? event.run_id
-      if (!(toolCallId in state.toolProgress)) return state
+      const toolCallId = event.metadata.tool_call_id ?? event.run_id
       const existing = state.toolProgress[toolCallId]
+      if (!existing) return state
       return {
         ...state,
         toolProgress: {
@@ -241,16 +248,16 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
 
     case 'on_chain_start': {
       if (isSub) return state
-      const ns = meta.checkpoint_ns as string | undefined
+      const ns = event.metadata.checkpoint_ns
       if (ns && state._agentToolScopes[ns]) return state
-      const input = event.data.input as Record<string, unknown> | undefined
+      const input = event.data.input
       if (input !== undefined) {
         return {
           ...state,
           values: {
             ...state.values,
             ...input,
-          },
+          } as AgentState,
         }
       }
       return state
@@ -258,16 +265,16 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
 
     case 'on_chain_end': {
       if (isSub) return state
-      const ns = meta.checkpoint_ns as string | undefined
+      const ns = event.metadata.checkpoint_ns
       if (ns && state._agentToolScopes[ns]) return state
-      const output = event.data.output as Record<string, unknown> | undefined
+      const output = event.data.output
       if (output !== undefined) {
         return {
           ...state,
           values: {
             ...state.values,
             ...output,
-          },
+          } as AgentState,
         }
       }
       return state

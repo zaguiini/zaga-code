@@ -9,7 +9,47 @@ import type { AgentState } from '@/graphs/agent'
 import type { StreamEvent } from '@langchain/core/types/stream'
 import { db } from '@/db'
 
-const toMessageUnion = (message: BaseMessage) => {
+// ── Serialized stream event types (consumed by the frontend via tRPC inference) ──
+
+type SerializedEventMeta = {
+  tool_call_id?: string
+  checkpoint_ns?: string
+  langgraph_checkpoint_ns?: string
+  [key: string]: unknown
+}
+
+type SerializedBaseEvent = {
+  name: string
+  run_id: string
+  tags?: Array<string>
+  metadata: SerializedEventMeta
+}
+
+export type SerializedStreamEvent =
+  | (SerializedBaseEvent & {
+      event: 'on_chat_model_stream'
+      data: { chunk: Message }
+    })
+  | (SerializedBaseEvent & {
+      event: 'on_tool_start'
+      data: { input: Record<string, unknown> }
+    })
+  | (SerializedBaseEvent & {
+      event: 'on_tool_end'
+      data: { output: Record<string, unknown> }
+    })
+  | (SerializedBaseEvent & {
+      event: 'on_chain_start'
+      data: { input?: Record<string, unknown> }
+    })
+  | (SerializedBaseEvent & {
+      event: 'on_chain_end'
+      data: { output?: Record<string, unknown> }
+    })
+
+// ── Serialization helpers ──
+
+const toMessageUnion = (message: BaseMessage): Message => {
   return { ...message.toDict().data, type: message.type } as Message
 }
 
@@ -19,33 +59,48 @@ function serializeMessages(messages: Array<BaseMessage>): Array<Message> {
   }).map(toMessageUnion)
 }
 
-function serializeEvent(event: StreamEvent) {
-  const data = event.data
+function serializeEvent(event: StreamEvent): SerializedStreamEvent | null {
+  const base: SerializedBaseEvent = {
+    name: event.name,
+    run_id: event.run_id,
+    tags: event.tags,
+    metadata: event.metadata,
+  }
 
   switch (event.event) {
     case 'on_chat_model_stream': {
-      const chunk = data.chunk
-      if (!BaseMessage.isInstance(chunk)) return event
-      return { ...event, data: { ...data, chunk: toMessageUnion(chunk) } }
+      const chunk = event.data.chunk
+      if (!BaseMessage.isInstance(chunk)) return null
+      return { ...base, event: 'on_chat_model_stream', data: { chunk: toMessageUnion(chunk) } }
     }
+    case 'on_tool_start':
+      return { ...base, event: 'on_tool_start', data: { input: event.data.input ?? {} } }
+    case 'on_tool_end':
+      return { ...base, event: 'on_tool_end', data: { output: event.data.output ?? {} } }
     case 'on_chain_start': {
-      const input = data.input
-      if (!Array.isArray(input?.messages)) return event
-      return {
-        ...event,
-        data: { ...data, input: { ...input, messages: serializeMessages(input.messages) } },
+      const input = event.data.input
+      if (input != null && Array.isArray(input.messages)) {
+        return {
+          ...base,
+          event: 'on_chain_start',
+          data: { input: { ...input, messages: serializeMessages(input.messages) } },
+        }
       }
+      return { ...base, event: 'on_chain_start', data: { input: input ?? undefined } }
     }
     case 'on_chain_end': {
-      const output = data.output
-      if (!Array.isArray(output?.messages)) return event
-      return {
-        ...event,
-        data: { ...data, output: { ...output, messages: serializeMessages(output.messages) } },
+      const output = event.data.output
+      if (output != null && Array.isArray(output.messages)) {
+        return {
+          ...base,
+          event: 'on_chain_end',
+          data: { output: { ...output, messages: serializeMessages(output.messages) } },
+        }
       }
+      return { ...base, event: 'on_chain_end', data: { output: output ?? undefined } }
     }
     default:
-      return event
+      return null
   }
 }
 
@@ -59,7 +114,7 @@ type RunRow = {
 }
 
 type RunBuffer = {
-  events: Array<ReturnType<typeof serializeEvent>>
+  events: Array<SerializedStreamEvent>
   ac: AbortController
   isComplete: boolean
   notify: () => void
@@ -210,8 +265,11 @@ const runsRouter = router({
                 }
               )
               for await (const event of eventStream) {
-                buffer.events.push(serializeEvent(event))
-                buffer.notify()
+                const serialized = serializeEvent(event)
+                if (serialized) {
+                  buffer.events.push(serialized)
+                  buffer.notify()
+                }
               }
               db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
             } catch {

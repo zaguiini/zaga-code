@@ -3,7 +3,6 @@
 ## TODO
 
 - [ ] Desktop app (use Tauri, allow multiple sessions/projects)
-  - [ ] Type streamReducer properly
   - [ ] Add activeRunId endpoint
 - [ ] Unreliable tool calls (https://chatgpt.com/share/69d3f1d1-8668-83e9-8d33-97bcccd97c0b)
 - [ ] Settings management (desktop-only)
