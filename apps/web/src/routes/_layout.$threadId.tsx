@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_layout/$threadId')({
 function RouteComponent() {
   const { threadId } = Route.useParams()
   const threadQuery = trpc.threads.get.useQuery({ threadId })
-  const stream = useAgentStream(threadId, threadQuery.data)
+  const stream = useAgentStream(threadId, threadQuery.data, threadQuery.data?.activeRunId ?? null)
   const [input, setInput] = useState('')
 
   // Kick off graph if index route left a pending prompt in sessionStorage

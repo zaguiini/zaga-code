@@ -18,3 +18,14 @@ db.exec(`
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS runs (
+    run_id    TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    status    TEXT NOT NULL DEFAULT 'running'
+  )
+`)
+
+// Mark any runs that were still 'running' when the server last stopped as failed
+db.prepare("UPDATE runs SET status = 'failed' WHERE status = 'running'").run()

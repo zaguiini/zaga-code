@@ -13,7 +13,8 @@ type PendingRun = { input: string }
 
 export function useAgentStream(
   threadId: string,
-  historicalState?: StreamState['values']
+  historicalState?: StreamState['values'],
+  activeRunId?: string | null
 ): AgentStream {
   const threadsQuery = trpc.threads.list.useQuery()
   const utils = trpc.useUtils()
@@ -32,27 +33,31 @@ export function useAgentStream(
 
   const lastSyncedThreadIdRef = useRef<string | null>(null)
 
-  const stream = trpc.runs.stream.useSubscription(
-    pending ? { threadId, input: pending.input } : { threadId, input: '' },
-    {
-      enabled: pending !== null,
-      onData(event) {
-        const thread = threadsQuery.data?.threads.find(t => t.threadId === threadId)
-        if (!thread?.firstMessage) {
-          utils.threads.list.invalidate()
-        }
-        dispatch({ type: 'event', event })
-      },
-      onComplete() {
-        setPending(null)
-        void utils.threads.get.invalidate({ threadId })
-      },
-      onError() {
-        setPending(null)
-        void utils.threads.get.invalidate({ threadId })
-      },
-    }
-  )
+  const isResuming = pending === null && !!activeRunId
+
+  const subscriptionInput =
+    pending !== null
+      ? { threadId, mode: 'new' as const, input: pending.input }
+      : { threadId, mode: 'resume' as const, runId: activeRunId ?? '' }
+
+  const stream = trpc.runs.stream.useSubscription(subscriptionInput, {
+    enabled: pending !== null || isResuming,
+    onData(event) {
+      const thread = threadsQuery.data?.threads.find(t => t.threadId === threadId)
+      if (!thread?.firstMessage) {
+        utils.threads.list.invalidate()
+      }
+      dispatch({ type: 'event', event: event.data })
+    },
+    onComplete() {
+      setPending(null)
+      void utils.threads.get.invalidate({ threadId })
+    },
+    onError() {
+      setPending(null)
+      void utils.threads.get.invalidate({ threadId })
+    },
+  })
 
   useLayoutEffect(() => {
     const threadSwitched = lastSyncedThreadIdRef.current !== threadId

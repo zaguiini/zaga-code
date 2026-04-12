@@ -1,6 +1,8 @@
-import { TRPCError } from '@trpc/server'
+import { TRPCError, tracked } from '@trpc/server'
 import { z } from 'zod'
 import { BaseMessage, HumanMessage, filterMessages } from '@langchain/core/messages'
+// @ts-ignore -- Types are needed so router compiles
+import { TrackedData } from '@trpc/server/unstable-core-do-not-import'
 import { procedure, router } from './trpc'
 import type { Message } from '@langchain/langgraph-sdk'
 import type { AgentState } from '@/graphs/agent'
@@ -52,7 +54,35 @@ type ThreadRow = {
   created_at: string
 }
 
-const abortControllers = new Map<string, AbortController>()
+type RunRow = {
+  run_id: string
+}
+
+type RunBuffer = {
+  events: Array<ReturnType<typeof serializeEvent>>
+  ac: AbortController
+  isComplete: boolean
+  notify: () => void
+  nextEventPromise: () => Promise<void>
+}
+
+function createRunBuffer(ac: AbortController): RunBuffer {
+  const waiters: Array<() => void> = []
+  return {
+    events: [],
+    ac,
+    isComplete: false,
+    notify() {
+      const current = waiters.splice(0)
+      for (const r of current) r()
+    },
+    nextEventPromise() {
+      return new Promise<void>(r => waiters.push(r))
+    },
+  }
+}
+
+const runBuffers = new Map<string, RunBuffer>()
 
 const threadsRouter = router({
   delete: procedure.input(z.object({ threadId: z.string() })).mutation(({ input }) => {
@@ -117,45 +147,100 @@ const threadsRouter = router({
 
     const messages = filteredMessages.map(toMessageUnion)
 
+    const activeRun = db
+      .prepare('SELECT run_id FROM runs WHERE thread_id = ? AND status = ? LIMIT 1')
+      .get(input.threadId, 'running') as RunRow | undefined
+
     return {
       ...values,
       messages,
+      activeRunId: activeRun?.run_id ?? null,
     }
   }),
 })
 
 const runsRouter = router({
   stream: procedure
-    .input(z.object({ threadId: z.string(), input: z.string() }))
+    .input(
+      z.discriminatedUnion('mode', [
+        z.object({ threadId: z.string(), mode: z.literal('new'), input: z.string() }),
+        z.object({ threadId: z.string(), mode: z.literal('resume'), runId: z.string() }),
+      ])
+    )
     .subscription(async function* ({ input, ctx }) {
-      const ac = new AbortController()
-      abortControllers.set(input.threadId, ac)
+      const { threadId } = input
 
-      try {
-        const eventStream = ctx.graph.streamEvents(
-          {
-            messages: [{ type: 'human', content: [{ type: 'text', text: input.input }] }],
-          },
-          {
-            subgraphs: true,
-            version: 'v2',
-            configurable: { thread_id: input.threadId },
-            signal: ac.signal,
-          }
+      let runId: string
+      let buffer: RunBuffer
+
+      if (input.mode === 'new') {
+        runId = crypto.randomUUID()
+        db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
+          runId,
+          threadId,
+          'running'
         )
 
-        for await (const event of eventStream) {
-          yield serializeEvent(event)
+        const ac = new AbortController()
+        buffer = createRunBuffer(ac)
+        runBuffers.set(runId, buffer)
+
+        // Run LangGraph as a detached background task — NOT tied to the SSE connection.
+        // This keeps the run alive across page refreshes.
+        void (async () => {
+          try {
+            const eventStream = ctx.graph.streamEvents(
+              { messages: [{ type: 'human', content: [{ type: 'text', text: input.input }] }] },
+              {
+                subgraphs: true,
+                version: 'v2',
+                configurable: { thread_id: threadId },
+                signal: ac.signal,
+              }
+            )
+            for await (const event of eventStream) {
+              buffer.events.push(serializeEvent(event))
+              buffer.notify()
+            }
+            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
+          } catch {
+            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
+          } finally {
+            buffer.isComplete = true
+            buffer.notify()
+            setTimeout(() => runBuffers.delete(runId), 60_000)
+          }
+        })()
+      } else {
+        runId = input.runId
+        const existing = runBuffers.get(runId)
+        if (!existing) return
+        buffer = existing
+      }
+
+      // Tail the buffer. Works for both 'new' and 'resume'.
+      // Register the waiter BEFORE draining to avoid a race where notify fires
+      // between the drain loop exiting and nextEventPromise being called.
+      let idx = 0
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      while (true) {
+        const nextP = buffer.nextEventPromise()
+        while (idx < buffer.events.length) {
+          yield tracked(`${runId}:${idx}`, buffer.events[idx])
+          idx++
         }
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') throw err
-      } finally {
-        abortControllers.delete(input.threadId)
+        if (buffer.isComplete || buffer.ac.signal.aborted) break
+        await nextP
       }
     }),
 
   cancel: procedure.input(z.object({ threadId: z.string() })).mutation(({ input }) => {
-    abortControllers.get(input.threadId)?.abort()
+    const row = db
+      .prepare('SELECT run_id FROM runs WHERE thread_id = ? AND status = ? LIMIT 1')
+      .get(input.threadId, 'running') as RunRow | undefined
+    if (row) {
+      runBuffers.get(row.run_id)?.ac.abort()
+    }
     return { ok: true }
   }),
 })
