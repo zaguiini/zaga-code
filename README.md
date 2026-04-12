@@ -4,7 +4,6 @@
 
 - [ ] Desktop app (use Tauri, allow multiple sessions/projects)
   - [ ] Nested messages (agents)
-  - [ ] Syntax highlighting in tools and agents
   - [ ] Directory picker if running desktop
   - [ ] Fix initial path when running CLI and desktop
   - [ ] Fix lms ENOENT
@@ -13,7 +12,7 @@
 - [ ] Settings management (desktop-only)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
 - [ ] Add vision support
-- [ ] Commands (compact, help, setup for AGENTS.md)
+- [ ] Skills (compact, help, setup for AGENTS.md)
 - [ ] Review implementation, both frontend and backend
 - [ ] Document the project
 - [ ] Add tests and evals?

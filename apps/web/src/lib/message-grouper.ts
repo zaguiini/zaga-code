@@ -1,4 +1,4 @@
-import type { Message, ToolProgress } from '@langchain/langgraph-sdk'
+import type { Message, ToolMessage, ToolProgress } from '@langchain/langgraph-sdk'
 import type { Message as MessageType, ToolInvocationPart } from '@/components/ui/chat-message'
 
 export function extractText(content: string | Array<{ type: string; text?: string }>): string {
@@ -15,10 +15,13 @@ export const messageGrouper = (
   toolProgress: Record<string, ToolProgress>
 ): Array<MessageType> => {
   // Build a map of tool results keyed by tool_call_id
-  const toolResults = new Map<string, string>()
+  const toolResults = new Map<string, { content: string; metadata?: Record<string, unknown> }>()
   for (const msg of messages) {
     if (msg.type === 'tool' && msg.tool_call_id) {
-      toolResults.set(msg.tool_call_id, extractText(msg.content))
+      toolResults.set(msg.tool_call_id, {
+        content: extractText(msg.content),
+        metadata: (msg as ToolMessage & { metadata?: Record<string, unknown> }).metadata,
+      })
     }
   }
 
@@ -73,16 +76,17 @@ export const messageGrouper = (
         result.push(
           ...toolCalls.map(toolCall => {
             const parts: Array<ToolInvocationPart> = []
-            const resultContent = toolResults.get(toolCall.id!)
+            const toolResult = toolResults.get(toolCall.id!)
 
-            if (resultContent !== undefined) {
+            if (toolResult !== undefined) {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
                   toolName: toolCall.name,
                   state: 'result',
                   args: toolCall.args,
-                  result: resultContent,
+                  result: toolResult.content,
+                  metadata: toolResult.metadata,
                 },
               })
             }
@@ -101,7 +105,7 @@ export const messageGrouper = (
                   data: progress.input,
                 },
               })
-            } else if (resultContent === undefined) {
+            } else if (toolResult === undefined) {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
