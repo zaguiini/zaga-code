@@ -55,7 +55,7 @@ export function createAgentTool(definition: AgentDefinition, model: BaseChatMode
 
       const stream = await subagent.stream(
         { messages: [new HumanMessage(prompt)], projectPath },
-        { streamMode: 'values' }
+        { streamMode: 'values', recursionLimit: 100 }
       )
 
       let lastMessages: Array<BaseMessage> = []

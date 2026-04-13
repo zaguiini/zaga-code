@@ -36,7 +36,10 @@ export function createExecutorNode(model: BaseChatModel, modelName?: string) {
 
     // Pass parent config through so streamEvents callbacks are preserved
     const start = Date.now()
-    const response = await modelWithTools.invoke(messages, config)
+    const response = await modelWithTools.invoke(messages, {
+      ...config,
+      recursionLimit: 100,
+    })
     const durationMs = Date.now() - start
 
     const reasoning =
