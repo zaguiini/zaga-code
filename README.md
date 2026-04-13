@@ -11,3 +11,4 @@
 - [ ] Deslopify the project: Review implementation, both frontend and backend
 - [ ] Document the project
 - [ ] Add tests and evals?
+- [ ] Long-term Memory (both custom and automated)
