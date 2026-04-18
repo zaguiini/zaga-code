@@ -4,7 +4,6 @@
 
 - [ ] First message flashing
 - [ ] No syntax format in subagent tool results
-- [ ] No tool arguments in subagent tool call/results
 - [ ] Settings management (desktop-only)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
 - [ ] Add vision support

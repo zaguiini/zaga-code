@@ -54,6 +54,88 @@ function asString(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
+type RawToolCall = {
+  index?: number
+  id?: string
+  type?: string
+  function?: { name?: string; arguments?: string }
+}
+
+/**
+ * Merge streamed `additional_kwargs.tool_calls` arrays by index,
+ * concatenating `function.arguments` strings. Then try to parse
+ * each accumulated arguments string to rebuild proper `tool_calls`.
+ */
+function mergeAdditionalKwargs(
+  prev: Record<string, unknown> | undefined,
+  next: Record<string, unknown> | undefined
+): {
+  additional_kwargs: Record<string, unknown>
+  tool_calls:
+    | Array<{ name: string; args: Record<string, unknown>; id: string; type: 'tool_call' }>
+    | undefined
+} {
+  const merged: Record<string, unknown> = {
+    ...prev,
+    reasoning_content: `${asString(prev?.reasoning_content)}${asString(next?.reasoning_content)}`,
+  }
+
+  const prevRaw = (prev?.tool_calls ?? []) as Array<RawToolCall>
+  const nextRaw = (next?.tool_calls ?? []) as Array<RawToolCall>
+
+  if (prevRaw.length === 0 && nextRaw.length === 0) {
+    return { additional_kwargs: merged, tool_calls: undefined }
+  }
+
+  const rawMerged = [...prevRaw]
+  for (const inc of nextRaw) {
+    const idx = inc.index ?? 0
+    const ex = rawMerged[idx] as RawToolCall | undefined
+    if (ex) {
+      rawMerged[idx] = {
+        ...ex,
+        ...(inc.id ? { id: inc.id } : {}),
+        function: {
+          name: inc.function?.name || ex.function?.name,
+          arguments: (ex.function?.arguments ?? '') + (inc.function?.arguments ?? ''),
+        },
+      }
+    } else {
+      rawMerged[idx] = inc
+    }
+  }
+
+  merged.tool_calls = rawMerged
+
+  type ParsedToolCall = {
+    name: string
+    args: Record<string, unknown>
+    id: string
+    type: 'tool_call'
+  }
+
+  const parsed: Array<ParsedToolCall> = rawMerged
+    .map((tc): ParsedToolCall | null => {
+      if (!tc.function?.arguments) return null
+      try {
+        return {
+          name: tc.function.name ?? '',
+          args: JSON.parse(tc.function.arguments) as Record<string, unknown>,
+          id: tc.id ?? '',
+          type: 'tool_call',
+        }
+      } catch {
+        return null
+      }
+    })
+    .filter((tc): tc is ParsedToolCall => tc !== null)
+
+  return {
+    additional_kwargs: merged,
+    tool_calls: parsed.length > 0 ? parsed : undefined,
+  }
+}
+
 function appendToAgentMessages(
   state: StreamState,
   parentToolCallId: string,
@@ -72,14 +154,19 @@ function appendToAgentMessages(
         const prev = m.type === 'ai' ? (m.tool_calls ?? []) : []
         const prevIds = new Set(prev.map(tc => tc.id))
         const novel = (incomingToolCalls ?? []).filter(tc => tc.id && !prevIds.has(tc.id))
+        const { additional_kwargs, tool_calls: rebuilt } = mergeAdditionalKwargs(
+          m.additional_kwargs,
+          message.additional_kwargs
+        )
         return {
           ...m,
           content: `${asString(m.content)}${asString(message.content)}`,
-          additional_kwargs: {
-            ...m.additional_kwargs,
-            reasoning_content: `${asString(m.additional_kwargs?.reasoning_content)}${asString(message.additional_kwargs?.reasoning_content)}`,
-          },
-          ...(novel.length > 0 ? { tool_calls: [...prev, ...novel] } : {}),
+          additional_kwargs,
+          ...(rebuilt
+            ? { tool_calls: rebuilt }
+            : novel.length > 0
+              ? { tool_calls: [...prev, ...novel] }
+              : {}),
         }
       })
     : [...messages, message]
@@ -146,18 +233,19 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
           ...state,
           values: {
             ...state.values,
-            messages: state.values.messages.map(m =>
-              m.id === message.id
-                ? {
-                    ...m,
-                    content: `${asString(m.content)}${asString(message.content)}`,
-                    additional_kwargs: {
-                      ...m.additional_kwargs,
-                      reasoning_content: `${asString(m.additional_kwargs?.reasoning_content)}${asString(message.additional_kwargs?.reasoning_content)}`,
-                    },
-                  }
-                : m
-            ),
+            messages: state.values.messages.map(m => {
+              if (m.id !== message.id) return m
+              const { additional_kwargs, tool_calls: rebuilt } = mergeAdditionalKwargs(
+                m.additional_kwargs,
+                message.additional_kwargs
+              )
+              return {
+                ...m,
+                content: `${asString(m.content)}${asString(message.content)}`,
+                additional_kwargs,
+                ...(rebuilt ? { tool_calls: rebuilt } : {}),
+              }
+            }),
           },
         }
       }
