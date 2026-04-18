@@ -23,5 +23,6 @@
     "paths": {
       "@/*": ["./src/*"]
     }
-  }
+  },
+  "references": [{ "path": "../agent" }]
 }

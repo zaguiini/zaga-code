@@ -1,44 +1,53 @@
-import { getToolCallsWithResults } from '@langchain/langgraph-sdk/utils'
-import type { Message, ToolProgress } from '@langchain/langgraph-sdk'
-import type { DefaultToolCall } from '@langchain/langgraph-sdk/react'
+import type { Message, ToolMessage, ToolProgress } from '@langchain/langgraph-sdk'
 import type { Message as MessageType, ToolInvocationPart } from '@/components/ui/chat-message'
 
+export function extractText(content: string | Array<{ type: string; text?: string }>): string {
+  if (typeof content === 'string') return content.trim()
+  return content
+    .filter(c => c.type === 'text' && c.text !== undefined)
+    .map(c => c.text ?? '')
+    .join('')
+    .trim()
+}
+
 export const messageGrouper = (
-  messages: Array<Message<DefaultToolCall>>,
-  toolProgress: Array<ToolProgress>
-) => {
-  const threadToolCalls = getToolCallsWithResults(messages)
+  messages: Array<Message>,
+  toolProgress: Record<string, ToolProgress | undefined>
+): Array<MessageType> => {
+  // Build a map of tool results keyed by tool_call_id
+  const toolResults = new Map<string, { content: string; metadata?: Record<string, unknown> }>()
+  for (const msg of messages) {
+    if (msg.type === 'tool' && msg.tool_call_id) {
+      toolResults.set(msg.tool_call_id, {
+        content: extractText(msg.content),
+        metadata: (msg as ToolMessage & { metadata?: Record<string, unknown> }).metadata,
+      })
+    }
+  }
+
   return messages
-    .filter(message => message.type !== 'tool')
-    .map((message): MessageType | Array<MessageType> => {
-      if (
-        message.type === 'human' ||
-        message.type === 'system' ||
-        message.type === 'function' ||
-        message.type === 'remove'
-      ) {
-        return {
-          id: message.id!,
-          role: message.type === 'human' ? 'user' : 'assistant',
-          content: Array.isArray(message.content)
-            ? message.content
-                .filter(content => content.type === 'text')
-                .map(content => content.text)
-                .join('')
-            : message.content,
-        }
+    .filter(msg => msg.type !== 'tool')
+    .flatMap((msg): Array<MessageType> => {
+      const id = msg.id ?? Math.random().toString(36).slice(2)
+
+      if (msg.type !== 'ai') {
+        return [
+          {
+            id,
+            role: msg.type === 'human' ? 'user' : 'assistant',
+            content: extractText(msg.content),
+          },
+        ]
       }
 
+      // AI / assistant message
       const result: Array<MessageType> = []
 
-      const reasoningContent = message.additional_kwargs?.reasoning_content as string | undefined
-
+      const reasoningContent = msg.additional_kwargs?.reasoning_content as string | undefined
       if (reasoningContent?.trim()) {
-        const durationMs = message.additional_kwargs?.reasoning_duration_ms as number | undefined
-        const reasoningDone = durationMs != null
-
+        const durationMs = msg.additional_kwargs?.reasoning_duration_ms as number | undefined
         result.push({
-          id: message.id!,
+          id,
           role: 'assistant',
           content: reasoningContent,
           parts: [
@@ -46,75 +55,70 @@ export const messageGrouper = (
               type: 'reasoning',
               reasoning: reasoningContent,
               durationMs,
-              done: reasoningDone,
+              done: durationMs !== undefined,
             },
           ],
         })
       }
 
-      const messageContent = Array.isArray(message.content)
-        ? message.content
-            .filter(content => content.type === 'text')
-            .map(content => content.text)
-            .join('')
-        : message.content.toString().trim()
-
+      const messageContent = extractText(msg.content)
       if (messageContent) {
         result.push({
-          id: message.id!,
+          id,
           role: 'assistant',
           content: messageContent,
           parts: [{ type: 'text', text: messageContent }],
         })
       }
 
-      const toolCalls = threadToolCalls.filter(threadCall => threadCall.aiMessage.id === message.id)
-
+      const toolCalls = msg.tool_calls ?? []
       if (toolCalls.length > 0) {
         result.push(
           ...toolCalls.map(toolCall => {
             const parts: Array<ToolInvocationPart> = []
+            const toolResult = toolResults.get(toolCall.id!)
 
-            if (toolCall.state === 'completed') {
+            if (toolResult !== undefined) {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
-                  // @ts-expect-error - TODO: This is not typed
-                  metadata: toolCall.result?.metadata,
-                  toolName: toolCall.call.name,
+                  toolName: toolCall.name,
                   state: 'result',
-                  args: toolCall.call.args,
-                  result: toolCall.result?.content.toString() ?? 'No result',
+                  args: toolCall.args,
+                  result: toolResult.content,
+                  metadata: toolResult.metadata,
                 },
               })
             }
 
-            const progress = toolProgress.find(tp => tp.toolCallId === toolCall.call.id)
-
-            if (progress?.state === 'running') {
+            const progress = toolCall.id! in toolProgress ? toolProgress[toolCall.id!] : undefined
+            if (
+              progress !== undefined &&
+              (progress.state === 'running' || progress.state === 'starting')
+            ) {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
-                  toolName: toolCall.call.name,
+                  toolName: toolCall.name,
                   state: 'streaming',
-                  args: toolCall.call.args,
-                  data: progress.data,
+                  args: toolCall.args,
+                  data: progress.input,
                 },
               })
-            } else if (toolCall.state === 'pending') {
+            } else if (toolResult === undefined) {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
-                  args: toolCall.call.args,
-                  toolName: toolCall.call.name,
+                  toolName: toolCall.name,
                   state: 'call',
+                  args: toolCall.args,
                 },
               })
             }
 
             return {
-              id: toolCall.id,
-              role: 'assistant',
+              id: toolCall.id!,
+              role: 'assistant' as const,
               content: '',
               parts,
             }
@@ -124,5 +128,4 @@ export const messageGrouper = (
 
       return result
     })
-    .flat()
 }

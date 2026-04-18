@@ -2,8 +2,10 @@ import path from 'node:path'
 import { z } from 'zod'
 import { glob } from 'glob'
 import Fuse from 'fuse.js'
-import { tool } from 'langchain'
+import { tool } from '@langchain/core/tools'
+import { ToolMessage } from '@langchain/core/messages/tool'
 import { getCurrentTaskInput } from '@langchain/langgraph'
+import type { ToolRunnableConfig } from '@langchain/core/tools'
 import type { AgentState } from '@/graphs/agent'
 
 const fileSearchSchema = z.object({
@@ -22,7 +24,12 @@ const fileSearchSchema = z.object({
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
 export const fileSearchTool = tool(
-  async (input: z.infer<typeof fileSearchSchema>) => {
+  async (input: z.infer<typeof fileSearchSchema>, config: ToolRunnableConfig) => {
+    const toolCallId = config.toolCall?.id
+    if (!toolCallId) {
+      throw new Error('file_search tool invoked without a tool_call_id in config')
+    }
+
     try {
       const { query, limit } = input
       if (query.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
@@ -62,7 +69,11 @@ export const fileSearchTool = tool(
         return `${index + 1}. ${filePath}${score}`
       })
 
-      return `Found ${results.length} file(s) matching "${query}":\n\n${formattedResults.join('\n')}\n\nUse file_read to read the contents of any file.`
+      return new ToolMessage({
+        content: `Found ${results.length} file(s) matching "${query}":\n\n${formattedResults.join('\n')}\n\nUse file_read to read the contents of any file.`,
+        tool_call_id: toolCallId,
+        metadata: { format: 'markdown' },
+      })
     } catch (error) {
       if (error instanceof Error) {
         return `Error performing file search: ${error.message}`
@@ -72,9 +83,6 @@ export const fileSearchTool = tool(
   },
   {
     name: 'file_search',
-    metadata: {
-      format: 'markdown',
-    },
     description:
       'Fuzzy search through file NAMES and PATHS. Use this when you need to find files by their name or path. Examples: "find auth files", "search for component.tsx", "locate utils directory". This searches file names/paths, not file contents.',
     schema: fileSearchSchema,

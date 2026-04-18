@@ -1,12 +1,9 @@
 import { queryOptions } from '@tanstack/react-query'
-import { client } from '@/lib/ai-client'
+import { trpcClient } from '@/lib/trpc'
 
 export const threadsSearchQuery = () =>
   queryOptions({
     queryKey: ['threads'],
-    queryFn: () =>
-      client.threads.search({
-        limit: 100,
-      }),
+    queryFn: () => trpcClient.threads.list.query(),
     refetchOnMount: 'always', // Always refetch when component mounts
   })

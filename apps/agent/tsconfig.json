@@ -7,9 +7,10 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
-    "noEmit": true,
+    "composite": true,
+    "declaration": true,
+    "outDir": "./dist",
 
     /* Linting */
     "skipLibCheck": true,
@@ -18,6 +19,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    "rootDir": "./src",
     "paths": {
       "@/*": ["./src/*"]
     }

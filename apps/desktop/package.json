@@ -1,0 +1,26 @@
+{
+  "name": "@zaga/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "NODE_OPTIONS='--import tsx/esm --conditions=development' electron src/main.ts",
+    "prebuild": "pnpm --filter @zaga/web build && pnpm --filter @zaga/agent build",
+    "build": "tsc && electron-builder --config electron-builder.config.cjs",
+    "rebuild": "electron-rebuild"
+  },
+  "dependencies": {
+    "@zaga/agent": "workspace:*",
+    "@zaga/web": "workspace:*",
+    "sirv": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-rebuild": "^3.2.9",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}

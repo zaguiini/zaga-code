@@ -1,9 +1,9 @@
 import { Annotation, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { toolsCondition } from '@langchain/langgraph/prebuilt'
-import { ChatOpenAIWithReasoning } from '@/utils/chat-openai-with-reasoning'
-import { env } from '@/env'
+import { ChatOpenAI } from '@langchain/openai'
+import type { BaseCheckpointSaver } from '@langchain/langgraph'
+import { isExternalProvider, settings } from '@/settings'
 import { createExecutorNode } from '@/nodes/executor'
-import { systemPromptNode } from '@/nodes/system-prompt'
 import { createMaybeCompactNode } from '@/nodes/maybe-compact'
 import { createLoadConfigNode } from '@/nodes/load-config'
 import { dynamicToolNode } from '@/nodes/dynamic-tool-node'
@@ -34,11 +34,10 @@ export const agentStateSchema = Annotation.Root({
 export type AgentState = typeof agentStateSchema.State
 
 export function createModel() {
-  return new ChatOpenAIWithReasoning({
-    model: env.MODEL,
-    configuration: { baseURL: env.MODEL_API_BASE_URL },
-    apiKey: 'local',
-    temperature: 0.3,
+  return new ChatOpenAI({
+    model: settings.model,
+    configuration: { baseURL: settings.apiBase },
+    apiKey: settings.apiKey ?? 'local',
     streaming: true,
     streamUsage: true,
   })
@@ -48,31 +47,30 @@ function buildAgentGraph({ maxTokens }: { maxTokens: number }) {
   const model = createModel()
 
   const loadConfigNode = createLoadConfigNode(model)
-  const executorNode = createExecutorNode(model, env.MODEL)
+  const executorNode = createExecutorNode(model, settings.model)
 
   return new StateGraph(agentStateSchema)
     .addNode('maybe-compact', createMaybeCompactNode(model, maxTokens))
     .addNode('load-config', loadConfigNode)
-    .addNode('system-prompt', systemPromptNode)
     .addNode('executor', executorNode)
     .addNode('tools', dynamicToolNode)
 
     .addEdge(START, 'maybe-compact')
     .addEdge('maybe-compact', 'load-config')
-    .addEdge('load-config', 'system-prompt')
-    .addEdge('system-prompt', 'executor')
+    .addEdge('load-config', 'executor')
     .addConditionalEdges('executor', toolsCondition)
     .addEdge('tools', 'executor')
 }
 
 async function queryMaxTokens(): Promise<number> {
-  const info = await queryModelInfo(env.MODEL)
+  if (isExternalProvider(settings)) return 128_000
+  const info = await queryModelInfo(settings.model)
   return info.maxTokens
 }
 
 /** Convenience: builds and compiles with no checkpointer (for LangGraph API server compat) */
-export async function createAgent() {
+export async function createAgent(opts: { checkpointer?: BaseCheckpointSaver } = {}) {
   const maxTokens = await queryMaxTokens()
   const graph = buildAgentGraph({ maxTokens })
-  return graph.compile()
+  return graph.compile({ checkpointer: opts.checkpointer })
 }

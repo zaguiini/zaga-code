@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
 import { Bot, ChevronRight, Code2, Loader2 } from 'lucide-react'
@@ -62,6 +62,7 @@ interface Attachment {
 
 interface ToolCall {
   state: 'call'
+  toolCallId?: string
   toolName: string
   args: Record<string, any>
 }
@@ -69,6 +70,7 @@ interface ToolCall {
 interface ToolResult {
   metadata?: Record<string, unknown>
   state: 'result'
+  toolCallId?: string
   toolName: string
   args: Record<string, any>
   result: string
@@ -76,6 +78,7 @@ interface ToolResult {
 
 interface ToolStreaming {
   state: 'streaming'
+  toolCallId?: string
   toolName: string
   args: Record<string, any>
   data: unknown
@@ -179,7 +182,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return parts.map((part, index) => {
     if (part.type === 'text') {
       return (
-        <div className="flex flex-col items-start" key={`text-${index}`}>
+        <div className="flex flex-col items-start" key="text">
           <div className={cn(chatBubbleVariants({ isUser, animation }))}>
             <MarkdownRenderer>{part.text}</MarkdownRenderer>
             {actions ? (
@@ -203,7 +206,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )
     } else if (part.type === 'reasoning') {
-      return <ReasoningBlock key={`reasoning-${index}`} part={part} />
+      return <ReasoningBlock key="reasoning" part={part} />
     } else {
       return <ToolCallBlock key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
     }
@@ -221,13 +224,29 @@ const CollapsibleBlock = ({
   title,
   children,
   defaultOpen = false,
+  autoScroll = false,
 }: {
   icon?: React.ReactNode
   title: React.ReactNode
   children: React.ReactNode
   defaultOpen?: boolean
+  autoScroll?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const stickRef = useRef(true)
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40
+  }
+
+  useLayoutEffect(() => {
+    if (!autoScroll || !stickRef.current) return
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  })
 
   const chevron = (
     <ChevronRight className={cn('size-4 transition-transform', isOpen && 'rotate-90')} />
@@ -250,6 +269,8 @@ const CollapsibleBlock = ({
         </div>
         <CollapsibleContent forceMount>
           <motion.div
+            ref={scrollRef}
+            onScroll={handleScroll}
             initial={false}
             animate={isOpen ? 'open' : 'closed'}
             variants={{
@@ -282,11 +303,7 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   const label = part.done ? 'Thought' : 'Thinking'
   const duration = part.done && part.durationMs ? ` for ${formatDuration(part.durationMs)}` : ''
 
-  return (
-    <CollapsibleBlock title={`${label}${duration}`} defaultOpen={!part.done}>
-      {part.reasoning}
-    </CollapsibleBlock>
-  )
+  return <CollapsibleBlock title={`${label}${duration}`}>{part.reasoning}</CollapsibleBlock>
 }
 
 function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
@@ -299,7 +316,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
       {toolInvocations.map((invocation, index) => {
         const isAgent = invocation.toolName.startsWith('agent-')
 
-        const args = (
+        const args = !isAgent && (
           <pre className="mb-2 whitespace-pre-wrap">
             Arguments: {JSON.stringify(invocation.args)}
           </pre>
@@ -313,7 +330,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 icon={<Loader2 className="size-3 mx-0.5 animate-spin" />}
                 title={
                   <span>
-                    Calling{' '}
+                    {isAgent ? 'Running' : 'Calling'}{' '}
                     <span className="font-mono text-xs">
                       {invocation.toolName.replace('agent-', '')}
                     </span>
@@ -336,6 +353,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                     </span>
                   }
                   defaultOpen
+                  autoScroll
                 >
                   {args}
                   <pre className="font-mono whitespace-pre-wrap">{invocation.data}</pre>
@@ -361,6 +379,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                     </span>
                   }
                   defaultOpen
+                  autoScroll
                 >
                   <div className="space-y-2">
                     {messages.length > 0 ? (
@@ -388,11 +407,46 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
               </CollapsibleBlock>
             )
           }
-          case 'result':
+          case 'result': {
+            // Agent tools: show the accumulated sub-agent messages
+            if (isAgent && invocation.toolCallId) {
+              const progress = toolProgress[invocation.toolCallId]
+              const agentMessages =
+                progress?.input && Array.isArray(progress.input) ? progress.input : []
+              const messages = messageGrouper(agentMessages, toolProgress).filter(
+                message => message.role !== 'user'
+              )
+
+              return (
+                <CollapsibleBlock
+                  key={index}
+                  icon={<Bot className="size-4" />}
+                  title={
+                    <span>
+                      Result from{' '}
+                      <span className="font-mono text-xs">
+                        {invocation.toolName.replace('agent-', '')}
+                      </span>
+                    </span>
+                  }
+                >
+                  <div className="space-y-2">
+                    {messages.length > 0 ? (
+                      <MessageList messages={messages} />
+                    ) : invocation.result ? (
+                      <MarkdownRenderer>{invocation.result}</MarkdownRenderer>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No output</div>
+                    )}
+                  </div>
+                </CollapsibleBlock>
+              )
+            }
+
             return (
               <CollapsibleBlock
                 key={index}
-                icon={isAgent ? <Bot className="size-4" /> : <Code2 className="h-4 w-4" />}
+                icon={<Code2 className="h-4 w-4" />}
                 title={
                   <span>
                     Result from{' '}
@@ -414,6 +468,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                 )}
               </CollapsibleBlock>
             )
+          }
           default:
             return null
         }

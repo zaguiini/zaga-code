@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -14,8 +14,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { client } from '@/lib/ai-client'
 import { cn } from '@/lib/utils'
+import { trpc, trpcClient } from '@/lib/trpc'
 
 export function AppSidebar({
   activeThreadId,
@@ -24,14 +24,16 @@ export function AppSidebar({
   activeThreadId?: string
   threads: Array<{ id: string; title?: string; isActive?: boolean }>
 }) {
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const invalidateThreads = trpc.useUtils().threads.list.invalidate
 
   const deleteThread = useMutation({
-    mutationFn: (threadId: string) => client.threads.delete(threadId),
+    mutationFn: (threadId: string) => trpcClient.threads.delete.mutate({ threadId }),
     onSuccess: (_, threadId) => {
       window.sessionStorage.removeItem(`resume:${threadId}`)
-      queryClient.invalidateQueries({ queryKey: ['threads'] })
+
+      invalidateThreads()
+
       if (threadId === activeThreadId) {
         navigate({ to: '/' })
       }
@@ -54,7 +56,7 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               {threads.map(item => (
-                <SidebarMenuItem key={item.id} title={item.title || item.id}>
+                <SidebarMenuItem key={item.id} title={item.title}>
                   <SidebarMenuButton asChild isActive={item.isActive}>
                     <Link
                       to="/$threadId"
@@ -64,7 +66,7 @@ export function AppSidebar({
                         !item.title && 'text-muted-foreground italic'
                       )}
                     >
-                      <span>{item.title || item.id}</span>
+                      <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                   <SidebarMenuAction

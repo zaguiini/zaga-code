@@ -1,12 +1,11 @@
-import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { AgentState } from '@/graphs/agent'
-import type { Settings } from '@/config/settings'
-import { parseSettings } from '@/config/settings'
+import type { Settings } from '@/settings'
+import { parseSettings, settings } from '@/settings'
 import { loadAgentsFromDir, mergeAgentDefinitions } from '@/config/agent-loader'
 import { computeConfigHash, toolRegistry } from '@/config/registry'
 import { BUILT_IN_TOOLS, createAgentTool } from '@/utils/create-agent-tool'
@@ -14,19 +13,6 @@ import { BUILT_IN_TOOLS, createAgentTool } from '@/utils/create-agent-tool'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const BUILT_IN_AGENTS_DIR = join(__dirname, '..', 'agents')
-
-async function loadSettingsFromPath(filePath: string): Promise<Settings | null> {
-  try {
-    const raw = await readFile(filePath, 'utf-8')
-    const parsed = parseSettings(raw)
-    if (!parsed) {
-      console.warn(`[load-config] Malformed settings at ${filePath}, skipping`)
-    }
-    return parsed
-  } catch {
-    return null
-  }
-}
 
 async function connectMcps(mcpServers: Settings['mcpServers']) {
   if (Object.keys(mcpServers).length === 0) return []
@@ -42,14 +28,13 @@ async function connectMcps(mcpServers: Settings['mcpServers']) {
 export function createLoadConfigNode(model: BaseChatModel) {
   return async function loadConfigNode(state: AgentState): Promise<Partial<AgentState>> {
     // Load settings from global and per-project layers
-    const globalSettings = await loadSettingsFromPath(join(homedir(), '.zaga', 'settings.json'))
     const projectSettings = state.projectPath
-      ? await loadSettingsFromPath(join(state.projectPath, '.zaga', 'settings.json'))
+      ? parseSettings(join(state.projectPath, '.zaga', 'settings.json'))
       : null
 
     // Merge MCPs: project overrides global by key
     const mergedMcps = {
-      ...globalSettings?.mcpServers,
+      ...settings.mcpServers,
       ...projectSettings?.mcpServers,
     }
 

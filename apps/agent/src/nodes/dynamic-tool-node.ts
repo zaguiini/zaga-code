@@ -44,6 +44,7 @@ export async function dynamicToolNode(
           { ...toolCall, type: 'tool_call' as const },
           {
             ...config,
+            recursionLimit: 100,
             metadata: {
               ...config.metadata,
               tool_call_id: toolCall.id,
