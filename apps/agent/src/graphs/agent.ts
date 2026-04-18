@@ -4,7 +4,6 @@ import { ChatOpenAI } from '@langchain/openai'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import { isExternalProvider, settings } from '@/settings'
 import { createExecutorNode } from '@/nodes/executor'
-import { systemPromptNode } from '@/nodes/system-prompt'
 import { createMaybeCompactNode } from '@/nodes/maybe-compact'
 import { createLoadConfigNode } from '@/nodes/load-config'
 import { dynamicToolNode } from '@/nodes/dynamic-tool-node'
@@ -53,14 +52,12 @@ function buildAgentGraph({ maxTokens }: { maxTokens: number }) {
   return new StateGraph(agentStateSchema)
     .addNode('maybe-compact', createMaybeCompactNode(model, maxTokens))
     .addNode('load-config', loadConfigNode)
-    .addNode('system-prompt', systemPromptNode)
     .addNode('executor', executorNode)
     .addNode('tools', dynamicToolNode)
 
     .addEdge(START, 'maybe-compact')
     .addEdge('maybe-compact', 'load-config')
-    .addEdge('load-config', 'system-prompt')
-    .addEdge('system-prompt', 'executor')
+    .addEdge('load-config', 'executor')
     .addConditionalEdges('executor', toolsCondition)
     .addEdge('tools', 'executor')
 }

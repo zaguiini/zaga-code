@@ -14,3 +14,4 @@ todos.json
 .playwright-mcp
 release
 *.tsbuildinfo
+.logs
