@@ -2,12 +2,14 @@
 
 ## TODO
 
-- [ ] Rewrite stream reducer (client) and run stream (agent API)
-- [ ] No arguments or syntax highlighting within tools of subagent. Also doesn't scroll automatically when generating.
+- [ ] First message flashing
+- [ ] No syntax format in subagent tool results
+- [ ] No tool arguments in subagent tool call/results
 - [ ] Settings management (desktop-only)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
 - [ ] Add vision support
 - [ ] Skills (compact, help, setup for AGENTS.md)
+- [ ] Checkpoint restoration (from user message; either as new chat or a rewind feature for the current chat. Possible to rewind the code changes as well?)
 - [ ] Deslopify the project: Review implementation, both frontend and backend
 - [ ] Document the project
 - [ ] Add tests and evals?
