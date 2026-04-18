@@ -1,6 +1,3 @@
-import { writeFile } from 'node:fs/promises'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { TRPCError, tracked } from '@trpc/server'
 import { z } from 'zod'
 import { BaseMessage, HumanMessage, filterMessages } from '@langchain/core/messages'
@@ -11,8 +8,6 @@ import type { Message } from '@langchain/langgraph-sdk'
 import type { AgentState } from '@/graphs/agent'
 import type { StreamEvent } from '@langchain/core/types/stream'
 import { db } from '@/db'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ── Serialized stream event types (consumed by the frontend via tRPC inference) ──
 
@@ -304,13 +299,6 @@ const runsRouter = router({
               }
             )
             for await (const event of eventStream) {
-              writeFile(
-                path.resolve(__dirname, '.logs', `${runId}.log`),
-                JSON.stringify(event, null, 2) + '\n\n',
-                {
-                  flag: 'a+',
-                }
-              )
               const serialized = serializeEvent(event)
               if (serialized) {
                 buffer.events.push(serialized)
