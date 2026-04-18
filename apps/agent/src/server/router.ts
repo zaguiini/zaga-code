@@ -122,6 +122,7 @@ type RunBuffer = {
   events: Array<SerializedStreamEvent>
   ac: AbortController
   isComplete: boolean
+  subscribers: number
   notify: () => void
   nextEventPromise: () => Promise<void>
 }
@@ -132,6 +133,7 @@ function createRunBuffer(ac: AbortController): RunBuffer {
     events: [],
     ac,
     isComplete: false,
+    subscribers: 0,
     notify() {
       const current = waiters.splice(0)
       for (const r of current) r()
@@ -143,8 +145,15 @@ function createRunBuffer(ac: AbortController): RunBuffer {
 }
 
 const runBuffers = new Map<string, RunBuffer>()
-// Maps threadId → active runId so the server can find the buffer on reconnection/resume
 const threadRunMap = new Map<string, string>()
+
+/** Remove a run buffer if the run is finished and no one is listening. */
+function maybeCleanupBuffer(runId: string, threadId: string, buffer: RunBuffer) {
+  if (buffer.isComplete && buffer.subscribers === 0) {
+    runBuffers.delete(runId)
+    threadRunMap.delete(threadId)
+  }
+}
 
 const threadsRouter = router({
   delete: procedure.input(z.object({ threadId: z.string() })).mutation(({ input }) => {
@@ -229,33 +238,46 @@ const runsRouter = router({
       z.object({
         threadId: z.string(),
         input: z.string().optional(),
-        // tRPC sends this automatically on reconnection via httpSubscriptionLink
+        // tRPC sends this automatically on SSE reconnection via httpSubscriptionLink
         lastEventId: z.string().nullish(),
       })
     )
     .subscription(async function* ({ input, ctx }) {
       const { threadId } = input
 
-      // On reconnection, tRPC sends the last tracked id ("runId:idx").
-      // Parse it to resume from the correct position in the buffer.
+      let runId: string | undefined
+      let buffer: RunBuffer | undefined
       let startIdx = 0
+
+      // 1. SSE reconnection: lastEventId contains "runId:idx", look up buffer directly
       if (input.lastEventId) {
         const colonIdx = input.lastEventId.lastIndexOf(':')
-        if (colonIdx !== -1) startIdx = Number(input.lastEventId.slice(colonIdx + 1)) + 1
+        if (colonIdx !== -1) {
+          const resumeRunId = input.lastEventId.slice(0, colonIdx)
+          const resumeBuffer = runBuffers.get(resumeRunId)
+          if (resumeBuffer) {
+            runId = resumeRunId
+            buffer = resumeBuffer
+            startIdx = parseInt(input.lastEventId.slice(colonIdx + 1), 10) + 1
+          } else {
+            // Buffer already cleaned up — run finished and was fully consumed
+            return
+          }
+        }
       }
 
-      let runId: string
-      let buffer: RunBuffer
+      // 2. Active run on this thread (page refresh, React Strict Mode double-invoke)
+      if (!buffer) {
+        const activeRunId = threadRunMap.get(threadId)
+        const activeBuffer = activeRunId ? runBuffers.get(activeRunId) : undefined
+        if (activeBuffer && !activeBuffer.isComplete && !activeBuffer.ac.signal.aborted) {
+          runId = activeRunId!
+          buffer = activeBuffer
+        }
+      }
 
-      // Check for an already-active run on this thread (reconnection, page refresh, React Strict Mode)
-      const activeRunId = threadRunMap.get(threadId)
-      const activeBuffer = activeRunId ? runBuffers.get(activeRunId) : undefined
-
-      if (activeBuffer && !activeBuffer.isComplete && !activeBuffer.ac.signal.aborted) {
-        runId = activeRunId!
-        buffer = activeBuffer
-      } else if (input.input) {
-        // Start a new run
+      // 3. Start a new run
+      if (!buffer && input.input) {
         runId = crypto.randomUUID()
         db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
           runId,
@@ -301,26 +323,32 @@ const runsRouter = router({
           } finally {
             buffer.isComplete = true
             buffer.notify()
-            threadRunMap.delete(threadId)
-            runBuffers.delete(runId)
+            // Cleanup only if no subscriber is currently draining.
+            // Otherwise the subscriber's finally block will handle it.
+            maybeCleanupBuffer(runId, threadId, buffer)
           }
         })()
-      } else {
-        // No active run and no input — nothing to stream
-        return
       }
 
-      // Tail the buffer, resuming from startIdx on reconnection.
-      let idx = startIdx
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        const nextP = buffer.nextEventPromise()
-        while (idx < buffer.events.length) {
-          yield tracked(`${runId}:${idx}`, buffer.events[idx])
-          idx++
+      if (!buffer || !runId) return
+
+      // Track this subscriber so the buffer isn't cleaned up while we're draining.
+      buffer.subscribers++
+      try {
+        let idx = startIdx
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        while (true) {
+          const nextP = buffer.nextEventPromise()
+          while (idx < buffer.events.length) {
+            yield tracked(`${runId}:${idx}`, buffer.events[idx])
+            idx++
+          }
+          if (buffer.isComplete || buffer.ac.signal.aborted) break
+          await nextP
         }
-        if (buffer.isComplete || buffer.ac.signal.aborted) break
-        await nextP
+      } finally {
+        buffer.subscribers--
+        maybeCleanupBuffer(runId, threadId, buffer)
       }
     }),
 
