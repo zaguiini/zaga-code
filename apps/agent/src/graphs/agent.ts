@@ -1,7 +1,7 @@
 import { Annotation, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { toolsCondition } from '@langchain/langgraph/prebuilt'
+import { ChatOpenAI } from '@langchain/openai'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
-import { ChatOpenAIWithReasoning } from '@/utils/chat-openai-with-reasoning'
 import { isExternalProvider, settings } from '@/settings'
 import { createExecutorNode } from '@/nodes/executor'
 import { systemPromptNode } from '@/nodes/system-prompt'
@@ -35,11 +35,10 @@ export const agentStateSchema = Annotation.Root({
 export type AgentState = typeof agentStateSchema.State
 
 export function createModel() {
-  return new ChatOpenAIWithReasoning({
+  return new ChatOpenAI({
     model: settings.model,
     configuration: { baseURL: settings.apiBase },
     apiKey: settings.apiKey ?? 'local',
-    temperature: 0.3,
     streaming: true,
     streamUsage: true,
   })

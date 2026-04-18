@@ -3,6 +3,7 @@
 ## TODO
 
 - [ ] Rewrite stream reducer (client) and run stream (agent API)
+- [ ] No arguments or syntax highlighting within tools of subagent. Also doesn't scroll automatically when generating.
 - [ ] Unreliable tool calls (https://chatgpt.com/share/69d3f1d1-8668-83e9-8d33-97bcccd97c0b)
 - [ ] Settings management (desktop-only)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)

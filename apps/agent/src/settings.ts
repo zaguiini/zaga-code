@@ -22,7 +22,7 @@ const mcpServerSchema = z.discriminatedUnion('transport', [
 
 const settingsSchema = z.object({
   apiKey: z.string().optional(),
-  model: z.string().default('zai-org/glm-4.7-flash'),
+  model: z.string().default('qwen3.6-35b-a3b@4bit'),
   apiBase: z.string().default('http://localhost:1234/v1'),
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
 })
