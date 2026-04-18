@@ -138,7 +138,7 @@ function createRunBuffer(ac: AbortController): RunBuffer {
 }
 
 const runBuffers = new Map<string, RunBuffer>()
-// Maps threadId → active runId to guard against duplicate mode='new' subscriptions
+// Maps threadId → active runId so the server can find the buffer on reconnection/resume
 const threadRunMap = new Map<string, string>()
 
 const threadsRouter = router({
@@ -221,82 +221,85 @@ const runsRouter = router({
 
   stream: procedure
     .input(
-      z.discriminatedUnion('mode', [
-        z.object({ threadId: z.string(), mode: z.literal('new'), input: z.string() }),
-        z.object({ threadId: z.string(), mode: z.literal('resume'), runId: z.string() }),
-      ])
+      z.object({
+        threadId: z.string(),
+        input: z.string().optional(),
+        // tRPC sends this automatically on reconnection via httpSubscriptionLink
+        lastEventId: z.string().nullish(),
+      })
     )
     .subscription(async function* ({ input, ctx }) {
       const { threadId } = input
 
+      // On reconnection, tRPC sends the last tracked id ("runId:idx").
+      // Parse it to resume from the correct position in the buffer.
+      let startIdx = 0
+      if (input.lastEventId) {
+        const colonIdx = input.lastEventId.lastIndexOf(':')
+        if (colonIdx !== -1) startIdx = Number(input.lastEventId.slice(colonIdx + 1)) + 1
+      }
+
       let runId: string
       let buffer: RunBuffer
 
-      if (input.mode === 'new') {
-        // Guard against double-invocation (React Strict Mode, reconnects, etc.)
-        const existingRunId = threadRunMap.get(threadId)
-        const existingBuffer = existingRunId ? runBuffers.get(existingRunId) : undefined
-        if (existingBuffer && !existingBuffer.isComplete && !existingBuffer.ac.signal.aborted) {
-          // Attach to the already-running execution instead of starting a second one
-          runId = existingRunId!
-          buffer = existingBuffer
-        } else {
-          runId = crypto.randomUUID()
-          db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
-            runId,
-            threadId,
-            'running'
-          )
+      // Check for an already-active run on this thread (reconnection, page refresh, React Strict Mode)
+      const activeRunId = threadRunMap.get(threadId)
+      const activeBuffer = activeRunId ? runBuffers.get(activeRunId) : undefined
 
-          const ac = new AbortController()
-          buffer = createRunBuffer(ac)
-          runBuffers.set(runId, buffer)
-          threadRunMap.set(threadId, runId)
+      if (activeBuffer && !activeBuffer.isComplete && !activeBuffer.ac.signal.aborted) {
+        runId = activeRunId!
+        buffer = activeBuffer
+      } else if (input.input) {
+        // Start a new run
+        runId = crypto.randomUUID()
+        db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
+          runId,
+          threadId,
+          'running'
+        )
 
-          // Run LangGraph as a detached background task — NOT tied to the SSE connection.
-          // This keeps the run alive across page refreshes.
-          void (async () => {
-            try {
-              const eventStream = ctx.graph.streamEvents(
-                { messages: [{ type: 'human', content: [{ type: 'text', text: input.input }] }] },
-                {
-                  subgraphs: true,
-                  version: 'v2',
-                  configurable: { thread_id: threadId },
-                  signal: ac.signal,
-                }
-              )
-              for await (const event of eventStream) {
-                const serialized = serializeEvent(event)
-                if (serialized) {
-                  buffer.events.push(serialized)
-                  buffer.notify()
-                }
+        const ac = new AbortController()
+        buffer = createRunBuffer(ac)
+        runBuffers.set(runId, buffer)
+        threadRunMap.set(threadId, runId)
+
+        // Run LangGraph as a detached background task — NOT tied to the SSE connection.
+        // This keeps the run alive across page refreshes.
+        void (async () => {
+          try {
+            const eventStream = ctx.graph.streamEvents(
+              { messages: [{ type: 'human', content: [{ type: 'text', text: input.input! }] }] },
+              {
+                subgraphs: true,
+                version: 'v2',
+                configurable: { thread_id: threadId },
+                signal: ac.signal,
               }
-              db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
-            } catch {
-              db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
-            } finally {
-              buffer.isComplete = true
-              buffer.notify()
-              threadRunMap.delete(threadId)
-              setTimeout(() => runBuffers.delete(runId), 60_000)
+            )
+            for await (const event of eventStream) {
+              const serialized = serializeEvent(event)
+              if (serialized) {
+                buffer.events.push(serialized)
+                buffer.notify()
+              }
             }
-          })()
-        }
+            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
+          } catch {
+            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
+          } finally {
+            buffer.isComplete = true
+            buffer.notify()
+            threadRunMap.delete(threadId)
+            runBuffers.delete(runId)
+          }
+        })()
       } else {
-        runId = input.runId
-        const existing = runBuffers.get(runId)
-        // If the buffer is gone or already finished, nothing to replay — the client
-        // already received all events during the original subscription.
-        if (!existing || existing.isComplete) return
-        buffer = existing
+        // No active run and no input — nothing to stream
+        return
       }
 
-      // Tail the buffer. Works for both 'new' and 'resume'.
-      // Register the waiter BEFORE draining to avoid a race where notify fires
-      // between the drain loop exiting and nextEventPromise being called.
-      let idx = 0
+      // Tail the buffer, resuming from startIdx on reconnection.
+      let idx = startIdx
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         const nextP = buffer.nextEventPromise()
