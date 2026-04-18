@@ -303,6 +303,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
           typeof output['kwargs'] === 'object' && output['kwargs'] !== null
             ? (output['kwargs'] as Record<string, unknown>)
             : output
+        const metadata =
+          typeof rawKwargs['metadata'] === 'object' && rawKwargs['metadata'] !== null
+            ? (rawKwargs['metadata'] as Record<string, unknown>)
+            : undefined
         const toolMessage: AgentState['messages'][number] = {
           type: 'tool',
           content: typeof rawKwargs['content'] === 'string' ? rawKwargs['content'] : '',
@@ -310,6 +314,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
             typeof rawKwargs['tool_call_id'] === 'string' ? rawKwargs['tool_call_id'] : '',
           name: event.name,
           id: typeof rawKwargs['id'] === 'string' ? rawKwargs['id'] : undefined,
+          ...(metadata ? { metadata } : {}),
         }
 
         return {
