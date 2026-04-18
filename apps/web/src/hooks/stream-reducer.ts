@@ -192,21 +192,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
   }
 
   if (action.type === 'prepare') {
-    const text = action.userText?.trim()
-    const base = { ...state, toolProgress: {}, _agentToolScopes: {}, error: null }
-    if (!text) return base
-    const optimisticHuman = {
-      id: `local-human-${crypto.randomUUID()}`,
-      type: 'human' as const,
-      content: [{ type: 'text' as const, text }],
-    }
-    return {
-      ...base,
-      values: {
-        ...state.values,
-        messages: [...state.values.messages, optimisticHuman],
-      },
-    }
+    return { ...state, toolProgress: {}, _agentToolScopes: {}, error: null }
   }
 
   const { event } = action

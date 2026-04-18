@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] First message flashing
 - [ ] Settings management (desktop-only)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
 - [ ] Add vision support
