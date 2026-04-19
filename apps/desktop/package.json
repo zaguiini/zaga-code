@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "NODE_OPTIONS='--import tsx/esm --conditions=development' electron src/main.ts",
+    "dev": "concurrently \"NODE_OPTIONS='--import tsx/esm' electron src/main.ts\" \"tsc --watch --project tsconfig.preload.json\"",
     "prebuild": "pnpm --filter @zaga/web build && pnpm --filter @zaga/agent build",
     "build": "tsc && electron-builder --config electron-builder.config.cjs",
     "rebuild": "electron-rebuild"
@@ -16,7 +16,8 @@
     "sirv": "^3.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.2.1",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "electron-rebuild": "^3.2.9",

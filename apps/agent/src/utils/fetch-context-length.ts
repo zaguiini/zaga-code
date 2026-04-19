@@ -1,8 +1,10 @@
 import { LMStudioClient } from '@lmstudio/sdk'
 import { KNOWN_OPENAI_CONTEXT_WINDOWS } from './constants'
-import { settings } from '@/settings'
+import { parseSettings } from '@/settings'
 
 export async function fetchContextLength(): Promise<number> {
+  const settings = parseSettings()
+
   // Static lookup for known models
   const matchingContextWindow = KNOWN_OPENAI_CONTEXT_WINDOWS[settings.model]
   if (matchingContextWindow) return matchingContextWindow

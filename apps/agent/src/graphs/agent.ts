@@ -1,11 +1,9 @@
 import { Annotation, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { toolsCondition } from '@langchain/langgraph/prebuilt'
-import { ChatOpenAI } from '@langchain/openai'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
-import { settings } from '@/settings'
-import { createExecutorNode } from '@/nodes/executor'
-import { createMaybeCompactNode } from '@/nodes/maybe-compact'
-import { createLoadConfigNode } from '@/nodes/load-config'
+import { executorNode } from '@/nodes/executor'
+import { maybeCompactNode } from '@/nodes/maybe-compact'
+import { loadConfigNode } from '@/nodes/load-config'
 import { dynamicToolNode } from '@/nodes/dynamic-tool-node'
 
 export const agentStateSchema = Annotation.Root({
@@ -32,24 +30,9 @@ export const agentStateSchema = Annotation.Root({
 
 export type AgentState = typeof agentStateSchema.State
 
-export function createModel() {
-  return new ChatOpenAI({
-    model: settings.model,
-    configuration: { baseURL: settings.apiBase },
-    apiKey: settings.apiKey ?? 'local',
-    streaming: true,
-    streamUsage: true,
-  })
-}
-
 function buildAgentGraph() {
-  const model = createModel()
-
-  const loadConfigNode = createLoadConfigNode(model)
-  const executorNode = createExecutorNode(model, settings.model)
-
   return new StateGraph(agentStateSchema)
-    .addNode('maybe-compact', createMaybeCompactNode(model))
+    .addNode('maybe-compact', maybeCompactNode)
     .addNode('load-config', loadConfigNode)
     .addNode('executor', executorNode)
     .addNode('tools', dynamicToolNode)

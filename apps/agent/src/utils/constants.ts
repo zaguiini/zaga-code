@@ -17,3 +17,5 @@ export const KNOWN_OPENAI_CONTEXT_WINDOWS: Record<string, number> = {
   'o4-mini': 200_000,
   'chatgpt-4o-latest': 128_000,
 }
+
+export const OPENAI_API_BASE = 'https://api.openai.com/v1'

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { FolderOpen } from 'lucide-react'
 import { z } from 'zod'
 import { useState } from 'react'
+import type { Settings } from '@zaga/agent/settings'
 import { trpc } from '@/lib/trpc'
 import { MessageInput } from '@/components/ui/message-input'
 
@@ -9,6 +10,8 @@ declare global {
   interface Window {
     zaga?: {
       pickDirectory: () => Promise<string | null>
+      getSettings: () => Promise<Settings>
+      updateSettings: (data: Settings) => Promise<{ ok: true }>
     }
   }
 }

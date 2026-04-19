@@ -3,7 +3,9 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BrowserWindow, Menu, app, dialog, ipcMain } from 'electron'
+import { GLOBAL_SETTINGS_PATH, parseSettings, writeSettings } from '@zaga/agent/settings'
 import { WEB_PORT, getWebDistPath, startServers } from './servers.js'
+import type { Settings } from '@zaga/agent/settings'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -52,7 +54,7 @@ function createWindow(url: string) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: join(__dirname, IS_DEV ? 'preload.ts' : 'preload.js'),
+      preload: join(__dirname, '..', 'dist', 'preload.cjs'),
     },
   })
   mainWindow.loadURL(url)
@@ -150,8 +152,17 @@ async function main() {
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
 
+  ipcMain.handle('settings:get', (_event, path?: string) => {
+    return parseSettings(path)
+  })
+
+  ipcMain.handle('settings:update', async (_event, path = GLOBAL_SETTINGS_PATH, data: Settings) => {
+    await writeSettings(path, data)
+    return { ok: true }
+  })
+
   if (!IS_DEV) {
-    await startServers(getWebDistPath())
+    startServers(getWebDistPath())
   }
 
   createWindow(buildUrl(projectPath))

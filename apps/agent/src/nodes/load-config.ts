@@ -2,10 +2,10 @@ import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { ChatOpenAI } from '@langchain/openai'
 import type { AgentState } from '@/graphs/agent'
 import type { Settings } from '@/settings'
-import { parseSettings, settings } from '@/settings'
+import { parseSettings } from '@/settings'
 import { loadAgentsFromDir, mergeAgentDefinitions } from '@/config/agent-loader'
 import { computeConfigHash, toolRegistry } from '@/config/registry'
 import { BUILT_IN_TOOLS, createAgentTool } from '@/utils/create-agent-tool'
@@ -26,47 +26,54 @@ async function connectMcps(mcpServers: Settings['mcpServers']) {
   }
 }
 
-export function createLoadConfigNode(model: BaseChatModel) {
-  return async function loadConfigNode(state: AgentState): Promise<Partial<AgentState>> {
-    // Fetch context window size on the first run
-    const maxTokens = state.maxTokens > 0 ? state.maxTokens : await fetchContextLength()
+export async function loadConfigNode(state: AgentState): Promise<Partial<AgentState>> {
+  const settings = parseSettings()
 
-    // Load settings from global and per-project layers
-    const projectSettings = state.projectPath
-      ? parseSettings(join(state.projectPath, '.zaga', 'settings.json'))
-      : null
+  const model = new ChatOpenAI({
+    model: settings.model,
+    configuration: { baseURL: settings.apiBase },
+    apiKey: settings.apiKey ?? 'local',
+    streaming: true,
+    streamUsage: true,
+  })
 
-    // Merge MCPs: project overrides global by key
-    const mergedMcps = {
-      ...settings.mcpServers,
-      ...projectSettings?.mcpServers,
-    }
+  // Fetch context window size on the first run
+  const maxTokens = state.maxTokens > 0 ? state.maxTokens : await fetchContextLength()
+  // Load settings from global and per-project layers
+  // const projectSettings = state.projectPath
+  //   ? parseSettings(join(state.projectPath, '.zaga', 'settings.json'))
+  //   : null
 
-    // Load agents from all three layers
-    const builtInDefs = await loadAgentsFromDir(BUILT_IN_AGENTS_DIR)
-    const globalDefs = await loadAgentsFromDir(join(homedir(), '.zaga', 'agents'))
-    const projectDefs = state.projectPath
-      ? await loadAgentsFromDir(join(state.projectPath, '.zaga', 'agents'))
-      : []
+  // Merge MCPs: project overrides global by key
+  const mergedMcps = {
+    ...settings.mcpServers,
+    // ...projectSettings?.mcpServers,
+  }
 
-    const mergedAgentDefs = mergeAgentDefinitions(builtInDefs, globalDefs, projectDefs)
+  // Load agents from all three layers
+  const builtInDefs = await loadAgentsFromDir(BUILT_IN_AGENTS_DIR)
+  const globalDefs = await loadAgentsFromDir(join(homedir(), '.zaga', 'agents'))
+  const projectDefs = state.projectPath
+    ? await loadAgentsFromDir(join(state.projectPath, '.zaga', 'agents'))
+    : []
 
-    // Compute hash from effective config
-    const configHash = computeConfigHash(
-      JSON.stringify({ mcpServers: mergedMcps, agents: mergedAgentDefs })
-    )
+  const mergedAgentDefs = mergeAgentDefinitions(builtInDefs, globalDefs, projectDefs)
 
-    // Cache hit — tools already resolved for this config
-    if (toolRegistry.has(configHash)) {
-      return { configHash, maxTokens }
-    }
+  // Compute hash from effective config
+  const configHash = computeConfigHash(
+    JSON.stringify({ mcpServers: mergedMcps, agents: mergedAgentDefs })
+  )
 
-    // Resolve MCPs and build full tool list
-    const mcpTools = await connectMcps(mergedMcps)
-    const agentTools = mergedAgentDefs.map(def => createAgentTool(def, model))
-    const allTools = [...BUILT_IN_TOOLS, ...mcpTools, ...agentTools]
-
-    toolRegistry.set(configHash, allTools)
+  // Cache hit — tools already resolved for this config
+  if (toolRegistry.has(configHash)) {
     return { configHash, maxTokens }
   }
+
+  // Resolve MCPs and build full tool list
+  const mcpTools = await connectMcps(mergedMcps)
+  const agentTools = mergedAgentDefs.map(def => createAgentTool(def, model))
+  const allTools = [...BUILT_IN_TOOLS, ...mcpTools, ...agentTools]
+
+  toolRegistry.set(configHash, allTools)
+  return { configHash, maxTokens }
 }
