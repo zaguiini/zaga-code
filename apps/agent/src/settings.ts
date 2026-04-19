@@ -23,10 +23,25 @@ const mcpServerSchema = z.discriminatedUnion('transport', [
   stdioMcpServerSchema,
 ])
 
+const connection = z.discriminatedUnion('provider', [
+  z.object({
+    provider: z.literal('openai'),
+    apiKey: z.string(),
+    model: z.string(),
+  }),
+  z.object({
+    provider: z.literal('lm-studio'),
+    model: z.string(),
+    apiBase: z.string(),
+  }),
+])
+
 export const settingsSchema = z.object({
-  apiKey: z.string().optional(),
-  model: z.string().default('qwen3.6-35b-a3b@4bit'),
-  apiBase: z.string().default('http://localhost:1234/v1'),
+  connection: connection.default({
+    provider: 'lm-studio',
+    model: 'qwen3.6-35b-a3b@4bit',
+    apiBase: 'http://localhost:1234/v1',
+  }),
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
 })
 

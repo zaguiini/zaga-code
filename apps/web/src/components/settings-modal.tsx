@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
-import { KNOWN_OPENAI_CONTEXT_WINDOWS, OPENAI_API_BASE } from '@zaga/agent/constants'
+import { KNOWN_OPENAI_CONTEXT_WINDOWS } from '@zaga/agent/constants'
 import { Controller, useForm } from 'react-hook-form'
 import type { Settings } from '@zaga/agent/settings'
 import {
@@ -33,6 +33,13 @@ type GeneralFormValues = {
   apiKey: string
 }
 
+const DEFAULT_GENERAL_VALUES: GeneralFormValues = {
+  provider: 'lm-studio',
+  model: 'qwen3.6-35b-a3b@4bit',
+  apiBase: 'http://localhost:1234/v1',
+  apiKey: '',
+}
+
 type McpFormValues = {
   mcpServers: McpServers
   newName: string
@@ -41,8 +48,24 @@ type McpFormValues = {
 
 const OPENAI_MODELS = Object.keys(KNOWN_OPENAI_CONTEXT_WINDOWS)
 
-function getProvider(apiBase?: string): Provider {
-  return apiBase === OPENAI_API_BASE ? 'openai' : 'lm-studio'
+function getGeneralFormValues(connection?: Settings['connection']): GeneralFormValues {
+  if (!connection) return DEFAULT_GENERAL_VALUES
+
+  if (connection.provider === 'openai') {
+    return {
+      provider: 'openai',
+      model: connection.model,
+      apiBase: DEFAULT_GENERAL_VALUES.apiBase,
+      apiKey: connection.apiKey,
+    }
+  }
+
+  return {
+    provider: 'lm-studio',
+    model: connection.model,
+    apiBase: connection.apiBase,
+    apiKey: '',
+  }
 }
 
 export function SettingsModal({
@@ -118,44 +141,27 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
     control,
     formState: { errors, isDirty },
     register,
-    reset,
     handleSubmit,
     setValue,
     watch,
   } = useForm<GeneralFormValues>({
-    defaultValues: {
-      provider: 'lm-studio',
-      model: OPENAI_MODELS[0] ?? '',
-      apiBase: '',
-      apiKey: '',
-    },
+    defaultValues: getGeneralFormValues(data?.connection),
   })
-
-  useEffect(() => {
-    if (!data) return
-
-    const provider = getProvider(data.apiBase)
-    const model =
-      provider === 'openai'
-        ? OPENAI_MODELS.includes(data.model)
-          ? data.model
-          : (OPENAI_MODELS[0] ?? '')
-        : data.model
-
-    reset({
-      provider,
-      model,
-      apiBase: data.apiBase,
-      apiKey: data.apiKey ?? '',
-    })
-  }, [data, reset])
 
   const provider = watch('provider')
   const model = watch('model')
+  const apiBase = watch('apiBase')
+
+  console.log(data)
 
   useEffect(() => {
     if (provider !== 'openai') {
       clearErrors('apiKey')
+      if (!apiBase) {
+        setValue('apiBase', DEFAULT_GENERAL_VALUES.apiBase, {
+          shouldDirty: true,
+        })
+      }
       return
     }
 
@@ -164,16 +170,29 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
         shouldDirty: true,
       })
     }
-  }, [clearErrors, model, provider, setValue])
+  }, [apiBase, clearErrors, model, provider, setValue])
 
   const onSubmit = handleSubmit(values => {
+    if (!data) return
+
     setSaving(true)
+    const connection: Settings['connection'] =
+      values.provider === 'openai'
+        ? {
+            provider: 'openai',
+            model: values.model,
+            apiKey: values.apiKey,
+          }
+        : {
+            provider: 'lm-studio',
+            model: values.model,
+            apiBase: values.apiBase,
+          }
+
     window
       .zaga!.updateSettings({
-        model: values.model,
-        apiBase: values.provider === 'openai' ? OPENAI_API_BASE : values.apiBase,
-        apiKey: values.apiKey || undefined,
-        mcpServers: data?.mcpServers ?? {},
+        connection,
+        mcpServers: data.mcpServers,
       })
       .then(() => {
         reload()
@@ -239,19 +258,19 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="settings-apiKey">API Key</Label>
-        <Input
-          id="settings-apiKey"
-          type="password"
-          placeholder={provider === 'openai' ? 'Required' : 'Optional'}
-          {...register('apiKey', {
-            validate: value =>
-              provider !== 'openai' || value.trim().length > 0 || 'API key is required for OpenAI',
-          })}
-        />
-        {errors.apiKey && <p className="text-sm text-destructive">{errors.apiKey.message}</p>}
-      </div>
+      {provider === 'openai' && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="settings-apiKey">API Key</Label>
+          <Input
+            id="settings-apiKey"
+            type="password"
+            {...register('apiKey', {
+              validate: value => value.trim().length > 0 || 'API key is required for OpenAI',
+            })}
+          />
+          {errors.apiKey && <p className="text-sm text-destructive">{errors.apiKey.message}</p>}
+        </div>
+      )}
       <div className="flex justify-end">
         <Button type="submit" disabled={!isDirty || saving}>
           Save
