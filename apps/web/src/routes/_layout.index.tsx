@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { Settings } from '@zaga/agent/settings'
 import { trpc } from '@/lib/trpc'
 import { MessageInput } from '@/components/ui/message-input'
+import { fileToDataUrl } from '@/lib/file-to-data-url'
 
 declare global {
   interface Window {
@@ -31,11 +32,13 @@ function NewChat() {
   const navigate = useNavigate()
   const { projectPath: urlProjectPath } = useSearch({ from: '/_layout/' })
   const createThread = trpc.threads.create.useMutation()
+  const startRun = trpc.runs.start.useMutation()
   const [projectPath, setProjectPath] = useState(
     urlProjectPath ?? localStorage.getItem(STORAGE_KEY) ?? ''
   )
   const [prompt, setPrompt] = useState('')
-  const invalidateThreads = trpc.useUtils().threads.list.invalidate
+  const [files, setFiles] = useState<Array<File> | null>(null)
+  const utils = trpc.useUtils()
 
   const { zaga } = window
 
@@ -45,16 +48,22 @@ function NewChat() {
       <form
         onSubmit={async e => {
           e.preventDefault()
-          if (!projectPath.trim() || !prompt.trim()) return
+          const trimmedPrompt = prompt.trim()
+          const attachedFiles = files ?? []
+          if (!projectPath.trim() || (!trimmedPrompt && attachedFiles.length === 0)) return
+
           localStorage.setItem(STORAGE_KEY, projectPath)
 
+          const images = await Promise.all(attachedFiles.map(fileToDataUrl))
           const { threadId } = await createThread.mutateAsync({ projectPath })
+          await startRun.mutateAsync({
+            threadId,
+            input: { text: trimmedPrompt, images },
+          })
 
-          invalidateThreads()
-
-          // Hand off prompt to thread route via sessionStorage.
-          // Thread route reads it on mount and calls stream.submit automatically.
-          sessionStorage.setItem(`pending-prompt:${threadId}`, prompt)
+          void utils.threads.list.invalidate()
+          void utils.threads.get.invalidate({ threadId })
+          void utils.runs.get.invalidate({ threadId })
 
           void navigate({ to: '/$threadId', params: { threadId } })
         }}
@@ -89,8 +98,11 @@ function NewChat() {
           </div>
         </div>
         <MessageInput
+          allowAttachments
+          files={files}
+          setFiles={setFiles}
           placeholder="Ask Zaga Code"
-          isGenerating={createThread.isPending}
+          isGenerating={createThread.isPending || startRun.isPending}
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
         />

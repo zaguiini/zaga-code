@@ -4,6 +4,7 @@ import { BaseMessage } from '@langchain/core/messages'
 import { procedure, router } from '../trpc'
 import type { Message } from '@langchain/langgraph-sdk'
 import type { StreamEvent } from '@langchain/core/types/stream'
+import type { Context } from '../trpc'
 import { db } from '@/db'
 import { serializeMessages, toMessageUnion } from '@/utils/messages'
 // ── Serialized stream event types (consumed by the frontend via tRPC inference) ──
@@ -95,6 +96,17 @@ type RunRow = {
   run_id: string
 }
 
+const runImageSchema = z.object({
+  name: z.string(),
+  mimeType: z.string().startsWith('image/'),
+  url: z.string().startsWith('data:image/'),
+})
+
+const runInputSchema = z.object({
+  text: z.string(),
+  images: z.array(runImageSchema).default([]),
+})
+
 type RunBuffer = {
   events: Array<SerializedStreamEvent>
   ac: AbortController
@@ -132,6 +144,70 @@ function maybeCleanupBuffer(runId: string, threadId: string, buffer: RunBuffer) 
   }
 }
 
+function buildHumanContent(input: z.infer<typeof runInputSchema>) {
+  const text = input.text.trim()
+
+  return [
+    ...(text ? [{ type: 'text' as const, text }] : []),
+    ...input.images.map(image => ({
+      type: 'image_url' as const,
+      image_url: { url: image.url },
+      name: image.name,
+    })),
+  ]
+}
+
+function startRun(
+  ctx: Context,
+  input: { threadId: string; input: z.infer<typeof runInputSchema> }
+) {
+  const { threadId } = input
+  const messageContent = buildHumanContent(input.input)
+  if (messageContent.length === 0) return null
+
+  const runId = crypto.randomUUID()
+  db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
+    runId,
+    threadId,
+    'running'
+  )
+
+  const ac = new AbortController()
+  const buffer = createRunBuffer(ac)
+  runBuffers.set(runId, buffer)
+  threadRunMap.set(threadId, runId)
+
+  void (async () => {
+    try {
+      const eventStream = ctx.graph.streamEvents(
+        { messages: [{ type: 'human', content: messageContent }] },
+        {
+          subgraphs: true,
+          version: 'v2',
+          configurable: { thread_id: threadId },
+          signal: ac.signal,
+        }
+      )
+      for await (const event of eventStream) {
+        const serialized = serializeEvent(event)
+        if (serialized) {
+          buffer.events.push(serialized)
+          buffer.notify()
+        }
+      }
+      db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
+    } catch {
+      db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
+    } finally {
+      buffer.isComplete = true
+      buffer.notify()
+      maybeCleanupBuffer(runId, threadId, buffer)
+    }
+  })()
+
+  return { runId }
+}
+
 export const runsRouter = router({
   get: procedure.input(z.object({ threadId: z.string() })).query(({ input }) => {
     const row = db
@@ -140,16 +216,38 @@ export const runsRouter = router({
     return { activeRunId: row?.run_id ?? null }
   }),
 
+  start: procedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        input: runInputSchema,
+      })
+    )
+    .mutation(({ input, ctx }) => {
+      const existingRunId = threadRunMap.get(input.threadId)
+      const existingBuffer = existingRunId ? runBuffers.get(existingRunId) : undefined
+      if (existingBuffer && !existingBuffer.isComplete && !existingBuffer.ac.signal.aborted) {
+        return { runId: existingRunId }
+      }
+
+      const started = startRun(ctx, input)
+      if (!started) {
+        return { runId: null }
+      }
+
+      return started
+    }),
+
   stream: procedure
     .input(
       z.object({
         threadId: z.string(),
-        input: z.string().optional(),
+        runId: z.string().optional(),
         // tRPC sends this automatically on SSE reconnection via httpSubscriptionLink
         lastEventId: z.string().nullish(),
       })
     )
-    .subscription(async function* ({ input, ctx }) {
+    .subscription(async function* ({ input }) {
       const { threadId } = input
 
       let runId: string | undefined
@@ -173,7 +271,16 @@ export const runsRouter = router({
         }
       }
 
-      // 2. Active run on this thread (page refresh, React Strict Mode double-invoke)
+      // 2. Explicit run id from the client
+      if (!buffer && input.runId) {
+        const requestedBuffer = runBuffers.get(input.runId)
+        if (requestedBuffer) {
+          runId = input.runId
+          buffer = requestedBuffer
+        }
+      }
+
+      // 3. Active run on this thread (page refresh, React Strict Mode double-invoke)
       if (!buffer) {
         const activeRunId = threadRunMap.get(threadId)
         const activeBuffer = activeRunId ? runBuffers.get(activeRunId) : undefined
@@ -181,53 +288,6 @@ export const runsRouter = router({
           runId = activeRunId!
           buffer = activeBuffer
         }
-      }
-
-      // 3. Start a new run
-      if (!buffer && input.input) {
-        runId = crypto.randomUUID()
-        db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
-          runId,
-          threadId,
-          'running'
-        )
-
-        const ac = new AbortController()
-        buffer = createRunBuffer(ac)
-        runBuffers.set(runId, buffer)
-        threadRunMap.set(threadId, runId)
-
-        // Run LangGraph as a detached background task — NOT tied to the SSE connection.
-        // This keeps the run alive across page refreshes.
-        void (async () => {
-          try {
-            const eventStream = ctx.graph.streamEvents(
-              { messages: [{ type: 'human', content: [{ type: 'text', text: input.input! }] }] },
-              {
-                subgraphs: true,
-                version: 'v2',
-                configurable: { thread_id: threadId },
-                signal: ac.signal,
-              }
-            )
-            for await (const event of eventStream) {
-              const serialized = serializeEvent(event)
-              if (serialized) {
-                buffer.events.push(serialized)
-                buffer.notify()
-              }
-            }
-            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
-          } catch {
-            db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
-          } finally {
-            buffer.isComplete = true
-            buffer.notify()
-            // Cleanup only if no subscriber is currently draining.
-            // Otherwise the subscriber's finally block will handle it.
-            maybeCleanupBuffer(runId, threadId, buffer)
-          }
-        })()
       }
 
       if (!buffer || !runId) return

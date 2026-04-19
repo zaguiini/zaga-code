@@ -7,6 +7,7 @@ import { messageGrouper } from '@/lib/message-grouper'
 import { StreamProvider } from '@/lib/stream-context'
 import { useAgentStream } from '@/hooks/use-agent-stream'
 import { trpc } from '@/lib/trpc'
+import { fileToDataUrl } from '@/lib/file-to-data-url'
 
 export const Route = createFileRoute('/_layout/$threadId')({
   component: RouteComponent,
@@ -17,19 +18,18 @@ function RouteComponent() {
   const threadQuery = trpc.threads.get.useQuery({ threadId })
   const stream = useAgentStream(threadId, threadQuery.data)
   const [input, setInput] = useState('')
+  const [files, setFiles] = useState<Array<File> | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const latestInputRef = useRef(input)
+  const latestFilesRef = useRef(files)
 
-  // Kick off graph if index route left a pending prompt in sessionStorage
-  const didSubmitInitial = useRef(false)
-  const streamSubmit = stream.submit
   useEffect(() => {
-    if (didSubmitInitial.current) return
-    const pending = sessionStorage.getItem(`pending-prompt:${threadId}`)
-    if (pending) {
-      sessionStorage.removeItem(`pending-prompt:${threadId}`)
-      didSubmitInitial.current = true
-      streamSubmit(pending)
-    }
-  }, [threadId, streamSubmit])
+    latestInputRef.current = input
+  }, [input])
+
+  useEffect(() => {
+    latestFilesRef.current = files
+  }, [files])
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
@@ -83,20 +83,47 @@ function RouteComponent() {
           <MessageList messages={items} />
         </div>
         <form
-          onSubmit={e => {
+          onSubmit={async e => {
             e.preventDefault()
-            if (!input.trim() || stream.isLoading) return
+            if (stream.isLoading || isSubmitting) return
+
+            const trimmed = input.trim()
+            const attachedFiles = files ?? []
+            if (!trimmed && attachedFiles.length === 0) return
+
             stickToBottomRef.current = true
-            stream.submit(input)
-            setInput('')
+
+            setIsSubmitting(true)
+
+            try {
+              const submittedInput = input
+              const submittedFiles = files
+              const images = await Promise.all(attachedFiles.map(fileToDataUrl))
+              stream.submit({ text: trimmed, images })
+
+              if (latestInputRef.current === submittedInput) {
+                setInput('')
+              }
+              if (latestFilesRef.current === submittedFiles) {
+                setFiles(null)
+              }
+            } finally {
+              setIsSubmitting(false)
+            }
           }}
           className="shrink-0 w-full"
         >
-          <MessageInput
-            isGenerating={stream.isLoading}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-          />
+          <fieldset disabled={isSubmitting}>
+            <MessageInput
+              autoFocus
+              allowAttachments
+              files={files}
+              setFiles={setFiles}
+              isGenerating={stream.isLoading || isSubmitting}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+            />
+          </fieldset>
           <div className="flex items-center justify-between gap-2">
             {stream.isLoading && (
               <div className="flex items-center gap-2">

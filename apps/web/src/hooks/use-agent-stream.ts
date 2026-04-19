@@ -3,13 +3,22 @@ import { initialStreamState, streamReducer } from './stream-reducer'
 import type { StreamState } from './stream-reducer'
 import { trpc } from '@/lib/trpc'
 
-export interface AgentStream extends StreamState {
-  isLoading: boolean
-  submit: (input: string) => void
-  stop: () => void
+type RunImageInput = {
+  name: string
+  url: string
+  mimeType: string
 }
 
-type PendingRun = { input: string }
+type RunInput = {
+  text: string
+  images: Array<RunImageInput>
+}
+
+export interface AgentStream extends StreamState {
+  isLoading: boolean
+  submit: (input: RunInput) => void
+  stop: () => void
+}
 
 export function useAgentStream(
   threadId: string,
@@ -18,15 +27,18 @@ export function useAgentStream(
   const threadsQuery = trpc.threads.list.useQuery()
   const runsQuery = trpc.runs.get.useQuery({ threadId })
   const utils = trpc.useUtils()
-  const [pending, setPending] = useState<PendingRun | null>(null)
+  const [isStarting, setIsStarting] = useState(false)
+  const [pendingRunId, setPendingRunId] = useState<string | null>(null)
   const [state, dispatch] = useReducer(streamReducer, initialStreamState)
   const cancelMutation = trpc.runs.cancel.useMutation()
+  const startMutation = trpc.runs.start.useMutation()
   const cancelMutate = cancelMutation.mutate
   const prevThreadIdRef = useRef(threadId)
 
   useLayoutEffect(() => {
     if (prevThreadIdRef.current !== threadId) {
-      setPending(null)
+      setIsStarting(false)
+      setPendingRunId(null)
       prevThreadIdRef.current = threadId
     }
   }, [threadId])
@@ -34,11 +46,12 @@ export function useAgentStream(
   const lastSyncedThreadIdRef = useRef<string | null>(null)
 
   const activeRunId = runsQuery.data?.activeRunId ?? null
+  const subscribedRunId = pendingRunId ?? activeRunId
 
   const stream = trpc.runs.stream.useSubscription(
-    { threadId, input: pending?.input },
+    { threadId, ...(subscribedRunId ? { runId: subscribedRunId } : {}) },
     {
-      enabled: pending !== null || !!activeRunId,
+      enabled: !!subscribedRunId,
       onData(event) {
         const thread = threadsQuery.data?.threads.find(t => t.threadId === threadId)
         if (!thread?.firstMessage) {
@@ -47,12 +60,16 @@ export function useAgentStream(
         dispatch({ type: 'event', event: event.data })
       },
       onComplete() {
-        setPending(null)
+        setIsStarting(false)
+        setPendingRunId(null)
         void utils.threads.get.invalidate({ threadId })
+        void utils.runs.get.invalidate({ threadId })
       },
       onError() {
-        setPending(null)
+        setIsStarting(false)
+        setPendingRunId(null)
         void utils.threads.get.invalidate({ threadId })
+        void utils.runs.get.invalidate({ threadId })
       },
     }
   )
@@ -76,22 +93,48 @@ export function useAgentStream(
     dispatch({ type: 'reset', state: historicalState })
   }, [threadId, historicalState, stream.status, state.values.messages.length])
 
-  const submit = useCallback((input: string) => {
-    const trimmed = input.trim()
-    dispatch({ type: 'prepare', userText: trimmed })
-    setPending({ input: trimmed })
-  }, [])
+  const submit = useCallback(
+    (input: RunInput) => {
+      const text = input.text.trim()
+      if (!text && input.images.length === 0) return
+
+      setIsStarting(true)
+      startMutation.mutate(
+        { threadId, input: { ...input, text } },
+        {
+          onSuccess(data) {
+            if (!data.runId) {
+              setIsStarting(false)
+              return
+            }
+
+            setPendingRunId(data.runId)
+            dispatch({ type: 'prepare', userText: text })
+            void utils.runs.get.invalidate({ threadId })
+            void utils.threads.list.invalidate()
+            void utils.threads.get.invalidate({ threadId })
+          },
+          onError() {
+            setIsStarting(false)
+            setPendingRunId(null)
+          },
+        }
+      )
+    },
+    [startMutation, threadId, utils]
+  )
 
   const stop = useCallback(() => {
     cancelMutate({ threadId })
-    setPending(null)
+    setIsStarting(false)
+    setPendingRunId(null)
   }, [threadId, cancelMutate])
 
   return {
     toolProgress: state.toolProgress,
     _agentToolScopes: state._agentToolScopes,
     values: state.values,
-    isLoading: stream.status === 'pending',
+    isLoading: isStarting || stream.status === 'pending',
     error: state.error,
     submit,
     stop,

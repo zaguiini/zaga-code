@@ -215,8 +215,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
 function dataUrlToUint8Array(data: string) {
   const base64 = data.split(',')[1]
-  const buf = Buffer.from(base64, 'base64')
-  return new Uint8Array(buf)
+  if (!base64) return new Uint8Array()
+
+  const binary = window.atob(base64)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+
+  return bytes
 }
 
 const CollapsibleBlock = ({

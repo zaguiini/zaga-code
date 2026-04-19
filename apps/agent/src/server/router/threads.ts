@@ -11,6 +11,36 @@ type ThreadRow = {
   created_at: string
 }
 
+type MessageContentPart = {
+  type: string
+  text?: string
+  image_url?: {
+    url?: string
+  }
+}
+
+function getMessageContentParts(content: unknown): Array<MessageContentPart> {
+  return Array.isArray(content) ? content : []
+}
+
+function getFirstMessageSummary(message: HumanMessage | undefined): string | undefined {
+  if (!message) return undefined
+
+  const text = message.text.trim()
+  if (text) return text
+
+  const imageCount = getMessageContentParts(message.content).filter(
+    (part): part is MessageContentPart & { image_url: { url: string } } =>
+      part.type === 'image_url' && typeof part.image_url?.url === 'string'
+  ).length
+
+  if (imageCount > 0) {
+    return imageCount === 1 ? '[Image]' : '[Images]'
+  }
+
+  return undefined
+}
+
 export const threadsRouter = router({
   delete: procedure.input(z.object({ threadId: z.string() })).mutation(({ input }) => {
     db.prepare('DELETE FROM threads WHERE thread_id = ?').run(input.threadId)
@@ -47,12 +77,13 @@ export const threadsRouter = router({
           })
 
           const values: AgentState = state.values
+          const firstHumanMessage = values.messages.find(m => HumanMessage.isInstance(m))
 
           return {
             threadId: r.thread_id,
             projectPath: values.projectPath,
             createdAt: r.created_at,
-            firstMessage: values.messages.find(m => HumanMessage.isInstance(m))?.text,
+            firstMessage: getFirstMessageSummary(firstHumanMessage),
           }
         })
       ),

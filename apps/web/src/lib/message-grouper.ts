@@ -1,7 +1,42 @@
 import type { Message, ToolMessage, ToolProgress } from '@langchain/langgraph-sdk'
 import type { Message as MessageType, ToolInvocationPart } from '@/components/ui/chat-message'
 
-export function extractText(content: string | Array<{ type: string; text?: string }>): string {
+type ContentPart = {
+  type: string
+  name?: string
+  text?: string
+  image_url?: {
+    url?: string
+  }
+}
+
+function getContentParts(content: string | Array<ContentPart>): Array<ContentPart> {
+  return Array.isArray(content) ? content : []
+}
+
+function getImageAttachments(content: string | Array<ContentPart>) {
+  return getContentParts(content)
+    .filter(
+      (part): part is ContentPart & { image_url: { url: string } } =>
+        part.type === 'image_url' && typeof part.image_url?.url === 'string'
+    )
+    .map(part => ({
+      name: part.name,
+      url: part.image_url.url,
+      contentType: getAttachmentContentType(part.image_url.url),
+    }))
+}
+
+function getAttachmentContentType(url: string): string | undefined {
+  const dataUrlMatch = url.match(/^data:([^;,]+)[;,]/)
+  return dataUrlMatch?.[1]
+}
+
+function getAttachmentFallbackLabel(attachmentCount: number): string {
+  return attachmentCount === 1 ? 'Attached image' : 'Attached images'
+}
+
+export function extractText(content: string | Array<ContentPart>): string {
   if (typeof content === 'string') return content.trim()
   return content
     .filter(c => c.type === 'text' && c.text !== undefined)
@@ -31,11 +66,21 @@ export const messageGrouper = (
       const id = msg.id ?? Math.random().toString(36).slice(2)
 
       if (msg.type !== 'ai') {
+        const experimental_attachments = getImageAttachments(msg.content)
+        const textContent = extractText(msg.content)
+        const content =
+          textContent ||
+          (experimental_attachments.length > 0
+            ? getAttachmentFallbackLabel(experimental_attachments.length)
+            : '')
+
         return [
           {
             id,
             role: msg.type === 'human' ? 'user' : 'assistant',
-            content: extractText(msg.content),
+            content,
+            experimental_attachments:
+              experimental_attachments.length > 0 ? experimental_attachments : undefined,
           },
         ]
       }

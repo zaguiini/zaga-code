@@ -1,6 +1,13 @@
 import React, { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FileIcon, X } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface FilePreviewProps {
   file: File
@@ -26,6 +33,18 @@ FilePreview.displayName = 'FilePreview'
 
 const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
   ({ file, onRemove }, ref) => {
+    const [objectUrl, setObjectUrl] = React.useState<string | null>(null)
+    const [isOpen, setIsOpen] = React.useState(false)
+
+    useEffect(() => {
+      const nextObjectUrl = URL.createObjectURL(file)
+      setObjectUrl(nextObjectUrl)
+
+      return () => {
+        URL.revokeObjectURL(nextObjectUrl)
+      }
+    }, [file])
+
     return (
       <motion.div
         ref={ref}
@@ -35,14 +54,45 @@ const ImageFilePreview = React.forwardRef<HTMLDivElement, FilePreviewProps>(
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: '100%' }}
       >
-        <div className="flex w-full items-center space-x-2">
-          <img
-            alt={`Attachment ${file.name}`}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border bg-muted object-cover"
-            src={URL.createObjectURL(file)}
-          />
-          <span className="w-full truncate text-muted-foreground">{file.name}</span>
-        </div>
+        {objectUrl ? (
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="cursor-pointer flex w-full items-center space-x-2 rounded-sm text-left outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+                title={`Open ${file.name} in full size`}
+              >
+                <img
+                  alt={`Attachment ${file.name}`}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border bg-muted object-cover"
+                  src={objectUrl}
+                />
+                <span className="w-full truncate text-muted-foreground">{file.name}</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent
+              showCloseButton={false}
+              className="w-auto max-w-[90vw] border-none bg-transparent p-0 shadow-none sm:max-w-5xl"
+            >
+              <DialogTitle className="sr-only">{file.name}</DialogTitle>
+              <DialogDescription className="sr-only">
+                Full-size preview for {file.name}
+              </DialogDescription>
+              <div className="inline-flex max-w-full items-center justify-center overflow-auto rounded-lg border bg-background/95 p-2 backdrop-blur">
+                <img
+                  alt={file.name}
+                  className="h-auto max-h-[85vh] w-auto max-w-full rounded-md object-contain"
+                  src={objectUrl}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <div className="flex w-full items-center space-x-2">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border bg-muted" />
+            <span className="w-full truncate text-muted-foreground">{file.name}</span>
+          </div>
+        )}
 
         {onRemove ? (
           <button

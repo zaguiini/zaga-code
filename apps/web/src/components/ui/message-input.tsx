@@ -37,6 +37,7 @@ type MessageInputProps = MessageInputWithoutAttachmentProps | MessageInputWithAt
 export function MessageInput({
   placeholder = 'Ask AI...',
   className,
+  autoFocus,
   onKeyDown: onKeyDownProp,
   submitOnEnter = true,
   stop,
@@ -69,24 +70,28 @@ export function MessageInput({
     }
   }, [isGenerating])
 
+  const imageFiles = (files: Array<File> | null) =>
+    files?.filter(file => file.type.startsWith('image/')) ?? null
+
+  const hasImageDragItems = (items: DataTransferItemList) =>
+    Array.from(items).some(item => item.kind === 'file' && item.type.startsWith('image/'))
+
   const addFiles = (files: Array<File> | null) => {
     if (props.allowAttachments) {
+      const nextFiles = imageFiles(files)
+      if (!nextFiles?.length) return
+
       props.setFiles(currentFiles => {
-        if (currentFiles === null) {
-          return files
-        }
+        if (currentFiles === null) return nextFiles
 
-        if (files === null) {
-          return currentFiles
-        }
-
-        return [...currentFiles, ...files]
+        return [...currentFiles, ...nextFiles]
       })
     }
   }
 
   const onDragOver = (event: React.DragEvent) => {
     if (props.allowAttachments !== true) return
+    if (!hasImageDragItems(event.dataTransfer.items)) return
     event.preventDefault()
     setIsDragging(true)
   }
@@ -111,21 +116,9 @@ export function MessageInput({
     const items = event.clipboardData.items
     if (items.length === 0) return
 
-    const text = event.clipboardData.getData('text')
-    if (text && text.length > 500 && props.allowAttachments) {
-      event.preventDefault()
-      const blob = new Blob([text], { type: 'text/plain' })
-      const file = new File([blob], 'Pasted text', {
-        type: 'text/plain',
-        lastModified: Date.now(),
-      })
-      addFiles([file])
-      return
-    }
-
     const files = Array.from(items)
       .map(item => item.getAsFile())
-      .filter(file => file !== null)
+      .filter((file): file is File => file !== null && file.type.startsWith('image/'))
 
     if (props.allowAttachments && files.length > 0) {
       addFiles(files)
@@ -188,6 +181,7 @@ export function MessageInput({
         <div className="relative flex-1">
           <textarea
             aria-label="Write your prompt here"
+            autoFocus={autoFocus}
             placeholder={placeholder}
             ref={textAreaRef}
             onPaste={onPaste}
@@ -274,7 +268,10 @@ export function MessageInput({
             size="icon"
             className="h-8 w-8 transition-opacity"
             aria-label="Send message"
-            disabled={props.value === '' || isGenerating}
+            disabled={
+              isGenerating ||
+              (props.value === '' && !(props.allowAttachments && props.files?.length))
+            }
           >
             <ArrowUp className="h-5 w-5" />
           </Button>
@@ -312,7 +309,7 @@ function FileUploadOverlay({ isDragging }: FileUploadOverlayProps) {
           aria-hidden
         >
           <Paperclip className="h-4 w-4" />
-          <span>Drop your files here to attach them.</span>
+          <span>Drop your images here to attach them.</span>
         </motion.div>
       )}
     </AnimatePresence>
@@ -324,7 +321,7 @@ function showFileUploadDialog() {
 
   input.type = 'file'
   input.multiple = true
-  input.accept = '*/*'
+  input.accept = 'image/*'
   input.click()
 
   return new Promise<Array<File> | null>(resolve => {
@@ -332,7 +329,7 @@ function showFileUploadDialog() {
       const files = (e.currentTarget as HTMLInputElement).files
 
       if (files) {
-        resolve(Array.from(files))
+        resolve(Array.from(files).filter(file => file.type.startsWith('image/')))
         return
       }
 
