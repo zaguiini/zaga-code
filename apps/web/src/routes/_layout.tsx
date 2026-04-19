@@ -9,7 +9,6 @@ export const Route = createFileRoute('/_layout')({
 
 function RouteComponent() {
   const routerState = useMatchRoute()
-
   const threadRouteParams = routerState({ to: '/$threadId' })
 
   const [{ threads }] = trpc.threads.list.useSuspenseQuery()

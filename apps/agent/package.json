@@ -14,24 +14,30 @@
       "types": "./dist/graphs/agent.d.ts",
       "default": "./dist/graphs/agent.js"
     },
-    "./utils/token-budget": {
-      "development": "./src/utils/token-budget.ts",
-      "types": "./dist/utils/token-budget.d.ts",
-      "default": "./dist/utils/token-budget.js"
-    },
     "./server": {
       "development": "./src/server/index.ts",
       "types": "./dist/server/index.d.ts",
       "default": "./dist/server/index.js"
     },
     "./server/router": {
-      "development": "./src/server/router.ts",
-      "types": "./dist/server/router.d.ts",
-      "default": "./dist/server/router.js"
+      "development": "./src/server/router/index.ts",
+      "types": "./dist/server/router/index.d.ts",
+      "default": "./dist/server/router/index.js"
+    },
+    "./settings": {
+      "development": "./src/settings.ts",
+      "types": "./dist/settings.d.ts",
+      "default": "./dist/settings.js"
+    },
+    "./constants": {
+      "development": "./src/utils/constants.ts",
+      "types": "./dist/utils/constants.d.ts",
+      "default": "./dist/utils/constants.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "postbuild": "cp -rf src/agents dist",
     "dev": "tsx --watch src/server/start.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -45,6 +51,7 @@
     "@langchain/langgraph-sdk": "^1.8.7",
     "@langchain/mcp-adapters": "^1.1.3",
     "@langchain/openai": "^1.4.1",
+    "@lmstudio/sdk": "^1.5.0",
     "@trpc/server": "^11.13.0",
     "better-sqlite3": "^12.8.0",
     "fuse.js": "^7.1.0",

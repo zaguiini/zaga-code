@@ -1,10 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { PlusIcon, Trash2Icon } from 'lucide-react'
+import { PlusIcon, SettingsIcon, Trash2Icon } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -16,6 +18,7 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { trpc, trpcClient } from '@/lib/trpc'
+import { SettingsModal } from '@/components/settings-modal'
 
 export function AppSidebar({
   activeThreadId,
@@ -26,6 +29,7 @@ export function AppSidebar({
 }) {
   const navigate = useNavigate()
   const invalidateThreads = trpc.useUtils().threads.list.invalidate
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const deleteThread = useMutation({
     mutationFn: (threadId: string) => trpcClient.threads.delete.mutate({ threadId }),
@@ -88,6 +92,19 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      {window.zaga && (
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton className="cursor-pointer" onClick={() => setSettingsOpen(true)}>
+                <SettingsIcon className="size-4" />
+                <span className="font-bold">Settings</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+        </SidebarFooter>
+      )}
     </Sidebar>
   )
 }

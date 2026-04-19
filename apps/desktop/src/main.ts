@@ -2,9 +2,10 @@ import { existsSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BrowserWindow, Menu, app, dialog, ipcMain, shell } from 'electron'
-import { setup } from '@zaga/agent/setup'
+import { BrowserWindow, Menu, app, dialog, ipcMain } from 'electron'
+import { GLOBAL_SETTINGS_PATH, parseSettings, writeSettings } from '@zaga/agent/settings'
 import { WEB_PORT, getWebDistPath, startServers } from './servers.js'
+import type { Settings } from '@zaga/agent/settings'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -53,7 +54,7 @@ function createWindow(url: string) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: join(__dirname, IS_DEV ? 'preload.ts' : 'preload.js'),
+      preload: join(__dirname, '..', 'dist', 'preload.cjs'),
     },
   })
   mainWindow.loadURL(url)
@@ -151,10 +152,17 @@ async function main() {
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
 
-  await setup({ logLevel: 'verbose' })
+  ipcMain.handle('settings:get', _event => {
+    return parseSettings()
+  })
+
+  ipcMain.handle('settings:update', async (_event, data: Settings) => {
+    await writeSettings(data)
+    return { ok: true }
+  })
 
   if (!IS_DEV) {
-    await startServers(getWebDistPath())
+    startServers(getWebDistPath())
   }
 
   createWindow(buildUrl(projectPath))

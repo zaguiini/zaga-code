@@ -12,8 +12,8 @@ export { AGENT_PORT }
 
 export { WEB_PORT }
 
-export async function startServers(webDistPath: string) {
-  await startAgentServer(AGENT_PORT)
+export function startServers(webDistPath: string) {
+  startAgentServer(AGENT_PORT)
 
   const serve = sirv(webDistPath, { single: true })
   const webServer = http.createServer(serve)

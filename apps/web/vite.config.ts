@@ -5,8 +5,6 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 import { WEB_PORT } from './vite.port.mjs'
 
-export { WEB_PORT }
-
 export default defineConfig({
   envDir: '../../',
   server: {

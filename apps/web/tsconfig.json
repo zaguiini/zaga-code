@@ -1,5 +1,5 @@
 {
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "vite.port.d.mts"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "noEmit": true,
+    "customConditions": ["development"],
 
     /* Linting */
     "skipLibCheck": true,
