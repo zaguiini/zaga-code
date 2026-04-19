@@ -2,8 +2,7 @@ import { existsSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BrowserWindow, Menu, app, dialog, ipcMain, shell } from 'electron'
-import { setup } from '@zaga/agent/setup'
+import { BrowserWindow, Menu, app, dialog, ipcMain } from 'electron'
 import { WEB_PORT, getWebDistPath, startServers } from './servers.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -150,8 +149,6 @@ async function main() {
     })
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
-
-  await setup({ logLevel: 'verbose' })
 
   if (!IS_DEV) {
     await startServers(getWebDistPath())

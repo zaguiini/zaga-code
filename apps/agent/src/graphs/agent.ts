@@ -2,12 +2,11 @@ import { Annotation, MessagesAnnotation, START, StateGraph } from '@langchain/la
 import { toolsCondition } from '@langchain/langgraph/prebuilt'
 import { ChatOpenAI } from '@langchain/openai'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
-import { isExternalProvider, settings } from '@/settings'
+import { settings } from '@/settings'
 import { createExecutorNode } from '@/nodes/executor'
 import { createMaybeCompactNode } from '@/nodes/maybe-compact'
 import { createLoadConfigNode } from '@/nodes/load-config'
 import { dynamicToolNode } from '@/nodes/dynamic-tool-node'
-import { queryModelInfo } from '@/setup'
 
 export const agentStateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -43,14 +42,14 @@ export function createModel() {
   })
 }
 
-function buildAgentGraph({ maxTokens }: { maxTokens: number }) {
+function buildAgentGraph() {
   const model = createModel()
 
   const loadConfigNode = createLoadConfigNode(model)
   const executorNode = createExecutorNode(model, settings.model)
 
   return new StateGraph(agentStateSchema)
-    .addNode('maybe-compact', createMaybeCompactNode(model, maxTokens))
+    .addNode('maybe-compact', createMaybeCompactNode(model))
     .addNode('load-config', loadConfigNode)
     .addNode('executor', executorNode)
     .addNode('tools', dynamicToolNode)
@@ -62,15 +61,8 @@ function buildAgentGraph({ maxTokens }: { maxTokens: number }) {
     .addEdge('tools', 'executor')
 }
 
-async function queryMaxTokens(): Promise<number> {
-  if (isExternalProvider(settings)) return 128_000
-  const info = await queryModelInfo(settings.model)
-  return info.maxTokens
-}
-
 /** Convenience: builds and compiles with no checkpointer (for LangGraph API server compat) */
-export async function createAgent(opts: { checkpointer?: BaseCheckpointSaver } = {}) {
-  const maxTokens = await queryMaxTokens()
-  const graph = buildAgentGraph({ maxTokens })
+export function createAgent(opts: { checkpointer?: BaseCheckpointSaver } = {}) {
+  const graph = buildAgentGraph()
   return graph.compile({ checkpointer: opts.checkpointer })
 }

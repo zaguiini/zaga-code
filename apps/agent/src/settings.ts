@@ -41,7 +41,3 @@ export function parseSettings(path?: string) {
 }
 
 export const settings = parseSettings()
-
-export function isExternalProvider(s: Settings): s is Settings & { apiKey: string } {
-  return typeof s.apiKey === 'string'
-}

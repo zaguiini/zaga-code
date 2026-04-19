@@ -9,6 +9,7 @@ import { parseSettings, settings } from '@/settings'
 import { loadAgentsFromDir, mergeAgentDefinitions } from '@/config/agent-loader'
 import { computeConfigHash, toolRegistry } from '@/config/registry'
 import { BUILT_IN_TOOLS, createAgentTool } from '@/utils/create-agent-tool'
+import { fetchContextLength } from '@/utils/fetch-context-length'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -27,6 +28,9 @@ async function connectMcps(mcpServers: Settings['mcpServers']) {
 
 export function createLoadConfigNode(model: BaseChatModel) {
   return async function loadConfigNode(state: AgentState): Promise<Partial<AgentState>> {
+    // Fetch context window size on the first run
+    const maxTokens = state.maxTokens > 0 ? state.maxTokens : await fetchContextLength()
+
     // Load settings from global and per-project layers
     const projectSettings = state.projectPath
       ? parseSettings(join(state.projectPath, '.zaga', 'settings.json'))
@@ -54,7 +58,7 @@ export function createLoadConfigNode(model: BaseChatModel) {
 
     // Cache hit — tools already resolved for this config
     if (toolRegistry.has(configHash)) {
-      return { configHash }
+      return { configHash, maxTokens }
     }
 
     // Resolve MCPs and build full tool list
@@ -63,6 +67,6 @@ export function createLoadConfigNode(model: BaseChatModel) {
     const allTools = [...BUILT_IN_TOOLS, ...mcpTools, ...agentTools]
 
     toolRegistry.set(configHash, allTools)
-    return { configHash }
+    return { configHash, maxTokens }
   }
 }
