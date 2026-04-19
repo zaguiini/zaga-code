@@ -7,6 +7,7 @@ import { z } from 'zod'
 const httpMcpServerSchema = z.object({
   transport: z.literal('http'),
   url: z.url(),
+  enabled: z.boolean().default(true),
 })
 
 const stdioMcpServerSchema = z.object({
@@ -14,6 +15,7 @@ const stdioMcpServerSchema = z.object({
   command: z.string(),
   args: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).optional(),
+  enabled: z.boolean().default(true),
 })
 
 const mcpServerSchema = z.discriminatedUnion('transport', [

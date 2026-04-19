@@ -50,6 +50,11 @@ export async function loadConfigNode(state: AgentState): Promise<Partial<AgentSt
     // ...projectSettings?.mcpServers,
   }
 
+  const activeMcps = Object.entries(mergedMcps)
+    .filter(([_, config]) => config.enabled)
+    .map(([name, config]) => ({ name, config }))
+    .reduce((acc, { name, config }) => ({ ...acc, [name]: config }), {} as Settings['mcpServers'])
+
   // Load agents from all three layers
   const builtInDefs = await loadAgentsFromDir(BUILT_IN_AGENTS_DIR)
   const globalDefs = await loadAgentsFromDir(join(homedir(), '.zaga', 'agents'))
@@ -61,7 +66,7 @@ export async function loadConfigNode(state: AgentState): Promise<Partial<AgentSt
 
   // Compute hash from effective config
   const configHash = computeConfigHash(
-    JSON.stringify({ mcpServers: mergedMcps, agents: mergedAgentDefs })
+    JSON.stringify({ mcpServers: activeMcps, agents: mergedAgentDefs })
   )
 
   // Cache hit — tools already resolved for this config
@@ -70,7 +75,7 @@ export async function loadConfigNode(state: AgentState): Promise<Partial<AgentSt
   }
 
   // Resolve MCPs and build full tool list
-  const mcpTools = await connectMcps(mergedMcps)
+  const mcpTools = await connectMcps(activeMcps)
   const agentTools = mergedAgentDefs.map(def => createAgentTool(def, model))
   const allTools = [...BUILT_IN_TOOLS, ...mcpTools, ...agentTools]
 

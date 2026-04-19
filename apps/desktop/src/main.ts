@@ -152,12 +152,12 @@ async function main() {
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
 
-  ipcMain.handle('settings:get', (_event, path?: string) => {
-    return parseSettings(path)
+  ipcMain.handle('settings:get', _event => {
+    return parseSettings()
   })
 
-  ipcMain.handle('settings:update', async (_event, path = GLOBAL_SETTINGS_PATH, data: Settings) => {
-    await writeSettings(path, data)
+  ipcMain.handle('settings:update', async (_event, data: Settings) => {
+    await writeSettings(data)
     return { ok: true }
   })
 

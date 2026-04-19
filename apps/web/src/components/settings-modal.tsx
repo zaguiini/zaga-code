@@ -33,6 +33,12 @@ type GeneralFormValues = {
   apiKey: string
 }
 
+type McpFormValues = {
+  mcpServers: McpServers
+  newName: string
+  newTransport: 'http' | 'stdio'
+}
+
 const OPENAI_MODELS = Object.keys(KNOWN_OPENAI_CONTEXT_WINDOWS)
 
 function getProvider(apiBase?: string): Provider {
@@ -102,7 +108,7 @@ function useSettings() {
     load()
   }, [load])
 
-  return { data, reload: load }
+  return { data, reload: load, setData }
 }
 
 function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
@@ -255,16 +261,34 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
   )
 }
 
-function McpTab({ data, reload }: ReturnType<typeof useSettings>) {
-  const servers = data?.mcpServers ?? {}
-
-  const [draft, setDraft] = useState<McpServers | null>(null)
-  const [newName, setNewName] = useState('')
-  const [newTransport, setNewTransport] = useState<'http' | 'stdio'>('http')
-  const [dirty, setDirty] = useState(false)
+function McpTab({ data, reload, setData }: ReturnType<typeof useSettings>) {
   const [saving, setSaving] = useState(false)
+  const {
+    control,
+    formState: { isDirty },
+    getValues,
+    reset,
+    setValue,
+    watch,
+  } = useForm<McpFormValues>({
+    defaultValues: {
+      mcpServers: {},
+      newName: '',
+      newTransport: 'http',
+    },
+  })
 
-  const currentServers = draft ?? servers
+  useEffect(() => {
+    reset({
+      mcpServers: data?.mcpServers ?? {},
+      newName: '',
+      newTransport: 'http',
+    })
+  }, [data, reset])
+
+  const currentServers = watch('mcpServers')
+  const newName = watch('newName')
+  const newTransport = watch('newTransport')
 
   function save(updated: McpServers) {
     if (!data) return
@@ -273,34 +297,37 @@ function McpTab({ data, reload }: ReturnType<typeof useSettings>) {
     window
       .zaga!.updateSettings({ ...data, mcpServers: updated })
       .then(() => {
-        setDirty(false)
-        setDraft(null)
-        reload()
+        const nextData = { ...data, mcpServers: updated }
+        setData(nextData)
+        reset({
+          mcpServers: updated,
+          newName: '',
+          newTransport: 'http',
+        })
+        return reload()
       })
       .finally(() => setSaving(false))
   }
 
   function addServer() {
     const name = newName.trim()
+    if (!name) return
+
     const entry: McpServers[string] =
       newTransport === 'http'
-        ? { transport: 'http', url: '' }
-        : { transport: 'stdio', command: '', args: [] }
-    const updated = { ...currentServers, [name]: entry }
-    setDraft(updated)
-    setDirty(true)
-    setNewName('')
+        ? { transport: 'http', url: '', enabled: true }
+        : { transport: 'stdio', command: '', args: [], enabled: true }
+    setValue('mcpServers', { ...currentServers, [name]: entry }, { shouldDirty: true })
+    setValue('newName', '', { shouldDirty: false })
   }
 
   function removeServer(name: string) {
     const { [name]: _, ...rest } = currentServers
-    setDraft(rest)
-    setDirty(true)
+    setValue('mcpServers', rest, { shouldDirty: true })
   }
 
   function updateServer(name: string, server: McpServers[string]) {
-    setDraft({ ...currentServers, [name]: server })
-    setDirty(true)
+    setValue('mcpServers', { ...currentServers, [name]: server }, { shouldDirty: true })
   }
 
   return (
@@ -328,7 +355,7 @@ function McpTab({ data, reload }: ReturnType<typeof useSettings>) {
             id="new-mcp-name"
             placeholder="my-server"
             value={newName}
-            onChange={e => setNewName(e.target.value)}
+            onChange={e => setValue('newName', e.target.value, { shouldDirty: false })}
             onKeyDown={e => e.key === 'Enter' && addServer()}
           />
         </div>
@@ -336,18 +363,21 @@ function McpTab({ data, reload }: ReturnType<typeof useSettings>) {
           <Label htmlFor="new-mcp-transport" className="text-xs">
             Transport
           </Label>
-          <Select
-            value={newTransport}
-            onValueChange={value => setNewTransport(value as 'http' | 'stdio')}
-          >
-            <SelectTrigger id="new-mcp-transport" className="h-9 min-w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="http">HTTP</SelectItem>
-              <SelectItem value="stdio">Stdio</SelectItem>
-            </SelectContent>
-          </Select>
+          <Controller
+            control={control}
+            name="newTransport"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="new-mcp-transport" className="h-9 min-w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="http">HTTP</SelectItem>
+                  <SelectItem value="stdio">Stdio</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
         <Button type="button" variant="outline" size="sm" onClick={addServer}>
           <PlusIcon className="size-4" />
@@ -356,7 +386,11 @@ function McpTab({ data, reload }: ReturnType<typeof useSettings>) {
       </div>
 
       <div className="flex justify-end">
-        <Button type="button" disabled={!dirty || saving} onClick={() => save(currentServers)}>
+        <Button
+          type="button"
+          disabled={!isDirty || saving}
+          onClick={() => save(getValues('mcpServers'))}
+        >
           Save
         </Button>
       </div>
@@ -375,13 +409,24 @@ function McpServerEntry({
   onUpdate: (server: McpServers[string]) => void
   onRemove: () => void
 }) {
+  const enabled = server.enabled ?? true
+
   return (
     <div className="rounded-md border p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="font-mono text-sm font-medium">{name}</span>
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant={enabled ? 'outline' : 'secondary'}
+            size="sm"
+            aria-pressed={enabled}
+            onClick={() => onUpdate({ ...server, enabled: !enabled })}
+          >
+            {enabled ? 'Enabled' : 'Disabled'}
+          </Button>
           <span className="text-xs text-muted-foreground uppercase">{server.transport}</span>
-          <Button variant="ghost" size="icon-sm" onClick={onRemove}>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onRemove}>
             <Trash2Icon className="size-3.5" />
           </Button>
         </div>

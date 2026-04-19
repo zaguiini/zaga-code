@@ -3,7 +3,7 @@ import type { Settings } from '@zaga/agent/settings' with { "resolution-mode": "
 
 contextBridge.exposeInMainWorld('zaga', {
   pickDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickDirectory'),
-  getSettings: (path?: string): Promise<Settings> => ipcRenderer.invoke('settings:get', path),
-  updateSettings: (path: string, data: Settings): Promise<{ ok: true }> =>
-    ipcRenderer.invoke('settings:update', data, path),
+  getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
+  updateSettings: (data: Settings): Promise<{ ok: true }> =>
+    ipcRenderer.invoke('settings:update', data),
 })

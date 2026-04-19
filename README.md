@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] Settings management (desktop-only)
 - [ ] Add vision support
 - [ ] Skills (compact, help, setup for AGENTS.md)
 - [ ] Langfuse tracing (agent, tool calls, reasoning - under a single trace per session if possible)
