@@ -1,5 +1,16 @@
 /** Known context window sizes for OpenAI models (tokens). */
 export const KNOWN_OPENAI_CONTEXT_WINDOWS: Record<string, number> = {
+  'gpt-5.2': 400_000,
+  'gpt-5.2-pro': 400_000,
+  'gpt-5.2-chat-latest': 128_000,
+  'gpt-5.2-codex': 400_000,
+  'gpt-5.1': 400_000,
+  'gpt-5.1-codex': 400_000,
+  'gpt-5.1-codex-mini': 400_000,
+  'gpt-5.1-codex-max': 400_000,
+  'gpt-5': 400_000,
+  'gpt-5-mini': 400_000,
+  'gpt-5-nano': 400_000,
   'gpt-4o': 128_000,
   'gpt-4o-mini': 128_000,
   'gpt-4.1': 1_047_576,
@@ -14,6 +25,7 @@ export const KNOWN_OPENAI_CONTEXT_WINDOWS: Record<string, number> = {
   'o1-pro': 200_000,
   o3: 200_000,
   'o3-mini': 200_000,
+  'o3-pro': 200_000,
   'o4-mini': 200_000,
   'chatgpt-4o-latest': 128_000,
 }

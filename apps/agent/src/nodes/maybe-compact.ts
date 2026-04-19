@@ -1,9 +1,8 @@
 import { RemoveMessage } from '@langchain/core/messages'
-import { ChatOpenAI } from '@langchain/openai'
 import type { AgentState } from '@/graphs/agent'
 import { contextFillRatio } from '@/utils/token-budget'
 import { summarizeMessages } from '@/utils/summarize'
-import { parseSettings } from '@/settings'
+import { getModel } from '@/utils/get-model'
 
 const COMPACT_THRESHOLD = 0.85
 const KEEP_RECENT = 10
@@ -20,15 +19,7 @@ export async function maybeCompactNode(state: AgentState): Promise<Partial<Agent
 
   if (toSummarize.length === 0) return {}
 
-  const settings = parseSettings()
-
-  const model = new ChatOpenAI({
-    model: settings.model,
-    configuration: { baseURL: settings.apiBase },
-    apiKey: settings.apiKey ?? 'local',
-    streaming: true,
-    streamUsage: true,
-  })
+  const model = getModel()
 
   const summary = await summarizeMessages(toSummarize, model)
 

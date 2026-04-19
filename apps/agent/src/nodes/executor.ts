@@ -1,11 +1,10 @@
-import { ChatOpenAI } from '@langchain/openai'
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
 import type { AgentState } from '@/graphs/agent'
 import { getLangfuse } from '@/utils/langfuse'
 import { extractPromptTokens } from '@/utils/token-budget'
 import { toolRegistry } from '@/config/registry'
 import { buildSystemPrompt } from '@/utils/build-system-prompt'
-import { parseSettings } from '@/settings'
+import { getModel } from '@/utils/get-model'
 
 export async function executorNode(
   state: AgentState,
@@ -16,15 +15,7 @@ export async function executorNode(
     throw new Error(`[executor] No tools registered for configHash: ${state.configHash}`)
   }
 
-  const settings = parseSettings()
-
-  const model = new ChatOpenAI({
-    model: settings.model,
-    configuration: { baseURL: settings.apiBase },
-    apiKey: settings.apiKey ?? 'local',
-    streaming: true,
-    streamUsage: true,
-  })
+  const model = getModel()
 
   const modelWithTools = model.bindTools(tools)
 

@@ -2,7 +2,6 @@ import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { MultiServerMCPClient } from '@langchain/mcp-adapters'
-import { ChatOpenAI } from '@langchain/openai'
 import type { AgentState } from '@/graphs/agent'
 import type { Settings } from '@/settings'
 import { parseSettings } from '@/settings'
@@ -10,6 +9,7 @@ import { loadAgentsFromDir, mergeAgentDefinitions } from '@/config/agent-loader'
 import { computeConfigHash, toolRegistry } from '@/config/registry'
 import { BUILT_IN_TOOLS, createAgentTool } from '@/utils/create-agent-tool'
 import { fetchContextLength } from '@/utils/fetch-context-length'
+import { getModel } from '@/utils/get-model'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -29,13 +29,7 @@ async function connectMcps(mcpServers: Settings['mcpServers']) {
 export async function loadConfigNode(state: AgentState): Promise<Partial<AgentState>> {
   const settings = parseSettings()
 
-  const model = new ChatOpenAI({
-    model: settings.model,
-    configuration: { baseURL: settings.apiBase },
-    apiKey: settings.apiKey ?? 'local',
-    streaming: true,
-    streamUsage: true,
-  })
+  const model = getModel()
 
   // Fetch context window size on the first run
   const maxTokens = state.maxTokens > 0 ? state.maxTokens : await fetchContextLength()
