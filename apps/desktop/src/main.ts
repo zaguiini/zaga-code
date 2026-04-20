@@ -2,8 +2,8 @@ import { existsSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BrowserWindow, Menu, app, dialog, ipcMain } from 'electron'
-import { GLOBAL_SETTINGS_PATH, parseSettings, writeSettings } from '@zaga/agent/settings'
+import { BrowserWindow, Menu, app, dialog, ipcMain, nativeTheme } from 'electron'
+import { parseSettings, writeSettings } from '@zaga/agent/settings'
 import { WEB_PORT, getWebDistPath, startServers } from './servers.js'
 import type { Settings } from '@zaga/agent/settings'
 
@@ -46,6 +46,10 @@ function buildUrl(projectPath: string | null): string {
 }
 
 let mainWindow: BrowserWindow | null = null
+
+function getSystemTheme(): 'light' | 'dark' {
+  return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+}
 
 function createWindow(url: string) {
   mainWindow = new BrowserWindow({
@@ -159,6 +163,14 @@ async function main() {
   ipcMain.handle('settings:update', async (_event, data: Settings) => {
     await writeSettings(data)
     return { ok: true }
+  })
+  ipcMain.handle('theme:getSystem', () => getSystemTheme())
+
+  nativeTheme.on('updated', () => {
+    const theme = getSystemTheme()
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('theme:system-changed', theme)
+    }
   })
 
   if (!IS_DEV) {

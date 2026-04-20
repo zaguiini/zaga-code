@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] Dark mode
 - [ ] Focus on desktop mode
 - [ ] Tool call correction - some models, especially Qwen, output tool calls within reasoning blocks
 - [ ] Web fetching and web search tools

@@ -7,10 +7,10 @@
       "type": "string",
       "const": "http://localhost:2025/settings.schema.json"
     },
-    "contextWindow": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Override the model's context window size (in tokens). If omitted, it is auto-detected from the /models endpoint."
+    "theme": {
+      "type": "string",
+      "enum": ["system", "light", "dark"],
+      "description": "UI theme preference. Use 'system' to follow the operating system."
     },
     "mcpServers": {
       "type": "object",

@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import {
   Select,
   SelectContent,
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { THEME_PREFERENCE_CHANGED_EVENT, applyTheme } from '@/lib/theme'
 
 type McpServers = Settings['mcpServers']
 
@@ -31,6 +33,7 @@ type GeneralFormValues = {
   model: string
   apiBase: string
   apiKey: string
+  theme: Settings['theme']
 }
 
 const DEFAULT_GENERAL_VALUES: GeneralFormValues = {
@@ -38,6 +41,7 @@ const DEFAULT_GENERAL_VALUES: GeneralFormValues = {
   model: 'qwen3.6-35b-a3b@4bit',
   apiBase: 'http://localhost:1234/v1',
   apiKey: '',
+  theme: 'system',
 }
 
 type McpFormValues = {
@@ -48,23 +52,25 @@ type McpFormValues = {
 
 const OPENAI_MODELS = Object.keys(KNOWN_OPENAI_CONTEXT_WINDOWS)
 
-function getGeneralFormValues(connection?: Settings['connection']): GeneralFormValues {
-  if (!connection) return DEFAULT_GENERAL_VALUES
+function getGeneralFormValues(settings?: Settings): GeneralFormValues {
+  if (!settings) return DEFAULT_GENERAL_VALUES
 
-  if (connection.provider === 'openai') {
+  if (settings.connection.provider === 'openai') {
     return {
       provider: 'openai',
-      model: connection.model,
+      model: settings.connection.model,
       apiBase: DEFAULT_GENERAL_VALUES.apiBase,
-      apiKey: connection.apiKey,
+      apiKey: settings.connection.apiKey,
+      theme: settings.theme,
     }
   }
 
   return {
     provider: 'lm-studio',
-    model: connection.model,
-    apiBase: connection.apiBase,
+    model: settings.connection.model,
+    apiBase: settings.connection.apiBase,
     apiKey: '',
+    theme: settings.theme,
   }
 }
 
@@ -145,14 +151,13 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
     setValue,
     watch,
   } = useForm<GeneralFormValues>({
-    defaultValues: getGeneralFormValues(data?.connection),
+    defaultValues: getGeneralFormValues(data ?? undefined),
   })
 
   const provider = watch('provider')
   const model = watch('model')
   const apiBase = watch('apiBase')
-
-  console.log(data)
+  const theme = watch('theme')
 
   useEffect(() => {
     if (provider !== 'openai') {
@@ -192,9 +197,17 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
     window
       .zaga!.updateSettings({
         connection,
+        theme: values.theme,
         mcpServers: data.mcpServers,
       })
-      .then(() => {
+      .then(async () => {
+        const savedSettings = await window.zaga!.getSettings()
+        void applyTheme(savedSettings.theme)
+        window.dispatchEvent(
+          new CustomEvent(THEME_PREFERENCE_CHANGED_EVENT, {
+            detail: { theme: savedSettings.theme },
+          })
+        )
         reload()
       })
       .finally(() => setSaving(false))
@@ -202,6 +215,7 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
 
   return (
     <form className="flex flex-col gap-4 py-2" onSubmit={onSubmit}>
+      <input type="hidden" {...register('theme')} />
       <div className="flex flex-col gap-2">
         <Label htmlFor="settings-provider">Provider</Label>
         <Controller
@@ -271,12 +285,57 @@ function GeneralTab({ data, reload }: ReturnType<typeof useSettings>) {
           {errors.apiKey && <p className="text-sm text-destructive">{errors.apiKey.message}</p>}
         </div>
       )}
+      <fieldset className="flex justify-between gap-3 rounded-md border p-3">
+        <div className="flex flex-col gap-1">
+          <Label>Theme</Label>
+          <p className="text-sm text-muted-foreground">Choose light, dark, or follow system.</p>
+        </div>
+        <ButtonGroup>
+          <ThemeButton
+            active={theme === 'system'}
+            label="System"
+            onClick={() => setValue('theme', 'system', { shouldDirty: true })}
+          />
+          <ThemeButton
+            active={theme === 'light'}
+            label="Light"
+            onClick={() => setValue('theme', 'light', { shouldDirty: true })}
+          />
+          <ThemeButton
+            active={theme === 'dark'}
+            label="Dark"
+            onClick={() => setValue('theme', 'dark', { shouldDirty: true })}
+          />
+        </ButtonGroup>
+      </fieldset>
       <div className="flex justify-end">
         <Button type="submit" disabled={!isDirty || saving}>
           Save
         </Button>
       </div>
     </form>
+  )
+}
+
+function ThemeButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      type="button"
+      variant={active ? 'default' : 'secondary'}
+      onClick={onClick}
+      role="radio"
+      aria-checked={active}
+    >
+      {label}
+    </Button>
   )
 }
 

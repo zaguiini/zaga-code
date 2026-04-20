@@ -13,6 +13,8 @@ declare global {
       pickDirectory: () => Promise<string | null>
       getSettings: () => Promise<Settings>
       updateSettings: (data: Settings) => Promise<{ ok: true }>
+      getSystemTheme?: () => Promise<'light' | 'dark'>
+      onSystemThemeChange?: (listener: (theme: 'light' | 'dark') => void) => () => void
     }
   }
 }

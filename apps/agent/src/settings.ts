@@ -42,6 +42,7 @@ export const settingsSchema = z.object({
     model: 'qwen3.6-35b-a3b@4bit',
     apiBase: 'http://localhost:1234/v1',
   }),
+  theme: z.enum(['light', 'dark', 'system']).default('system'),
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
 })
 
