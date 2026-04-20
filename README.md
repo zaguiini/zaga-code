@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] Group related reasoning and tool calls to avoid cluttering on main thread
 - [ ] Dark mode
 - [ ] Focus on desktop mode
 - [ ] Tool call correction - some models, especially Qwen, output tool calls within reasoning blocks

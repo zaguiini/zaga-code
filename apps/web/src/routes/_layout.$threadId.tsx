@@ -81,7 +81,7 @@ function RouteComponent() {
           onScroll={updateStickToBottom}
           className="w-full flex-1 min-h-0 overflow-y-auto"
         >
-          <MessageList messages={items} />
+          <MessageList messages={items} groupOperationMessages />
         </div>
         <form
           onSubmit={async e => {

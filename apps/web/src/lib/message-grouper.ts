@@ -179,6 +179,7 @@ export const messageGrouper = (
                 toolInvocation: {
                   toolName: toolCall.name,
                   state: 'result',
+                  toolCallId: toolCall.id,
                   args: toolCall.args,
                   result: toolResult.content,
                   metadata: toolResult.metadata,
@@ -196,6 +197,7 @@ export const messageGrouper = (
                 toolInvocation: {
                   toolName: toolCall.name,
                   state: 'streaming',
+                  toolCallId: toolCall.id,
                   args: toolCall.args,
                   data: progress.input,
                 },
@@ -206,6 +208,7 @@ export const messageGrouper = (
                 toolInvocation: {
                   toolName: toolCall.name,
                   state: 'call',
+                  toolCallId: toolCall.id,
                   args: toolCall.args,
                 },
               })
