@@ -12,6 +12,7 @@ import { grepTool } from '@/tools/grep'
 import { fileEditTool } from '@/tools/file-edit'
 import { fileWriteTool } from '@/tools/file-write'
 import { shellTool } from '@/tools/shell'
+import { webFetchTool } from '@/tools/web-fetch'
 
 /** All built-in tools available for subagent `tools` filtering. */
 export const BUILT_IN_TOOLS: Array<StructuredTool> = [
@@ -21,6 +22,7 @@ export const BUILT_IN_TOOLS: Array<StructuredTool> = [
   fileEditTool,
   fileWriteTool,
   shellTool,
+  webFetchTool,
 ]
 
 const agentStateSchema = z.object({ projectPath: z.string() })

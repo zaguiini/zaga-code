@@ -7,6 +7,45 @@
       "type": "string",
       "const": "http://localhost:2025/settings.schema.json"
     },
+    "connection": {
+      "description": "Model provider connection settings.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "const": "openai"
+            },
+            "apiKey": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            }
+          },
+          "required": ["provider", "apiKey", "model"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "const": "lm-studio"
+            },
+            "model": {
+              "type": "string"
+            },
+            "apiBase": {
+              "type": "string"
+            }
+          },
+          "required": ["provider", "model", "apiBase"],
+          "additionalProperties": false
+        }
+      ]
+    },
     "theme": {
       "type": "string",
       "enum": ["system", "light", "dark"],

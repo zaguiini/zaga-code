@@ -15,6 +15,7 @@ const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users w
 - Always execute tools instead of asking for user confirmation. If a tool fails to execute, explain the error and try again with a fix.
 - For searching files by NAME or PATH (e.g., "read auth.ts", "describe package.json", etc.), use the file_search tool to find the file.
 - For searching file CONTENTS, use the grep tool with a regex pattern. Use the glob parameter to limit to specific file types.
+- If the user message includes URL(s), use the web_fetch tool to retrieve the page content when it is relevant to answering the request.
 - Prefer file_edit over file_write for modifying existing files.
 - Use file_write only for creating new files or complete rewrites.
 - When using file_edit, include 2-3 lines of surrounding context in old_string to ensure uniqueness.
@@ -26,16 +27,36 @@ const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users w
 **Reasoning and Tool Usage:**
 - Think step-by-step about what information you need before making tool calls
 - Use tools strategically - gather necessary context first, then take action
+- For time-sensitive or externally changing facts (e.g., sports fixtures, stock/crypto prices, weather, news, releases, schedules, leadership roles, "latest" queries), you MUST verify with tools and never answer from memory.
+- When a question depends on the current date/time, treat the provided "Today is ..." line as authoritative context and use it to compute relative dates like "tomorrow" before answering. Bonus points if you can pass it to the tool you're going to call.
 - When you have enough information to answer the user's question, provide a clear and helpful response
 - If a tool call fails, reason about why it failed and try a different approach
 `
 
-const AGENTS_MD_PROMPT = `
-${BASE_SYSTEM_PROMPT}\n\n
-Use the following project-specific instructions to guide your actions:
+function formatTodayLine(
+  date: Date = new Date(),
+  timeZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone
+): string {
+  console.log(timeZone)
+  const resolvedTimeZone = timeZone || 'UTC'
 
-{{agentsMd}}
-`
+  const formattedDate = new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: resolvedTimeZone,
+    year: 'numeric',
+  }).format(date)
+
+  return `Today is ${formattedDate} (${resolvedTimeZone}). Treat this as authoritative. For time-sensitive questions, verify with tools and use concrete dates in your answer.`
+}
+
+function buildBaseSystemPrompt(): string {
+  return `${formatTodayLine()}\n\n${BASE_SYSTEM_PROMPT}`
+}
+
+function buildAgentsMdPrompt(baseSystemPrompt: string, agentsMd: string): string {
+  return `${baseSystemPrompt}\n\nUse the following project-specific instructions to guide your actions:\n\n${agentsMd}`
+}
 
 function buildAgentsSection(configHash: string): string {
   const tools = toolRegistry.get(configHash)
@@ -60,12 +81,13 @@ function buildMemorySection(
 
 export async function buildSystemPrompt(projectPath: string, configHash: string) {
   const agentsSection = buildAgentsSection(configHash)
-  const promptChunks: Array<string> = [BASE_SYSTEM_PROMPT]
+  const baseSystemPrompt = buildBaseSystemPrompt()
+  const promptChunks: Array<string> = [baseSystemPrompt]
 
   if (projectPath) {
     try {
       const agentsMd = await readFile(join(projectPath, 'AGENTS.md'), 'utf-8')
-      promptChunks[0] = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
+      promptChunks[0] = buildAgentsMdPrompt(baseSystemPrompt, agentsMd)
     } catch {
       // AGENTS.md not found, fall through to base prompt
     }
