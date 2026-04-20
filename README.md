@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] @ file references
 - [ ] Long-term memory (project and user level)
 - [ ] Skills (compact, help, setup, BYOS) and slash execution
 - [ ] Planning mode

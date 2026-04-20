@@ -16,6 +16,7 @@ export const Route = createFileRoute('/_layout/$threadId')({
 function RouteComponent() {
   const { threadId } = Route.useParams()
   const threadQuery = trpc.threads.get.useQuery({ threadId })
+  const threadFilesQuery = trpc.threads.files.useQuery({ threadId })
   const stream = useAgentStream(threadId, threadQuery.data)
   const [input, setInput] = useState('')
   const [files, setFiles] = useState<Array<File> | null>(null)
@@ -117,6 +118,8 @@ function RouteComponent() {
             <MessageInput
               autoFocus
               allowAttachments
+              filePaths={threadFilesQuery.data?.files ?? []}
+              folderPaths={threadFilesQuery.data?.folders ?? []}
               files={files}
               setFiles={setFiles}
               isGenerating={stream.isLoading || isSubmitting}

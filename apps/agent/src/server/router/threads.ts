@@ -5,6 +5,7 @@ import { procedure, router } from '../trpc'
 import type { AgentState } from '@/graphs/agent'
 import { db } from '@/db'
 import { toMessageUnion } from '@/utils/messages'
+import { listProjectFiles } from '@/utils/list-project-files'
 
 type ThreadRow = {
   thread_id: string
@@ -18,6 +19,15 @@ type MessageContentPart = {
     url?: string
   }
 }
+
+const threadFilesInputSchema = z
+  .object({
+    threadId: z.string().optional(),
+    projectPath: z.string().optional(),
+  })
+  .refine(input => Number(Boolean(input.threadId)) + Number(Boolean(input.projectPath)) === 1, {
+    message: 'Provide exactly one of threadId or projectPath.',
+  })
 
 function getMessageContentParts(content: unknown): Array<MessageContentPart> {
   return Array.isArray(content) ? content : []
@@ -39,6 +49,21 @@ function getFirstMessageSummary(message: HumanMessage | undefined): string | und
   }
 
   return undefined
+}
+
+function buildFolderList(files: Array<string>): Array<string> {
+  const folders = new Set<string>()
+
+  for (const file of files) {
+    const parts = file.split('/')
+    if (parts.length <= 1) continue
+
+    for (let index = 1; index < parts.length; index++) {
+      folders.add(parts.slice(0, index).join('/'))
+    }
+  }
+
+  return Array.from(folders).sort((a, b) => a.localeCompare(b))
 }
 
 export const threadsRouter = router({
@@ -109,5 +134,28 @@ export const threadsRouter = router({
       ...values,
       messages,
     }
+  }),
+
+  files: procedure.input(threadFilesInputSchema).query(async ({ input, ctx }) => {
+    const projectPath = input.projectPath
+      ? input.projectPath
+      : await (async () => {
+          const row = db
+            .prepare('SELECT thread_id FROM threads WHERE thread_id = ?')
+            .get(input.threadId) as ThreadRow | undefined
+          if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' })
+
+          const state = await ctx.graph.getState({
+            configurable: { thread_id: input.threadId! },
+          })
+          const values: AgentState = state.values
+          return values.projectPath
+        })()
+
+    if (!projectPath) return { files: [], folders: [] }
+
+    const files = await listProjectFiles(projectPath)
+    const folders = buildFolderList(files)
+    return { files, folders }
   }),
 })

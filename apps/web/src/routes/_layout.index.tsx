@@ -39,6 +39,11 @@ function NewChat() {
   const [prompt, setPrompt] = useState('')
   const [files, setFiles] = useState<Array<File> | null>(null)
   const utils = trpc.useUtils()
+  const trimmedProjectPath = projectPath.trim()
+  const threadFilesQuery = trpc.threads.files.useQuery(
+    { projectPath: trimmedProjectPath },
+    { enabled: trimmedProjectPath.length > 0 }
+  )
 
   const { zaga } = window
 
@@ -50,12 +55,12 @@ function NewChat() {
           e.preventDefault()
           const trimmedPrompt = prompt.trim()
           const attachedFiles = files ?? []
-          if (!projectPath.trim() || (!trimmedPrompt && attachedFiles.length === 0)) return
+          if (!trimmedProjectPath || (!trimmedPrompt && attachedFiles.length === 0)) return
 
-          localStorage.setItem(STORAGE_KEY, projectPath)
+          localStorage.setItem(STORAGE_KEY, trimmedProjectPath)
 
           const images = await Promise.all(attachedFiles.map(fileToDataUrl))
-          const { threadId } = await createThread.mutateAsync({ projectPath })
+          const { threadId } = await createThread.mutateAsync({ projectPath: trimmedProjectPath })
           await startRun.mutateAsync({
             threadId,
             input: { text: trimmedPrompt, images },
@@ -99,6 +104,8 @@ function NewChat() {
         </div>
         <MessageInput
           allowAttachments
+          filePaths={threadFilesQuery.data?.files ?? []}
+          folderPaths={threadFilesQuery.data?.folders ?? []}
           files={files}
           setFiles={setFiles}
           placeholder="Ask Zaga Code"

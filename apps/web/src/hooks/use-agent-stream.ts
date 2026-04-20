@@ -63,12 +63,14 @@ export function useAgentStream(
         setIsStarting(false)
         setPendingRunId(null)
         void utils.threads.get.invalidate({ threadId })
+        void utils.threads.files.invalidate({ threadId })
         void utils.runs.get.invalidate({ threadId })
       },
       onError() {
         setIsStarting(false)
         setPendingRunId(null)
         void utils.threads.get.invalidate({ threadId })
+        void utils.threads.files.invalidate({ threadId })
         void utils.runs.get.invalidate({ threadId })
       },
     }

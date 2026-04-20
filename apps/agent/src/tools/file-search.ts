@@ -1,12 +1,11 @@
-import path from 'node:path'
 import { z } from 'zod'
-import { glob } from 'glob'
 import Fuse from 'fuse.js'
 import { tool } from '@langchain/core/tools'
 import { ToolMessage } from '@langchain/core/messages/tool'
 import { getCurrentTaskInput } from '@langchain/langgraph'
 import type { ToolRunnableConfig } from '@langchain/core/tools'
 import type { AgentState } from '@/graphs/agent'
+import { listProjectFiles } from '@/utils/list-project-files'
 
 const fileSearchSchema = z.object({
   query: z
@@ -38,17 +37,13 @@ export const fileSearchTool = tool(
 
       const { projectPath } = getCurrentTaskInput<AgentState>()
 
-      const filePaths = await glob('**/*', {
-        cwd: projectPath,
-        nodir: true,
-        ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**', '.next/**'],
-      })
+      const filePaths = await listProjectFiles(projectPath)
 
       if (filePaths.length === 0) {
         return 'No files found in project directory.'
       }
 
-      const files = filePaths.map(f => ({ file: path.basename(f), filePath: f }))
+      const files = filePaths.map(f => ({ file: f.split('/').pop() ?? f, filePath: f }))
 
       const fuse = new Fuse(files, {
         keys: ['file', 'filePath'],
