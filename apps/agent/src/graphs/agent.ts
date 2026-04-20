@@ -1,10 +1,11 @@
-import { Annotation, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
+import { Annotation, END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph'
 import { toolsCondition } from '@langchain/langgraph/prebuilt'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import { executorNode } from '@/nodes/executor'
 import { maybeCompactNode } from '@/nodes/maybe-compact'
 import { loadConfigNode } from '@/nodes/load-config'
 import { dynamicToolNode } from '@/nodes/dynamic-tool-node'
+import { memoryCommandNode } from '@/nodes/memory-command'
 
 export const agentStateSchema = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -26,20 +27,29 @@ export const agentStateSchema = Annotation.Root({
     reducer: (_, next) => next,
     default: () => '',
   }),
+  memoryCommandHandled: Annotation<boolean>({
+    reducer: (_, next) => next,
+    default: () => false,
+  }),
 })
 
 export type AgentState = typeof agentStateSchema.State
 
 function buildAgentGraph() {
+  const routeAfterMemoryCommand = (state: AgentState) =>
+    state.memoryCommandHandled ? END : 'executor'
+
   return new StateGraph(agentStateSchema)
     .addNode('maybe-compact', maybeCompactNode)
     .addNode('load-config', loadConfigNode)
+    .addNode('memory-command', memoryCommandNode)
     .addNode('executor', executorNode)
     .addNode('tools', dynamicToolNode)
 
     .addEdge(START, 'maybe-compact')
     .addEdge('maybe-compact', 'load-config')
-    .addEdge('load-config', 'executor')
+    .addEdge('load-config', 'memory-command')
+    .addConditionalEdges('memory-command', routeAfterMemoryCommand)
     .addConditionalEdges('executor', toolsCondition)
     .addEdge('tools', 'executor')
 }

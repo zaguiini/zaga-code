@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SystemMessage } from '@langchain/core/messages'
 import { toolRegistry } from '@/config/registry'
+import { loadIndexedMemory } from '@/utils/memory'
 
 const BASE_SYSTEM_PROMPT = `You are an AI developer assistant that helps users with coding tasks.
 
@@ -47,18 +48,46 @@ function buildAgentsSection(configHash: string): string {
   return `\n**Specialist Agents:**\nUse these agents instead of doing the work yourself when they match the task:\n${lines.join('\n')}\n`
 }
 
+function buildMemorySection(
+  title: string,
+  notes: Array<{ fileName: string; content: string }>
+): string {
+  if (notes.length === 0) return ''
+
+  const chunks = notes.map(note => `\n### ${note.fileName}\n${note.content}`)
+  return `\n\n## ${title}\n${chunks.join('\n')}\n`
+}
+
 export async function buildSystemPrompt(projectPath: string, configHash: string) {
   const agentsSection = buildAgentsSection(configHash)
+  const promptChunks: Array<string> = [BASE_SYSTEM_PROMPT]
 
   if (projectPath) {
     try {
       const agentsMd = await readFile(join(projectPath, 'AGENTS.md'), 'utf-8')
-      const base = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd) + agentsSection
-      return new SystemMessage(base)
+      promptChunks[0] = AGENTS_MD_PROMPT.replace('{{agentsMd}}', agentsMd)
     } catch {
       // AGENTS.md not found, fall through to base prompt
     }
   }
 
-  return new SystemMessage(BASE_SYSTEM_PROMPT + agentsSection)
+  try {
+    const globalMemory = await loadIndexedMemory('global')
+    promptChunks.push(buildMemorySection('Global Memory', globalMemory))
+  } catch {
+    // Fail soft: omit broken memory scope.
+  }
+
+  if (projectPath) {
+    try {
+      const projectMemory = await loadIndexedMemory('project', projectPath)
+      promptChunks.push(buildMemorySection('Project Memory', projectMemory))
+    } catch {
+      // Fail soft: omit broken memory scope.
+    }
+  }
+
+  promptChunks.push(agentsSection)
+
+  return new SystemMessage(promptChunks.filter(Boolean).join(''))
 }

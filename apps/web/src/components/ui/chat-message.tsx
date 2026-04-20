@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cva } from 'class-variance-authority'
 import { motion } from 'framer-motion'
-import { Bot, ChevronRight, Code2, Loader2 } from 'lucide-react'
+import { Bot, ChevronRight, Code2, Loader2, Save } from 'lucide-react'
 import { MessageList } from './message-list'
 import type { VariantProps } from 'class-variance-authority'
 
@@ -103,7 +103,18 @@ interface TextPart {
   text: string
 }
 
-type MessagePart = TextPart | ReasoningPart | ToolInvocationPart
+interface CommandResultPart {
+  type: 'command-result'
+  commandResult: {
+    kind: string
+    title: string
+    contentMarkdown: string
+    icon?: string
+    scope?: string
+  }
+}
+
+type MessagePart = TextPart | ReasoningPart | ToolInvocationPart | CommandResultPart
 
 export interface Message {
   id: string
@@ -159,7 +170,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         ) : null}
 
         <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-          <MarkdownRenderer>{content}</MarkdownRenderer>
+          <p className="whitespace-pre-wrap">{content}</p>
         </div>
 
         {showTimeStamp && createdAt ? (
@@ -207,6 +218,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       )
     } else if (part.type === 'reasoning') {
       return <ReasoningBlock key="reasoning" part={part} />
+    } else if (part.type === 'command-result') {
+      return <CommandResultBlock key={`command-${index}`} part={part} />
     } else {
       return <ToolCallBlock key={`tool-${index}`} toolInvocations={[part.toolInvocation]} />
     }
@@ -312,6 +325,16 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   const duration = part.done && part.durationMs ? ` for ${formatDuration(part.durationMs)}` : ''
 
   return <CollapsibleBlock title={`${label}${duration}`}>{part.reasoning}</CollapsibleBlock>
+}
+
+function CommandResultBlock({ part }: { part: CommandResultPart }) {
+  const icon = part.commandResult.icon === 'floppy' ? <Save className="size-4" /> : undefined
+
+  return (
+    <CollapsibleBlock title={part.commandResult.title} icon={icon}>
+      <MarkdownRenderer>{part.commandResult.contentMarkdown}</MarkdownRenderer>
+    </CollapsibleBlock>
+  )
 }
 
 function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {

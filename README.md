@@ -2,7 +2,6 @@
 
 ## TODO
 
-- [ ] Long-term memory (project and user level)
 - [ ] Skills (compact, help, setup, BYOS) and slash execution
 - [ ] Planning mode
 - [ ] Permissions (diff preview, approval modes)

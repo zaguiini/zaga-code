@@ -5,9 +5,11 @@ type ContentPart = {
   type: string
   name?: string
   text?: string
-  image_url?: {
-    url?: string
-  }
+  image_url?:
+    | string
+    | {
+        url?: string
+      }
 }
 
 function getContentParts(content: string | Array<ContentPart>): Array<ContentPart> {
@@ -18,7 +20,10 @@ function getImageAttachments(content: string | Array<ContentPart>) {
   return getContentParts(content)
     .filter(
       (part): part is ContentPart & { image_url: { url: string } } =>
-        part.type === 'image_url' && typeof part.image_url?.url === 'string'
+        part.type === 'image_url' &&
+        !!part.image_url &&
+        typeof part.image_url !== 'string' &&
+        typeof part.image_url.url === 'string'
     )
     .map(part => ({
       name: part.name,
@@ -34,6 +39,35 @@ function getAttachmentContentType(url: string): string | undefined {
 
 function getAttachmentFallbackLabel(attachmentCount: number): string {
   return attachmentCount === 1 ? 'Attached image' : 'Attached images'
+}
+
+type CommandResult = {
+  kind: string
+  title: string
+  contentMarkdown: string
+  icon?: string
+  scope?: string
+}
+
+function getCommandResult(additionalKwargs: unknown): CommandResult | undefined {
+  if (!additionalKwargs || typeof additionalKwargs !== 'object') return undefined
+
+  const candidate = additionalKwargs as Record<string, unknown>
+  if (
+    typeof candidate.kind !== 'string' ||
+    typeof candidate.title !== 'string' ||
+    typeof candidate.contentMarkdown !== 'string'
+  ) {
+    return undefined
+  }
+
+  return {
+    kind: candidate.kind,
+    title: candidate.title,
+    contentMarkdown: candidate.contentMarkdown,
+    ...(typeof candidate.icon === 'string' ? { icon: candidate.icon } : {}),
+    ...(typeof candidate.scope === 'string' ? { scope: candidate.scope } : {}),
+  }
 }
 
 export function extractText(content: string | Array<ContentPart>): string {
@@ -106,13 +140,29 @@ export const messageGrouper = (
         })
       }
 
+      const commandResult = getCommandResult(msg.additional_kwargs)
       const messageContent = extractText(msg.content)
-      if (messageContent) {
+
+      if (messageContent && !commandResult) {
         result.push({
           id,
           role: 'assistant',
           content: messageContent,
           parts: [{ type: 'text', text: messageContent }],
+        })
+      }
+
+      if (commandResult) {
+        result.push({
+          id: `${id}-command-result`,
+          role: 'assistant',
+          content: commandResult.title,
+          parts: [
+            {
+              type: 'command-result',
+              commandResult,
+            },
+          ],
         })
       }
 

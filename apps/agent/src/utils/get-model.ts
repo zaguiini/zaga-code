@@ -1,15 +1,20 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { parseSettings } from '@/settings'
 
-export const getModel = () => {
+type GetModelOptions = {
+  streaming?: boolean
+}
+
+export const getModel = (options: GetModelOptions = {}) => {
   const { connection } = parseSettings()
+  const streaming = options.streaming ?? true
 
   if (connection.provider === 'openai') {
     return new ChatOpenAI({
       model: connection.model,
       apiKey: connection.apiKey,
-      streaming: true,
-      streamUsage: true,
+      streaming,
+      streamUsage: streaming,
     })
   }
 
@@ -17,7 +22,7 @@ export const getModel = () => {
     model: connection.model,
     configuration: { baseURL: connection.apiBase },
     apiKey: 'local',
-    streaming: true,
-    streamUsage: true,
+    streaming,
+    streamUsage: streaming,
   })
 }
