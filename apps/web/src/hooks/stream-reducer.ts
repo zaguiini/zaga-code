@@ -248,7 +248,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
 
     case 'on_tool_start': {
       const toolCallId = event.metadata.tool_call_id ?? event.run_id
-      const isAgent = event.name.startsWith('agent-')
+      const isAgent = event.name.startsWith('agent_')
       const checkpointNs = event.metadata.checkpoint_ns
 
       // Subagent inner tool — don't track

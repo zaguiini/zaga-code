@@ -37,7 +37,6 @@ function formatTodayLine(
   date: Date = new Date(),
   timeZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone
 ): string {
-  console.log(timeZone)
   const resolvedTimeZone = timeZone || 'UTC'
 
   const formattedDate = new Intl.DateTimeFormat('en-US', {
@@ -62,7 +61,7 @@ function buildAgentsSection(configHash: string): string {
   const tools = toolRegistry.get(configHash)
   if (!tools) return ''
 
-  const agentTools = tools.filter(t => t.name.startsWith('agent-'))
+  const agentTools = tools.filter(t => t.name.startsWith('agent_'))
   if (agentTools.length === 0) return ''
 
   const lines = agentTools.map(t => `- **${t.name}**: ${t.description}`)

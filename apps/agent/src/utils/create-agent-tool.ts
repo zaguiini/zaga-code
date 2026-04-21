@@ -77,7 +77,7 @@ export function createAgentTool(definition: AgentDefinition, model: BaseChatMode
       })
     },
     {
-      name: `agent-${definition.name}`,
+      name: `agent_${definition.name}`,
       description: definition.description,
       schema: z.object({
         prompt: z

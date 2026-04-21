@@ -345,7 +345,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
   return (
     <div className="flex flex-col items-start gap-2">
       {toolInvocations.map((invocation, index) => {
-        const isAgent = invocation.toolName.startsWith('agent-')
+        const isAgent = invocation.toolName.startsWith('agent_')
 
         const args = !isAgent && (
           <pre className="mb-2 whitespace-pre-wrap">
@@ -363,7 +363,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   <span>
                     {isAgent ? 'Running' : 'Calling'}{' '}
                     <span className="font-mono text-xs">
-                      {invocation.toolName.replace('agent-', '')}
+                      {invocation.toolName.replace('agent_', '')}
                     </span>
                   </span>
                 }
@@ -405,7 +405,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                     <span>
                       Running{' '}
                       <span className="font-mono text-xs">
-                        {invocation.toolName.replace('agent-', '')}
+                        {invocation.toolName.replace('agent_', '')}
                       </span>
                     </span>
                   }
@@ -456,7 +456,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                     <span>
                       Result from{' '}
                       <span className="font-mono text-xs">
-                        {invocation.toolName.replace('agent-', '')}
+                        {invocation.toolName.replace('agent_', '')}
                       </span>
                     </span>
                   }
@@ -482,7 +482,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
                   <span>
                     Result from{' '}
                     <span className="font-mono text-xs">
-                      {invocation.toolName.replace('agent-', '')}
+                      {invocation.toolName.replace('agent_', '')}
                     </span>
                   </span>
                 }
