@@ -15,6 +15,12 @@
 - [ ] CI on commit/push (lint, build, tests)
 - [ ] Add evals
 
+## Known issues
+
+Qwen models running on LM Studio often introduce tool calls within reasoning blocks, which breaks the parser and stops execution. I've tried fixing that within the harness through XML parsing but it doesn't seem to work. Switched to `zai-org/glm-4.7-flash` as the default model for this reason. Will revert back once it's fixed in LM Studio.
+
+## Recipes
+
 ### Web Search
 
 - Tavily MCP

@@ -39,7 +39,7 @@ const connection = z.discriminatedUnion('provider', [
 export const settingsSchema = z.object({
   connection: connection.default({
     provider: 'lm-studio',
-    model: 'qwen3.6-35b-a3b@4bit',
+    model: 'zai-org/glm-4.7-flash',
     apiBase: 'http://localhost:1234/v1',
   }),
   theme: z.enum(['light', 'dark', 'system']).default('system'),
