@@ -5,6 +5,7 @@ import { ToolMessage } from '@langchain/core/messages/tool'
 import { getCurrentTaskInput } from '@langchain/langgraph'
 import type { ToolRunnableConfig } from '@langchain/core/tools'
 import type { AgentState } from '@/graphs/agent'
+import type { ToolContext } from '@/runtime/tool-context'
 import { listProjectFiles } from '@/utils/list-project-files'
 
 const fileSearchSchema = z.object({
@@ -22,52 +23,62 @@ const fileSearchSchema = z.object({
 
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
 
+type FileSearchInput = z.infer<typeof fileSearchSchema>
+
+export async function fileSearchHandler(input: FileSearchInput, ctx: ToolContext) {
+  const { query, limit } = input
+  if (query.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
+    return `Search blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+  }
+
+  const filePaths = await listProjectFiles(ctx.projectPath)
+
+  if (filePaths.length === 0) {
+    return 'No files found in project directory.'
+  }
+
+  const files = filePaths.map(f => ({ file: f.split('/').pop() ?? f, filePath: f }))
+
+  const fuse = new Fuse(files, {
+    keys: ['file', 'filePath'],
+    threshold: 0.5,
+    includeScore: true,
+    minMatchCharLength: 1,
+  })
+
+  const results = fuse.search(query, { limit })
+
+  if (results.length === 0) {
+    return `No files found matching "${query}". Try a different search term.`
+  }
+
+  const formattedResults = results.map((result, index) => {
+    const { filePath } = result.item
+    const score = result.score ? ` (score: ${result.score.toFixed(3)})` : ''
+    return `${index + 1}. ${filePath}${score}`
+  })
+
+  return new ToolMessage({
+    content: `Found ${results.length} file(s) matching "${query}":\n\n${formattedResults.join('\n')}\n\nUse file_read to read the contents of any file.`,
+    tool_call_id: ctx.toolCallId,
+    metadata: { format: 'markdown' },
+  })
+}
+
 export const fileSearchTool = tool(
-  async (input: z.infer<typeof fileSearchSchema>, config: ToolRunnableConfig) => {
+  async (input: FileSearchInput, config: ToolRunnableConfig) => {
     const toolCallId = config.toolCall?.id
     if (!toolCallId) {
       throw new Error('file_search tool invoked without a tool_call_id in config')
     }
 
     try {
-      const { query, limit } = input
-      if (query.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
-        return `Search blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
-      }
-
       const { projectPath } = getCurrentTaskInput<AgentState>()
-
-      const filePaths = await listProjectFiles(projectPath)
-
-      if (filePaths.length === 0) {
-        return 'No files found in project directory.'
-      }
-
-      const files = filePaths.map(f => ({ file: f.split('/').pop() ?? f, filePath: f }))
-
-      const fuse = new Fuse(files, {
-        keys: ['file', 'filePath'],
-        threshold: 0.5,
-        includeScore: true,
-        minMatchCharLength: 1,
-      })
-
-      const results = fuse.search(query, { limit })
-
-      if (results.length === 0) {
-        return `No files found matching "${query}". Try a different search term.`
-      }
-
-      const formattedResults = results.map((result, index) => {
-        const { filePath } = result.item
-        const score = result.score ? ` (score: ${result.score.toFixed(3)})` : ''
-        return `${index + 1}. ${filePath}${score}`
-      })
-
-      return new ToolMessage({
-        content: `Found ${results.length} file(s) matching "${query}":\n\n${formattedResults.join('\n')}\n\nUse file_read to read the contents of any file.`,
-        tool_call_id: toolCallId,
-        metadata: { format: 'markdown' },
+      return await fileSearchHandler(input, {
+        threadId: '',
+        projectPath,
+        toolCallId,
+        runScope: { runId: '', depth: 0 },
       })
     } catch (error) {
       if (error instanceof Error) {

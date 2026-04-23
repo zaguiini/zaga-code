@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { tool } from 'langchain'
 import { getCurrentTaskInput } from '@langchain/langgraph'
 import type { AgentState } from '@/graphs/agent'
+import type { ToolContext } from '@/runtime/tool-context'
 import { validatePath } from '@/utils/validate-path'
 
 const fileWriteSchema = z.object({
@@ -13,6 +14,18 @@ const fileWriteSchema = z.object({
   content: z.string().describe('Content to write to the file'),
 })
 
+type FileWriteInput = z.infer<typeof fileWriteSchema>
+
+export async function fileWriteHandler(input: FileWriteInput, ctx: ToolContext) {
+  const validatedPath = validatePath(input.path, ctx.projectPath)
+  const directory = dirname(validatedPath)
+
+  await mkdir(directory, { recursive: true })
+  await writeFile(validatedPath, input.content, 'utf-8')
+
+  return `Successfully wrote file: ${input.path}`
+}
+
 /**
  * Creates a LangGraph tool for writing/creating files with path validation.
  * Automatically creates parent directories if they don't exist.
@@ -21,19 +34,15 @@ const fileWriteSchema = z.object({
  * @returns A LangGraph tool that writes files within the project directory
  */
 export const fileWriteTool = tool(
-  async (input: z.infer<typeof fileWriteSchema>) => {
+  async (input: FileWriteInput) => {
     try {
       const { projectPath } = getCurrentTaskInput<AgentState>()
-      const validatedPath = validatePath(input.path, projectPath)
-      const directory = dirname(validatedPath)
-
-      // Create parent directories if they don't exist
-      await mkdir(directory, { recursive: true })
-
-      // Write the file
-      await writeFile(validatedPath, input.content, 'utf-8')
-
-      return `Successfully wrote file: ${input.path}`
+      return await fileWriteHandler(input, {
+        threadId: '',
+        projectPath,
+        toolCallId: '',
+        runScope: { runId: '', depth: 0 },
+      })
     } catch (error) {
       if (error instanceof Error) {
         return `Error writing file: ${error.message}`
