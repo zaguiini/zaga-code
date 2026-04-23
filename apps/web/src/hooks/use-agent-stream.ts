@@ -30,8 +30,8 @@ export function useAgentStream(
   const [isStarting, setIsStarting] = useState(false)
   const [pendingRunId, setPendingRunId] = useState<string | null>(null)
   const [state, dispatch] = useReducer(streamReducerV2, initialStreamStateV2)
-  const cancelMutation = trpc.runs.cancelV2.useMutation()
-  const startMutation = trpc.runs.startV2.useMutation()
+  const cancelMutation = trpc.runs.cancel.useMutation()
+  const startMutation = trpc.runs.start.useMutation()
   const cancelMutate = cancelMutation.mutate
   const prevThreadIdRef = useRef(threadId)
 
@@ -48,7 +48,7 @@ export function useAgentStream(
   const activeRunId = runsQuery.data?.activeRunId ?? null
   const subscribedRunId = pendingRunId ?? activeRunId
 
-  const stream = trpc.runs.streamV2.useSubscription(
+  const stream = trpc.runs.stream.useSubscription(
     { threadId, ...(subscribedRunId ? { runId: subscribedRunId } : {}) },
     {
       enabled: !!subscribedRunId,

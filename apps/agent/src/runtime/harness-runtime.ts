@@ -3,9 +3,9 @@ import { createOpenAICompatibleClient } from './model/openai-compatible'
 import { defaultRuntimeState } from './state'
 import { isAsyncGenerator } from './tool-definition'
 import { builtInTools, getToolByName, toOpenAIToolDefinitions } from './tools'
-import type { AgentRuntime, RunInput, RunOptions, RunResult } from './agent-runtime'
-import type { RunScope, SerializedStreamEventV2, ToolCall } from './events'
 import type { RuntimeMessage, RuntimeState } from './state'
+import type { RunScope, SerializedStreamEvent, ToolCall } from './events'
+import type { AgentRuntime, RunInput, RunOptions, RunResult } from './agent-runtime'
 import { parseSettings } from '@/settings'
 
 function toModelMessages(messages: Array<RuntimeMessage>): Array<Record<string, unknown>> {
@@ -13,32 +13,25 @@ function toModelMessages(messages: Array<RuntimeMessage>): Array<Record<string, 
 
   for (const message of messages) {
     if (message.type === 'human') {
-      const content =
-        typeof message.content === 'string'
-          ? message.content
-          : message.content
-              .map(part => {
-                if (part.type === 'text' && typeof part.text === 'string') {
-                  return { type: 'text', text: part.text }
-                }
+      if (typeof message.content === 'string') {
+        result.push({ role: 'user', content: message.content })
+        continue
+      }
 
-                if (
-                  part.type === 'image_url' &&
-                  typeof part.image_url === 'object' &&
-                  part.image_url !== null &&
-                  typeof (part.image_url as { url?: unknown }).url === 'string'
-                ) {
-                  return {
-                    type: 'image_url',
-                    image_url: { url: (part.image_url as { url: string }).url },
-                  }
-                }
+      const parts: Array<Record<string, unknown>> = []
+      for (const part of message.content) {
+        if (part.type === 'text') {
+          parts.push({ type: 'text', text: part.text })
+          continue
+        }
 
-                return null
-              })
-              .filter(Boolean)
+        parts.push({
+          type: 'image_url',
+          image_url: { url: part.image_url.url },
+        })
+      }
 
-      result.push({ role: 'user', content: content.length > 0 ? content : '' })
+      result.push({ role: 'user', content: parts })
       continue
     }
 
@@ -54,27 +47,17 @@ function toModelMessages(messages: Array<RuntimeMessage>): Array<Record<string, 
 
       result.push({
         role: 'assistant',
-        content:
-          typeof message.content === 'string'
-            ? message.content
-            : message.content
-                .map(part =>
-                  part.type === 'text' && typeof part.text === 'string' ? part.text : ''
-                )
-                .join(''),
+        content: message.content,
         ...(toolCalls && toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
       })
       continue
     }
 
-    if (message.type === 'tool' && message.tool_call_id) {
-      result.push({
-        role: 'tool',
-        tool_call_id: message.tool_call_id,
-        content:
-          typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
-      })
-    }
+    result.push({
+      role: 'tool',
+      tool_call_id: message.tool_call_id,
+      content: message.content,
+    })
   }
 
   return result
@@ -109,8 +92,22 @@ function isAbortError(error: unknown): boolean {
   return error.name === 'AbortError' || error.message.toLowerCase().includes('abort')
 }
 
+function extractReasoningDelta(delta: unknown): string | undefined {
+  if (!delta || typeof delta !== 'object') return undefined
+  const record = delta as Record<string, unknown>
+
+  const candidates = [record.reasoning, record.reasoning_content, record.reasoningContent]
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.length > 0) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
+
 export class HarnessRuntime implements AgentRuntime<
-  SerializedStreamEventV2,
+  SerializedStreamEvent,
   RunResult<RuntimeMessage>
 > {
   private abortByThread = new Map<string, AbortController>()
@@ -132,7 +129,7 @@ export class HarnessRuntime implements AgentRuntime<
     }
   }
 
-  async *stream(input: RunInput, opts: RunOptions = {}): AsyncIterable<SerializedStreamEventV2> {
+  async *stream(input: RunInput, opts: RunOptions = {}): AsyncIterable<SerializedStreamEvent> {
     const runId = randomUUID()
     const scope: RunScope = { runId, depth: 0 }
     const abortController = new AbortController()
@@ -159,6 +156,7 @@ export class HarnessRuntime implements AgentRuntime<
 
         const messageId = randomUUID()
         const assistantText: Array<string> = []
+        const assistantReasoning: Array<string> = []
         const toolCallByIndex = new Map<number, { id: string; name: string; rawArgs: string }>()
 
         const completion = await client.chat.completions.create({
@@ -170,8 +168,18 @@ export class HarnessRuntime implements AgentRuntime<
 
         for await (const chunk of completion) {
           const choice = chunk.choices[0]
-
           const delta = choice.delta
+
+          const reasoningDelta = extractReasoningDelta(delta)
+          if (reasoningDelta) {
+            assistantReasoning.push(reasoningDelta)
+            yield {
+              type: 'assistant.reasoning_delta',
+              scope,
+              messageId,
+              delta: reasoningDelta,
+            }
+          }
 
           if (typeof delta.content === 'string' && delta.content.length > 0) {
             assistantText.push(delta.content)
@@ -186,9 +194,8 @@ export class HarnessRuntime implements AgentRuntime<
           if (Array.isArray(delta.tool_calls)) {
             for (const callDelta of delta.tool_calls) {
               const index = callDelta.index
-              if (typeof index !== 'number') {
-                continue
-              }
+              if (typeof index !== 'number') continue
+
               const current = toolCallByIndex.get(index) ?? { id: '', name: '', rawArgs: '' }
 
               if (typeof callDelta.id === 'string') {
@@ -229,6 +236,7 @@ export class HarnessRuntime implements AgentRuntime<
           id: messageId,
           type: 'ai',
           content: assistantText.join(''),
+          ...(assistantReasoning.length > 0 ? { reasoning: assistantReasoning.join('') } : {}),
           ...(parsedToolCalls.length > 0 ? { tool_calls: parsedToolCalls } : {}),
         }
 

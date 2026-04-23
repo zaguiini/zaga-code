@@ -1,4 +1,4 @@
-import type { AgentState, StreamEventV2 } from '@/lib/trpc'
+import type { AgentState, StreamEvent } from '@/lib/trpc'
 
 export type ToolProgress = {
   toolCallId: string
@@ -16,7 +16,7 @@ export type StreamStateV2 = {
 }
 
 export type StreamActionV2 =
-  | { type: 'event'; event: StreamEventV2 }
+  | { type: 'event'; event: StreamEvent }
   | { type: 'reset'; state?: AgentState }
   | { type: 'prepare'; userText?: string }
 
@@ -57,7 +57,36 @@ function appendAssistantText(
 
     return {
       ...message,
-      content: `${typeof message.content === 'string' ? message.content : ''}${delta}`,
+      content: `${message.content}${delta}`,
+    }
+  })
+}
+
+function appendAssistantReasoning(
+  messages: AgentState['messages'],
+  messageId: string,
+  delta: string
+): AgentState['messages'] {
+  const existing = messages.find(message => message.id === messageId)
+  if (!existing || existing.type !== 'ai') {
+    return [
+      ...messages,
+      {
+        id: messageId,
+        type: 'ai',
+        content: '',
+        reasoning: delta,
+      },
+    ]
+  }
+
+  return messages.map(message => {
+    if (message.id !== messageId) return message
+    if (message.type !== 'ai') return message
+
+    return {
+      ...message,
+      reasoning: `${message.reasoning ?? ''}${delta}`,
     }
   })
 }
@@ -84,7 +113,7 @@ export function streamReducerV2(state: StreamStateV2, action: StreamActionV2): S
       return state
 
     case 'assistant.reasoning_delta': {
-      const messages = appendAssistantText(state.values.messages, event.messageId, event.delta)
+      const messages = appendAssistantReasoning(state.values.messages, event.messageId, event.delta)
       return {
         ...state,
         values: {

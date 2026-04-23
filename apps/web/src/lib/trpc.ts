@@ -11,16 +11,10 @@ type RouterOutputs = inferRouterOutputs<AppRouter>
 
 export type AgentState = RouterOutputs['threads']['get']
 
-// Unwrap TrackedEnvelope<T> → T (the raw LangChain StreamEvent)
+// Unwrap TrackedEnvelope<T> -> T
 type TrackedStreamEvent =
   Awaited<ReturnType<AppRouter['runs']['stream']>> extends AsyncIterable<infer T> ? T : never
 export type StreamEvent = TrackedStreamEvent extends { data: infer D } ? D : TrackedStreamEvent
-
-type TrackedStreamEventV2 =
-  Awaited<ReturnType<AppRouter['runs']['streamV2']>> extends AsyncIterable<infer T> ? T : never
-export type StreamEventV2 = TrackedStreamEventV2 extends { data: infer D }
-  ? D
-  : TrackedStreamEventV2
 
 export const trpcClient = trpc.createClient({
   links: [

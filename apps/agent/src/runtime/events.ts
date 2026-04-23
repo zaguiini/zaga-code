@@ -30,4 +30,4 @@ export type UiEvent<TMessage = Record<string, unknown>, TState = Record<string, 
   | { type: 'run.completed'; scope: RunScope; finalState: TState }
   | { type: 'run.failed'; scope: RunScope; error: { code: string; message: string } }
 
-export type SerializedStreamEventV2 = UiEvent<RuntimeMessage, RuntimeState>
+export type SerializedStreamEvent = UiEvent<RuntimeMessage, RuntimeState>

@@ -2,7 +2,8 @@ import { tracked } from '@trpc/server'
 import { z } from 'zod'
 import { procedure, router } from '../trpc'
 import type { AgentRuntime } from '@/runtime/agent-runtime'
-import type { SerializedStreamEventV2 } from '@/runtime/events'
+import type { SerializedStreamEvent } from '@/runtime/events'
+import type { RuntimeHumanMessage } from '@/runtime/state'
 import { db } from '@/db'
 import { getThreadState, patchThreadState } from '@/runtime/state-store'
 
@@ -47,13 +48,13 @@ function createRunBuffer<TEvent>(ac: AbortController): RunBuffer<TEvent> {
   }
 }
 
-const runBuffers = new Map<string, RunBuffer<SerializedStreamEventV2>>()
+const runBuffers = new Map<string, RunBuffer<SerializedStreamEvent>>()
 const threadRunMap = new Map<string, string>()
 
 function maybeCleanupBuffer(
   runId: string,
   threadId: string,
-  buffer: RunBuffer<SerializedStreamEventV2>
+  buffer: RunBuffer<SerializedStreamEvent>
 ) {
   if (buffer.isComplete && buffer.subscribers === 0) {
     runBuffers.delete(runId)
@@ -61,9 +62,9 @@ function maybeCleanupBuffer(
   }
 }
 
-function startRunV2(
+function startRun(
   input: { threadId: string; input: z.infer<typeof runInputSchema> },
-  runtime: AgentRuntime<SerializedStreamEventV2>
+  runtime: AgentRuntime<SerializedStreamEvent>
 ) {
   const { threadId } = input
   const text = input.input.text.trim()
@@ -77,18 +78,18 @@ function startRunV2(
   )
 
   const ac = new AbortController()
-  const buffer = createRunBuffer<SerializedStreamEventV2>(ac)
+  const buffer = createRunBuffer<SerializedStreamEvent>(ac)
   runBuffers.set(runId, buffer)
   threadRunMap.set(threadId, runId)
 
   const current = getThreadState(threadId)
-  const humanMessage = {
+  const humanMessage: RuntimeHumanMessage = {
     id: crypto.randomUUID(),
-    type: 'human' as const,
+    type: 'human',
     content: [
-      ...(text ? [{ type: 'text', text }] : []),
+      ...(text ? [{ type: 'text' as const, text }] : []),
       ...input.input.images.map(image => ({
-        type: 'image_url',
+        type: 'image_url' as const,
         image_url: { url: image.url },
         name: image.name,
       })),
@@ -146,7 +147,7 @@ export const runsRouter = router({
     return { activeRunId: row?.run_id ?? null }
   }),
 
-  startV2: procedure
+  start: procedure
     .input(
       z.object({
         threadId: z.string(),
@@ -160,7 +161,7 @@ export const runsRouter = router({
         return { runId: existingRunId }
       }
 
-      const started = startRunV2(input, ctx.runtime)
+      const started = startRun(input, ctx.runtime)
       if (!started) {
         return { runId: null }
       }
@@ -168,7 +169,7 @@ export const runsRouter = router({
       return started
     }),
 
-  streamV2: procedure
+  stream: procedure
     .input(
       z.object({
         threadId: z.string(),
@@ -180,7 +181,7 @@ export const runsRouter = router({
       const { threadId } = input
 
       let runId: string | undefined
-      let buffer: RunBuffer<SerializedStreamEventV2> | undefined
+      let buffer: RunBuffer<SerializedStreamEvent> | undefined
       let startIdx = 0
 
       if (input.lastEventId) {
@@ -236,7 +237,7 @@ export const runsRouter = router({
       }
     }),
 
-  cancelV2: procedure.input(z.object({ threadId: z.string() })).mutation(({ input, ctx }) => {
+  cancel: procedure.input(z.object({ threadId: z.string() })).mutation(({ input, ctx }) => {
     const runId = threadRunMap.get(input.threadId)
     if (runId) {
       runBuffers.get(runId)?.ac.abort()
