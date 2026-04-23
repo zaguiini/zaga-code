@@ -4,25 +4,23 @@ export type ToolProgress = {
   toolCallId: string
   name: string
   state: 'running' | 'completed'
-  input: AgentState['messages'] | Record<string, unknown>
+  input: Record<string, unknown>
   result?: Record<string, unknown>
 }
 
-export type StreamStateV2 = {
+export type StreamState = {
   toolProgress: Record<string, ToolProgress | undefined>
-  _agentToolScopes: Record<string, string>
   values: AgentState
   error: string | null
 }
 
-export type StreamActionV2 =
+export type StreamAction =
   | { type: 'event'; event: StreamEvent }
   | { type: 'reset'; state?: AgentState }
   | { type: 'prepare'; userText?: string }
 
-export const initialStreamStateV2: StreamStateV2 = {
+export const initialStreamState: StreamState = {
   toolProgress: {},
-  _agentToolScopes: {},
   values: {
     configHash: '',
     maxTokens: 0,
@@ -90,19 +88,48 @@ function appendAssistantReasoning(
   })
 }
 
-export function streamReducerV2(state: StreamStateV2, action: StreamActionV2): StreamStateV2 {
+function appendAssistantToolCall(
+  messages: AgentState['messages'],
+  messageId: string,
+  toolCall: Extract<StreamEvent, { type: 'assistant.tool_call' }>['toolCall']
+): AgentState['messages'] {
+  const existing = messages.find(message => message.id === messageId)
+  if (!existing || existing.type !== 'ai') {
+    return [
+      ...messages,
+      {
+        id: messageId,
+        type: 'ai',
+        content: '',
+        tool_calls: [toolCall],
+      },
+    ]
+  }
+
+  return messages.map(message => {
+    if (message.id !== messageId) return message
+    if (message.type !== 'ai') return message
+
+    return {
+      ...message,
+      tool_calls: [...(message.tool_calls ?? []), toolCall],
+    }
+  })
+}
+
+export function streamReducer(state: StreamState, action: StreamAction): StreamState {
   if (action.type === 'reset') {
     if (action.state) {
       return {
-        ...initialStreamStateV2,
+        ...initialStreamState,
         values: action.state,
       }
     }
-    return initialStreamStateV2
+    return initialStreamState
   }
 
   if (action.type === 'prepare') {
-    return { ...state, toolProgress: {}, _agentToolScopes: {}, error: null }
+    return { ...state, toolProgress: {}, error: null }
   }
 
   const { event } = action
@@ -134,26 +161,11 @@ export function streamReducerV2(state: StreamStateV2, action: StreamActionV2): S
     }
 
     case 'assistant.tool_call': {
-      const existing = state.values.messages.find(message => message.id === event.messageId)
-      const messages = existing
-        ? state.values.messages.map(message => {
-            if (message.id !== event.messageId || message.type !== 'ai') return message
-
-            return {
-              ...message,
-              tool_calls: [...(message.tool_calls ?? []), event.toolCall],
-            }
-          })
-        : [
-            ...state.values.messages,
-            {
-              id: event.messageId,
-              type: 'ai',
-              content: '',
-              tool_calls: [event.toolCall],
-            },
-          ]
-
+      const messages = appendAssistantToolCall(
+        state.values.messages,
+        event.messageId,
+        event.toolCall
+      )
       return {
         ...state,
         values: {
