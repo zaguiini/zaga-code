@@ -213,20 +213,23 @@ Phase 2:
   - `RUN_STEP_LIMIT_EXCEEDED`
 - All emitted through `run.failed` with user-safe message and diagnostic details.
 
-## 15. Testing Strategy
+## 15. Verification Strategy
+
+### 15.0 Explicit Rewrite Policy
+
+- No new unit tests will be added as part of this rewrite.
+- Future implementation work for this rewrite should not add or require unit test coverage.
+- Validation focus is end-to-end behavior, integration checks, and manual verification.
 
 ### 15.1 Phase 1 Required
 
-- Unit: event normalization from streamed provider chunks.
-- Unit: tool-call completeness/validation logic.
-- Unit: scope propagation for subagents.
 - Integration: end-to-end run with tool call + reasoning + tool result.
 - Integration: known-bad provider output emits explicit compatibility failure.
-- Frontend: reducer tests for v2 event protocol, including nested scopes.
+- Frontend: manual verification of v2 event protocol behavior, including nested scopes.
 
 ### 15.2 Phase 2 Required
 
-- Parity test suite for memory compaction, dynamic MCP tools, and advanced state operations.
+- Integration/manual parity validation for memory compaction, dynamic MCP tools, and advanced state operations.
 
 ## 16. Rollout Plan
 
