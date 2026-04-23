@@ -87,6 +87,13 @@ export type ToolContext = {
 }
 ```
 
+### 6.3 State Management Contract
+
+- Runtime state transitions are owned by a typed reducer (deterministic updates).
+- `zod` is used at runtime boundaries only: DB payloads, tool input/output payloads, model/provider normalization, and API payloads.
+- Reducer outputs are not re-validated by `zod` in the normal path; optional debug assertions are allowed.
+- Action payloads are validated before reducer dispatch when they cross runtime boundaries.
+
 ## 7. Event Protocol V2
 
 Phase 1 introduces a UI-native stream protocol (top-level runs only):

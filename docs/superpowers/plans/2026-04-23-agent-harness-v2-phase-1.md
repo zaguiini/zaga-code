@@ -23,6 +23,8 @@
 
 - `apps/agent/src/runtime/agent-runtime.ts`: runtime interfaces (`RunInput`, `RunResult`, `RunOptions`, `AgentRuntime`).
 - `apps/agent/src/runtime/events.ts`: canonical v2 event types (`UiEvent`, `RunScope`, payload types).
+- `apps/agent/src/runtime/state-schema.ts`: `zod` schemas for runtime boundary validation.
+- `apps/agent/src/runtime/state-reducer.ts`: typed reducer and runtime action types.
 - `apps/agent/src/runtime/model/openai-compatible.ts`: model adapter using OpenAI SDK with configurable `baseURL` and streaming.
 - `apps/agent/src/runtime/capabilities.ts`: strict structured-tool capability probe and diagnostics.
 - `apps/agent/src/runtime/harness-runtime.ts`: main orchestration loop and event emission.
@@ -112,6 +114,8 @@ Expected: one docs-only commit.
 
 - Create: `apps/agent/src/runtime/agent-runtime.ts`
 - Create: `apps/agent/src/runtime/events.ts`
+- Create: `apps/agent/src/runtime/state-schema.ts`
+- Create: `apps/agent/src/runtime/state-reducer.ts`
 - Create: `apps/agent/src/runtime/tool-context.ts`
 - Modify: `apps/agent/src/server/trpc.ts`
 
@@ -208,7 +212,59 @@ export type ToolContext = {
 }
 ```
 
-- [ ] **Step 4: Swap tRPC context to runtime**
+- [ ] **Step 4: Add reducer-owned state transitions**
+
+Create `apps/agent/src/runtime/state-reducer.ts`:
+
+```ts
+import type { AgentState } from '@/graphs/agent'
+
+export type RuntimeAction =
+  | { type: 'messages.append'; message: AgentState['messages'][number] }
+  | { type: 'usedTokens.set'; value: number }
+  | { type: 'configHash.set'; value: string }
+  | { type: 'memoryCommandHandled.set'; value: boolean }
+
+export function runtimeStateReducer(state: AgentState, action: RuntimeAction): AgentState {
+  switch (action.type) {
+    case 'messages.append':
+      return { ...state, messages: [...state.messages, action.message] }
+    case 'usedTokens.set':
+      return { ...state, usedTokens: action.value }
+    case 'configHash.set':
+      return { ...state, configHash: action.value }
+    case 'memoryCommandHandled.set':
+      return { ...state, memoryCommandHandled: action.value }
+    default:
+      return state
+  }
+}
+```
+
+- [ ] **Step 5: Add boundary validation schemas (no reducer-output validation)**
+
+Create `apps/agent/src/runtime/state-schema.ts`:
+
+```ts
+import { z } from 'zod'
+
+export const toolBoundarySchema = z.object({
+  toolCallId: z.string().min(1),
+  name: z.string().min(1),
+  input: z.record(z.string(), z.unknown()).optional(),
+  output: z.unknown().optional(),
+})
+
+export const modelBoundarySchema = z.object({
+  messageId: z.string().optional(),
+  content: z.unknown().optional(),
+  tool_calls: z.array(z.unknown()).optional(),
+})
+```
+
+Use these schemas only at DB/tool/model/API boundaries before dispatching reducer actions.
+
+- [ ] **Step 6: Swap tRPC context to runtime**
 
 Update `apps/agent/src/server/trpc.ts`:
 
@@ -220,7 +276,7 @@ export type Context = {
 }
 ```
 
-- [ ] **Step 5: Verify typecheck for agent package**
+- [ ] **Step 7: Verify typecheck for agent package**
 
 Run:
 
@@ -230,12 +286,12 @@ pnpm --filter @zaga/agent build
 
 Expected: successful TypeScript build.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 Run:
 
 ```bash
-git add apps/agent/src/runtime/agent-runtime.ts apps/agent/src/runtime/events.ts apps/agent/src/runtime/tool-context.ts apps/agent/src/server/trpc.ts
+git add apps/agent/src/runtime/agent-runtime.ts apps/agent/src/runtime/events.ts apps/agent/src/runtime/state-schema.ts apps/agent/src/runtime/state-reducer.ts apps/agent/src/runtime/tool-context.ts apps/agent/src/server/trpc.ts
 git commit -m "feat(agent): add runtime contracts and v2 event schema"
 ```
 
