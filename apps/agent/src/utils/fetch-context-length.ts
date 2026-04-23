@@ -2,6 +2,8 @@ import { LMStudioClient } from '@lmstudio/sdk'
 import { KNOWN_OPENAI_CONTEXT_WINDOWS } from './constants'
 import { parseSettings } from '@/settings'
 
+const DEFAULT_CONTEXT_WINDOW = 128_000
+
 export async function fetchContextLength(): Promise<number> {
   const settings = parseSettings()
 
@@ -10,19 +12,19 @@ export async function fetchContextLength(): Promise<number> {
     const matchingContextWindow = KNOWN_OPENAI_CONTEXT_WINDOWS[settings.connection.model]
     if (matchingContextWindow) return matchingContextWindow
 
-    throw new Error(
-      `Unknown OpenAI model: ${settings.connection.model}. Please update KNOWN_OPENAI_CONTEXT_WINDOWS with the context window size for this model.`
-    )
+    return DEFAULT_CONTEXT_WINDOW
   }
 
-  const client = new LMStudioClient()
-  const llm = await client.llm.listLoaded()
+  try {
+    const client = new LMStudioClient()
+    const llm = await client.llm.listLoaded()
 
-  const model = llm.find(m => m.modelKey === settings.connection.model)
+    const model = llm.find(m => m.modelKey === settings.connection.model)
 
-  if (!model) {
-    throw new Error(`Model ${settings.connection.model} not found in LM Studio`)
+    if (!model) return DEFAULT_CONTEXT_WINDOW
+
+    return await model.getContextLength()
+  } catch {
+    return DEFAULT_CONTEXT_WINDOW
   }
-
-  return await model.getContextLength()
 }

@@ -42,6 +42,14 @@ export const settingsSchema = z.object({
     model: 'zai-org/glm-4.7-flash',
     apiBase: 'http://localhost:1234/v1',
   }),
+  modelCapabilities: z
+    .object({
+      supportsStructuredTools: z.boolean().optional(),
+      supportsReasoningDeltas: z.boolean().optional(),
+      lastCapabilityCheckAt: z.string().optional(),
+      capabilityCheckError: z.string().optional(),
+    })
+    .default({}),
   theme: z.enum(['light', 'dark', 'system']).default('system'),
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
 })
