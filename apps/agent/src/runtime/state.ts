@@ -59,7 +59,6 @@ export type RuntimeState = {
   usedTokens: number
   messages: Array<RuntimeMessage>
   projectPath: string
-  memoryCommandHandled: boolean
 }
 
 export const defaultRuntimeState: RuntimeState = {
@@ -68,5 +67,4 @@ export const defaultRuntimeState: RuntimeState = {
   usedTokens: 0,
   messages: [],
   projectPath: '',
-  memoryCommandHandled: false,
 }

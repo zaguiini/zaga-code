@@ -29,7 +29,6 @@ export const initialStreamStateV2: StreamStateV2 = {
     usedTokens: 0,
     messages: [],
     projectPath: '',
-    memoryCommandHandled: false,
   },
   error: null,
 }
