@@ -19,15 +19,24 @@ async function executeFileEdit(input: FileEditInput, projectPath: string) {
 
   const occurrences = content.split(input.old_string).length - 1
   if (occurrences === 0) {
-    return `Error: old_string not found in ${input.path}. Check for exact whitespace/indentation match.`
+    return {
+      content: `Error: old_string not found in ${input.path}. Check for exact whitespace/indentation match.`,
+      metadata: { path: input.path, ok: false },
+    }
   }
   if (occurrences > 1) {
-    return `Error: old_string appears ${occurrences} times in ${input.path}. Provide more context to make it unique.`
+    return {
+      content: `Error: old_string appears ${occurrences} times in ${input.path}. Provide more context to make it unique.`,
+      metadata: { path: input.path, ok: false, occurrences },
+    }
   }
 
   const updated = content.replace(input.old_string, input.new_string)
   await writeFile(validatedPath, updated, 'utf-8')
-  return { ok: true, path: input.path }
+  return {
+    content: `Edited ${input.path}`,
+    metadata: { path: input.path, ok: true },
+  }
 }
 
 export const fileEditTool: RuntimeToolDefinition<FileEditInput> = {

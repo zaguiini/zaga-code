@@ -1,15 +1,6 @@
 import type { AgentState, StreamEvent } from '@/lib/trpc'
 
-export type ToolProgress = {
-  toolCallId: string
-  name: string
-  state: 'running' | 'completed'
-  input: Record<string, unknown>
-  result?: Record<string, unknown>
-}
-
 export type StreamState = {
-  toolProgress: Record<string, ToolProgress | undefined>
   values: AgentState
   error: string | null
 }
@@ -20,7 +11,6 @@ export type StreamAction =
   | { type: 'prepare'; userText?: string }
 
 export const initialStreamState: StreamState = {
-  toolProgress: {},
   values: {
     configHash: '',
     maxTokens: 0,
@@ -31,88 +21,120 @@ export const initialStreamState: StreamState = {
   error: null,
 }
 
-function appendAssistantText(
+// FIX: We don't need this, outputs are typed in agent.
+function stringifyOutput(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value)
+}
+
+function updateAiMessage(
   messages: AgentState['messages'],
   messageId: string,
-  delta: string
+  updater: (
+    message: Extract<AgentState['messages'][number], { type: 'ai' }>
+  ) => Extract<AgentState['messages'][number], { type: 'ai' }>
 ): AgentState['messages'] {
   const existing = messages.find(message => message.id === messageId)
+
   if (!existing || existing.type !== 'ai') {
-    return [
-      ...messages,
-      {
-        id: messageId,
-        type: 'ai',
-        content: delta,
-      },
-    ]
+    const created = updater({
+      id: messageId,
+      type: 'ai',
+      content: '',
+      reasoning_started_at_ms: Date.now(),
+    })
+    return [...messages, created]
   }
 
   return messages.map(message => {
-    if (message.id !== messageId) return message
-    if (message.type !== 'ai') return message
-
-    return {
-      ...message,
-      content: `${message.content}${delta}`,
-    }
+    if (message.id !== messageId || message.type !== 'ai') return message
+    return updater(message)
   })
 }
 
-function appendAssistantReasoning(
+function updateToolCallById(
   messages: AgentState['messages'],
-  messageId: string,
-  delta: string
+  toolCallId: string,
+  updater: (
+    toolCall: NonNullable<
+      Extract<AgentState['messages'][number], { type: 'ai' }>['tool_calls']
+    >[number]
+  ) => NonNullable<Extract<AgentState['messages'][number], { type: 'ai' }>['tool_calls']>[number]
 ): AgentState['messages'] {
-  const existing = messages.find(message => message.id === messageId)
-  if (!existing || existing.type !== 'ai') {
-    return [
-      ...messages,
-      {
-        id: messageId,
-        type: 'ai',
-        content: '',
-        reasoning: delta,
-      },
-    ]
-  }
-
   return messages.map(message => {
-    if (message.id !== messageId) return message
-    if (message.type !== 'ai') return message
+    if (message.type !== 'ai' || !Array.isArray(message.tool_calls)) return message
 
-    return {
-      ...message,
-      reasoning: `${message.reasoning ?? ''}${delta}`,
-    }
+    const hasMatch = message.tool_calls.some(toolCall => toolCall.id === toolCallId)
+    if (!hasMatch) return message
+
+    const nextToolCalls = message.tool_calls.map(toolCall =>
+      toolCall.id === toolCallId ? updater(toolCall) : toolCall
+    )
+
+    return { ...message, tool_calls: nextToolCalls }
   })
 }
 
-function appendAssistantToolCall(
-  messages: AgentState['messages'],
-  messageId: string,
-  toolCall: Extract<StreamEvent, { type: 'assistant.tool_call' }>['toolCall']
-): AgentState['messages'] {
-  const existing = messages.find(message => message.id === messageId)
-  if (!existing || existing.type !== 'ai') {
-    return [
-      ...messages,
-      {
-        id: messageId,
-        type: 'ai',
-        content: '',
-        tool_calls: [toolCall],
-      },
-    ]
-  }
+function markReasoningComplete(
+  message: Extract<AgentState['messages'][number], { type: 'ai' }>
+): Extract<AgentState['messages'][number], { type: 'ai' }> {
+  if (message.reasoning_ended_at_ms !== undefined) return message
 
+  const startedAt = message.reasoning_started_at_ms ?? Date.now()
+  return {
+    ...message,
+    reasoning_started_at_ms: startedAt,
+    reasoning_ended_at_ms: Date.now(),
+  }
+}
+
+function finalizeOpenReasoning(messages: AgentState['messages']): AgentState['messages'] {
   return messages.map(message => {
-    if (message.id !== messageId) return message
     if (message.type !== 'ai') return message
+    if (!message.reasoning?.trim()) return message
+    return markReasoningComplete(message)
+  })
+}
+
+function mergeMessagesPreservingClientTransientFields(
+  currentMessages: AgentState['messages'],
+  incomingMessages: AgentState['messages']
+): AgentState['messages'] {
+  const currentById = new Map(currentMessages.map(message => [message.id, message] as const))
+
+  return incomingMessages.map(message => {
+    if (message.type !== 'ai' || !message.id) return message
+
+    const current = currentById.get(message.id)
+    if (!current || current.type !== 'ai') return message
 
     return {
       ...message,
-      tool_calls: [...(message.tool_calls ?? []), toolCall],
+      ...(current.reasoning_started_at_ms !== undefined
+        ? { reasoning_started_at_ms: current.reasoning_started_at_ms }
+        : {}),
+      ...(current.reasoning_ended_at_ms !== undefined
+        ? { reasoning_ended_at_ms: current.reasoning_ended_at_ms }
+        : {}),
+      ...(Array.isArray(current.tool_calls) && Array.isArray(message.tool_calls)
+        ? {
+            tool_calls: message.tool_calls.map(toolCall => {
+              const currentToolCall = current.tool_calls?.find(c => c.id === toolCall.id)
+              if (!currentToolCall) return toolCall
+
+              return {
+                ...toolCall,
+                ...(currentToolCall.state ? { state: currentToolCall.state } : {}),
+                ...(currentToolCall.stream_data !== undefined
+                  ? { stream_data: currentToolCall.stream_data }
+                  : {}),
+                ...(currentToolCall.result !== undefined ? { result: currentToolCall.result } : {}),
+                ...(currentToolCall.result_metadata
+                  ? { result_metadata: currentToolCall.result_metadata }
+                  : {}),
+              }
+            }),
+          }
+        : {}),
     }
   })
 }
@@ -129,7 +151,7 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
   }
 
   if (action.type === 'prepare') {
-    return { ...state, toolProgress: {}, error: null }
+    return { ...state, error: null }
   }
 
   const { event } = action
@@ -139,7 +161,12 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
       return state
 
     case 'assistant.reasoning_delta': {
-      const messages = appendAssistantReasoning(state.values.messages, event.messageId, event.delta)
+      const messages = updateAiMessage(state.values.messages, event.messageId, message => ({
+        ...message,
+        reasoning_started_at_ms: message.reasoning_started_at_ms ?? Date.now(),
+        reasoning: `${message.reasoning ?? ''}${event.delta}`,
+      }))
+
       return {
         ...state,
         values: {
@@ -150,7 +177,15 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     }
 
     case 'assistant.text_delta': {
-      const messages = appendAssistantText(state.values.messages, event.messageId, event.delta)
+      const messages = updateAiMessage(state.values.messages, event.messageId, message => {
+        const withText = {
+          ...message,
+          content: `${message.content}${event.delta}`,
+        }
+
+        return markReasoningComplete(withText)
+      })
+
       return {
         ...state,
         values: {
@@ -161,11 +196,17 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     }
 
     case 'assistant.tool_call': {
-      const messages = appendAssistantToolCall(
-        state.values.messages,
-        event.messageId,
-        event.toolCall
-      )
+      const messages = updateAiMessage(state.values.messages, event.messageId, message => {
+        const nextToolCalls = [
+          ...(message.tool_calls ?? []),
+          { ...event.toolCall, state: 'call' as const },
+        ]
+        return markReasoningComplete({
+          ...message,
+          tool_calls: nextToolCalls,
+        })
+      })
+
       return {
         ...state,
         values: {
@@ -176,70 +217,83 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     }
 
     case 'tool.started': {
+      const messages = updateToolCallById(state.values.messages, event.toolCallId, toolCall => ({
+        ...toolCall,
+        state: 'call',
+      }))
+
       return {
         ...state,
-        toolProgress: {
-          ...state.toolProgress,
-          [event.toolCallId]: {
-            toolCallId: event.toolCallId,
-            name: event.name,
-            input:
-              event.input && typeof event.input === 'object'
-                ? (event.input as Record<string, unknown>)
-                : {},
-            state: 'running',
-          },
+        values: {
+          ...state.values,
+          messages,
         },
       }
     }
 
     case 'tool.delta': {
-      const existing = state.toolProgress[event.toolCallId]
-      if (!existing) return state
+      const messages = updateToolCallById(state.values.messages, event.toolCallId, toolCall => ({
+        ...toolCall,
+        state: 'streaming',
+        stream_data: event.data,
+      }))
+
       return {
         ...state,
-        toolProgress: {
-          ...state.toolProgress,
-          [event.toolCallId]: {
-            ...existing,
-            input:
-              event.data && typeof event.data === 'object'
-                ? (event.data as Record<string, unknown>)
-                : existing.input,
-          },
+        values: {
+          ...state.values,
+          messages,
         },
       }
     }
 
     case 'tool.completed': {
-      const existing = state.toolProgress[event.toolCallId]
-      if (!existing) return state
+      const messagesWithToolState = updateToolCallById(
+        state.values.messages,
+        event.toolCallId,
+        toolCall => ({
+          ...toolCall,
+          state: 'result',
+          result: stringifyOutput(event.output),
+          ...(event.metadata ? { result_metadata: event.metadata } : {}),
+        })
+      )
 
-      const result =
-        event.output && typeof event.output === 'object'
-          ? (event.output as Record<string, unknown>)
-          : { output: event.output }
+      const existingLocalToolMessage = state.values.messages.some(
+        message => message.type === 'tool' && message.tool_call_id === event.toolCallId
+      )
+
+      const messages = existingLocalToolMessage
+        ? messagesWithToolState
+        : [
+            ...messagesWithToolState,
+            {
+              id: `local-tool-${event.toolCallId}`,
+              type: 'tool' as const,
+              name: '',
+              tool_call_id: event.toolCallId,
+              content: stringifyOutput(event.output),
+              ...(event.metadata ? { metadata: event.metadata } : {}),
+            },
+          ]
 
       return {
         ...state,
-        toolProgress: {
-          ...state.toolProgress,
-          [event.toolCallId]: {
-            ...existing,
-            state: 'completed',
-            result,
-          },
+        values: {
+          ...state.values,
+          messages,
         },
       }
     }
 
     case 'assistant.completed': {
       const existing = state.values.messages.find(message => message.id === event.message.id)
-      const messages = existing
+      const mergedMessages = existing
         ? state.values.messages.map(message =>
             message.id === event.message.id ? { ...message, ...event.message } : message
           )
         : [...state.values.messages, event.message]
+      const messages = finalizeOpenReasoning(mergedMessages)
 
       return {
         ...state,
@@ -251,10 +305,23 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     }
 
     case 'run.completed': {
-      const nextValues =
-        event.finalState && typeof event.finalState === 'object'
-          ? { ...state.values, ...event.finalState }
-          : state.values
+      if (!event.finalState || typeof event.finalState !== 'object') {
+        return state
+      }
+
+      const incomingMessages = Array.isArray(event.finalState.messages)
+        ? event.finalState.messages
+        : state.values.messages
+      const mergedMessages = mergeMessagesPreservingClientTransientFields(
+        state.values.messages,
+        incomingMessages
+      )
+      const nextValues = {
+        ...state.values,
+        ...event.finalState,
+        messages: finalizeOpenReasoning(mergedMessages),
+      }
+
       return {
         ...state,
         values: nextValues,
@@ -264,6 +331,10 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     case 'run.failed': {
       return {
         ...state,
+        values: {
+          ...state.values,
+          messages: finalizeOpenReasoning(state.values.messages),
+        },
         error: event.error.message,
       }
     }

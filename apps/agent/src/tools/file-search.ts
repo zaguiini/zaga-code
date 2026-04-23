@@ -23,13 +23,19 @@ type FileSearchInput = z.infer<typeof fileSearchSchema>
 async function executeFileSearch(input: FileSearchInput, projectPath: string) {
   const { query, limit } = input
   if (query.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
-    return `Search blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+    return {
+      content: `Search blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`,
+      metadata: { query, limit, results: [] },
+    }
   }
 
   const filePaths = await listProjectFiles(projectPath)
 
   if (filePaths.length === 0) {
-    return { query, results: [] as Array<string>, summary: 'No files found in project directory.' }
+    return {
+      content: 'No files found in project directory.',
+      metadata: { query, limit, results: [] as Array<string> },
+    }
   }
 
   const files = filePaths.map(f => ({ file: f.split('/').pop() ?? f, filePath: f }))
@@ -45,18 +51,22 @@ async function executeFileSearch(input: FileSearchInput, projectPath: string) {
 
   if (results.length === 0) {
     return {
-      query,
-      results: [] as Array<string>,
-      summary: `No files found matching "${query}". Try a different search term.`,
+      content: `No files found matching "${query}". Try a different search term.`,
+      metadata: { query, limit, results: [] as Array<string> },
     }
   }
 
   const formatted = results.map(result => result.item.filePath)
 
   return {
-    query,
-    results: formatted,
-    summary: `Found ${formatted.length} file(s) matching "${query}".`,
+    content: `Found ${formatted.length} file(s) matching "${query}":\n\n${formatted
+      .map((filePath, index) => `${index + 1}. ${filePath}`)
+      .join('\n')}`,
+    metadata: {
+      query,
+      limit,
+      results: formatted,
+    },
   }
 }
 

@@ -20,7 +20,10 @@ async function executeFileWrite(input: FileWriteInput, projectPath: string) {
   await mkdir(directory, { recursive: true })
   await writeFile(validatedPath, input.content, 'utf-8')
 
-  return { ok: true, path: input.path }
+  return {
+    content: `Successfully wrote file: ${input.path}`,
+    metadata: { path: input.path, ok: true },
+  }
 }
 
 export const fileWriteTool: RuntimeToolDefinition<FileWriteInput> = {

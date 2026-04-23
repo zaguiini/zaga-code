@@ -10,7 +10,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { FilePreview } from '@/components/ui/file-preview'
 import { CodeBlock, MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { messageGrouper } from '@/lib/message-grouper'
-import { useStreamContext } from '@/lib/stream-context'
 
 const chatBubbleVariants = cva(
   'group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]',
@@ -320,6 +319,15 @@ function formatDuration(ms: number): string {
   return remaining > 0 ? `${minutes}m ${remaining}s` : `${minutes}m`
 }
 
+function safeParseArray(value: string): Array<unknown> | null {
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
   const label = part.done ? 'Thought' : 'Thinking'
   const duration = part.done && part.durationMs ? ` for ${formatDuration(part.durationMs)}` : ''
@@ -338,8 +346,6 @@ function CommandResultBlock({ part }: { part: CommandResultPart }) {
 }
 
 function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvocation> }) {
-  const { toolProgress } = useStreamContext()
-
   if (!toolInvocations?.length) return null
 
   return (
@@ -394,7 +400,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
 
             // Explore tool: data is an array of ExploreStreamEvent objects
             if (Array.isArray(invocation.data)) {
-              const messages = messageGrouper(invocation.data, toolProgress).filter(
+              const messages = messageGrouper(invocation.data).filter(
                 message => message.role !== 'user'
               )
               return (
@@ -441,12 +447,7 @@ function ToolCallBlock({ toolInvocations }: { toolInvocations?: Array<ToolInvoca
           case 'result': {
             // Agent tools: show the accumulated sub-agent messages
             if (isAgent && invocation.toolCallId) {
-              const progress = toolProgress[invocation.toolCallId]
-              const agentMessages =
-                progress?.input && Array.isArray(progress.input) ? progress.input : []
-              const messages = messageGrouper(agentMessages, toolProgress).filter(
-                message => message.role !== 'user'
-              )
+              const messages: Array<any> = []
 
               return (
                 <CollapsibleBlock

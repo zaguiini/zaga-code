@@ -90,7 +90,7 @@ export function useAgentStream(
 
     if (!historicalState) return
     if (stream.status === 'pending') return
-    if (state.values.messages.length > historicalState.messages.length) return
+    if (state.values.messages.length >= historicalState.messages.length) return
 
     dispatch({ type: 'reset', state: historicalState })
   }, [threadId, historicalState, stream.status, state.values.messages.length])
@@ -133,7 +133,6 @@ export function useAgentStream(
   }, [threadId, cancelMutate])
 
   return {
-    toolProgress: state.toolProgress,
     values: state.values,
     isLoading: isStarting || stream.status === 'pending',
     error: state.error,

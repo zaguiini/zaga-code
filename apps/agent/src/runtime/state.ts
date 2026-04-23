@@ -20,6 +20,10 @@ export type RuntimeToolCall = {
   name: string
   args: Record<string, unknown>
   type?: 'tool_call'
+  state?: 'call' | 'streaming' | 'result'
+  stream_data?: unknown
+  result?: string
+  result_metadata?: Record<string, unknown>
 }
 
 export type RuntimeAiMessage = {
@@ -27,6 +31,8 @@ export type RuntimeAiMessage = {
   type: 'ai'
   content: string
   reasoning?: string
+  reasoning_started_at_ms?: number
+  reasoning_ended_at_ms?: number
   tool_calls?: Array<RuntimeToolCall>
   metadata?: Record<string, unknown>
 }
@@ -37,6 +43,7 @@ export type RuntimeToolMessage = {
   name: string
   tool_call_id: string
   content: string
+  metadata?: Record<string, unknown>
 }
 
 export type RuntimeMessage = RuntimeHumanMessage | RuntimeAiMessage | RuntimeToolMessage

@@ -16,7 +16,7 @@ type FileReadInput = z.infer<typeof fileReadSchema>
 
 async function executeFileRead(input: FileReadInput, projectPath: string) {
   if (input.path.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
-    return `Path blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+    return { content: `Path blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.` }
   }
 
   const validatedPath = validatePath(input.path, projectPath)
@@ -24,10 +24,12 @@ async function executeFileRead(input: FileReadInput, projectPath: string) {
   const extension = path.extname(input.path).slice(1) || undefined
 
   return {
-    path: input.path,
     content,
-    format: 'code',
-    ...(extension ? { language: extension } : {}),
+    metadata: {
+      path: input.path,
+      format: 'code',
+      ...(extension ? { language: extension } : {}),
+    },
   }
 }
 

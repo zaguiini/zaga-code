@@ -1,14 +1,6 @@
 import type { Message as MessageType, ToolInvocationPart } from '@/components/ui/chat-message'
 import type { AgentState } from '@/lib/trpc'
 
-type ToolProgress = {
-  toolCallId: string
-  name: string
-  state: 'running' | 'completed' | 'starting'
-  input: unknown
-  result?: Record<string, unknown>
-}
-
 type ContentPart = {
   type: string
   name?: string
@@ -21,6 +13,11 @@ type ContentPart = {
 }
 
 type AgentMessage = AgentState['messages'][number]
+
+type ToolResult = {
+  content: string
+  metadata?: Record<string, unknown>
+}
 
 function getContentParts(content: string | Array<ContentPart>): Array<ContentPart> {
   return Array.isArray(content) ? content : []
@@ -60,16 +57,13 @@ export function extractText(content: string | Array<ContentPart>): string {
     .trim()
 }
 
-export const messageGrouper = (
-  messages: Array<AgentMessage>,
-  toolProgress: Record<string, ToolProgress | undefined>
-): Array<MessageType> => {
-  // Build a map of tool results keyed by tool_call_id
-  const toolResults = new Map<string, { content: string; metadata?: Record<string, unknown> }>()
+export const messageGrouper = (messages: Array<AgentMessage>): Array<MessageType> => {
+  const toolResults = new Map<string, ToolResult>()
   for (const msg of messages) {
     if (msg.type === 'tool' && msg.tool_call_id) {
       toolResults.set(msg.tool_call_id, {
         content: extractText(msg.content),
+        ...(msg.metadata ? { metadata: msg.metadata } : {}),
       })
     }
   }
@@ -99,11 +93,18 @@ export const messageGrouper = (
         ]
       }
 
-      // AI / assistant message
       const result: Array<MessageType> = []
 
       const reasoningContent = msg.reasoning
       if (reasoningContent?.trim()) {
+        const startedAtMs = msg.reasoning_started_at_ms
+        const endedAtMs = msg.reasoning_ended_at_ms
+        const done = endedAtMs !== undefined || startedAtMs === undefined
+        const durationMs =
+          startedAtMs !== undefined && endedAtMs !== undefined
+            ? Math.max(0, endedAtMs - startedAtMs)
+            : undefined
+
         result.push({
           id,
           role: 'assistant',
@@ -112,11 +113,13 @@ export const messageGrouper = (
             {
               type: 'reasoning',
               reasoning: reasoningContent,
-              done: true,
+              done,
+              ...(durationMs !== undefined ? { durationMs } : {}),
             },
           ],
         })
       }
+
       const messageContent = extractText(msg.content)
       if (messageContent) {
         result.push({
@@ -132,7 +135,15 @@ export const messageGrouper = (
         result.push(
           ...toolCalls.map(toolCall => {
             const parts: Array<ToolInvocationPart> = []
-            const toolResult = toolResults.get(toolCall.id)
+            const persistedToolResult = toolResults.get(toolCall.id)
+            const inMessageResult =
+              toolCall.result !== undefined
+                ? {
+                    content: toolCall.result,
+                    ...(toolCall.result_metadata ? { metadata: toolCall.result_metadata } : {}),
+                  }
+                : undefined
+            const toolResult = persistedToolResult ?? inMessageResult
 
             if (toolResult !== undefined) {
               parts.push({
@@ -146,13 +157,7 @@ export const messageGrouper = (
                   metadata: toolResult.metadata,
                 },
               })
-            }
-
-            const progress = toolCall.id! in toolProgress ? toolProgress[toolCall.id!] : undefined
-            if (
-              progress !== undefined &&
-              (progress.state === 'running' || progress.state === 'starting')
-            ) {
+            } else if (toolCall.state === 'streaming') {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
@@ -160,10 +165,10 @@ export const messageGrouper = (
                   state: 'streaming',
                   toolCallId: toolCall.id,
                   args: toolCall.args,
-                  data: progress.input,
+                  data: toolCall.stream_data,
                 },
               })
-            } else if (toolResult === undefined) {
+            } else {
               parts.push({
                 type: 'tool-invocation',
                 toolInvocation: {
@@ -176,7 +181,7 @@ export const messageGrouper = (
             }
 
             return {
-              id: toolCall.id!,
+              id: toolCall.id,
               role: 'assistant' as const,
               content: '',
               parts,

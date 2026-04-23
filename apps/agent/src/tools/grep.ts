@@ -45,20 +45,32 @@ async function executeGrep(input: GrepInput, projectPath: string) {
 
     const lines = stdout.trim().split('\n').filter(Boolean)
     if (lines.length === 0) {
-      return { pattern: input.pattern, matches: [] as Array<string>, summary: 'No matches found.' }
+      return {
+        content: `No matches for "${input.pattern}"`,
+        metadata: { pattern: input.pattern, matches: [] as Array<string>, truncated: false },
+      }
     }
 
     return {
-      pattern: input.pattern,
-      matches: lines,
-      truncated: lines.length === 50,
+      content: lines.join('\n'),
+      metadata: {
+        pattern: input.pattern,
+        matches: lines,
+        truncated: lines.length === 50,
+      },
     }
   } catch (error) {
     const err = error as { code?: number; message?: string }
     if (err.code === 1) {
-      return { pattern: input.pattern, matches: [] as Array<string>, summary: 'No matches found.' }
+      return {
+        content: `No matches for "${input.pattern}"`,
+        metadata: { pattern: input.pattern, matches: [] as Array<string>, truncated: false },
+      }
     }
-    return `Search error: ${err.message ?? String(error)}`
+    return {
+      content: `Search error: ${err.message ?? String(error)}`,
+      metadata: { pattern: input.pattern, matches: [] as Array<string>, truncated: false },
+    }
   }
 }
 

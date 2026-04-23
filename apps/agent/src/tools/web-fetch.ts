@@ -52,11 +52,11 @@ async function executeWebFetch(input: WebFetchInput) {
   try {
     parsed = new URL(input.url)
   } catch {
-    return 'Invalid URL.'
+    return { content: 'Invalid URL.' }
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`
+    return { content: `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.` }
   }
 
   try {
@@ -77,18 +77,29 @@ async function executeWebFetch(input: WebFetchInput) {
     const title = isHtml ? extractTitle(rawBody) : null
     const bodyText = isHtml ? sanitizeHtmlToText(rawBody) : collapseWhitespace(rawBody)
 
+    const body = truncate(bodyText, MAX_OUTPUT_CHARS)
+
     return {
-      url: parsed.toString(),
-      status: statusLine,
-      contentType,
-      ...(title ? { title } : {}),
-      body: truncate(bodyText, MAX_OUTPUT_CHARS),
+      content: [
+        `URL: ${parsed.toString()}`,
+        `Status: ${statusLine}`,
+        `Content-Type: ${contentType}`,
+        ...(title ? [`Title: ${title}`] : []),
+        '',
+        body || '[empty response body]',
+      ].join('\n'),
+      metadata: {
+        url: parsed.toString(),
+        status: statusLine,
+        contentType,
+        ...(title ? { title } : {}),
+      },
     }
   } catch (error) {
     if (error instanceof Error) {
-      return `Error fetching URL: ${error.message}`
+      return { content: `Error fetching URL: ${error.message}` }
     }
-    return `Error fetching URL: ${String(error)}`
+    return { content: `Error fetching URL: ${String(error)}` }
   }
 }
 

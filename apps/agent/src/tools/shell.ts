@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { z } from 'zod'
 import type { RuntimeToolDefinition } from '@/runtime/tool-definition'
+import type { RuntimeToolOutput } from '@/runtime/tool-output'
 import { checkShellSafety } from '@/utils/shell-safety'
 
 const FORBIDDEN_PATH_SEGMENT = 'node_modules'
@@ -17,19 +18,31 @@ export const shellSchema = z.object({
 
 type ShellInput = z.infer<typeof shellSchema>
 
-async function* executeShell(input: ShellInput, projectPath: string) {
+async function* executeShell(
+  input: ShellInput,
+  projectPath: string
+): AsyncGenerator<string, RuntimeToolOutput, void> {
   if (input.command.toLowerCase().includes(FORBIDDEN_PATH_SEGMENT)) {
-    return `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`
+    return {
+      content: `Command blocked: references to "${FORBIDDEN_PATH_SEGMENT}" are not allowed.`,
+      metadata: { command: input.command, ok: false },
+    }
   }
 
   const safety = checkShellSafety(input.command)
 
   if (safety === 'block') {
-    return `Blocked: "${input.command}" matches a permanently blocked pattern.`
+    return {
+      content: `Blocked: "${input.command}" matches a permanently blocked pattern.`,
+      metadata: { command: input.command, ok: false, blocked: true },
+    }
   }
 
   if (safety === 'confirm' && !input.confirmed) {
-    return `CONFIRMATION_REQUIRED: "${input.command}" is a destructive command. Re-run with confirmed: true to execute.`
+    return {
+      content: `CONFIRMATION_REQUIRED: "${input.command}" is a destructive command. Re-run with confirmed: true to execute.`,
+      metadata: { command: input.command, ok: false, requiresConfirmation: true },
+    }
   }
 
   const resolvedProjectPath = resolve(projectPath)
@@ -65,12 +78,21 @@ async function* executeShell(input: ShellInput, projectPath: string) {
 
     const exitCode = await exitCodePromise
     if (exitCode !== 0) {
-      return `Command failed (exit code ${exitCode})${accumulated ? `\n\n${accumulated}` : ''}`
+      return {
+        content: `Command failed (exit code ${exitCode})${accumulated ? `\n\n${accumulated}` : ''}`,
+        metadata: { command: input.command, ok: false, exitCode },
+      }
     }
 
-    return accumulated || 'Command executed successfully (no output)'
+    return {
+      content: accumulated || 'Command executed successfully (no output)',
+      metadata: { command: input.command, ok: true, exitCode: 0 },
+    }
   } catch (error) {
-    return `Command failed: ${error instanceof Error ? error.message : String(error)}`
+    return {
+      content: `Command failed: ${error instanceof Error ? error.message : String(error)}`,
+      metadata: { command: input.command, ok: false },
+    }
   }
 }
 
