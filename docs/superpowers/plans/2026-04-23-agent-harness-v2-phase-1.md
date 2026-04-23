@@ -38,7 +38,6 @@
 - `apps/agent/src/tools/file-write.ts`: convert to runtime-native context input shape.
 - `apps/agent/src/tools/shell.ts`: convert generator tool to runtime-native context input shape.
 - `apps/agent/src/tools/file-read.ts`: preserve metadata behavior with runtime-native context.
-- `apps/agent/src/utils/create-agent-tool.ts`: emit subagent lifecycle through v2 scope semantics.
 - `apps/web/src/hooks/use-agent-stream.ts`: consume `streamV2` and reducer-v2 path.
 - `apps/web/src/lib/message-grouper.ts`: map v2 tool progress shape while preserving existing visuals.
 
@@ -134,13 +133,13 @@ export type RunOptions = {
   maxSteps?: number
 }
 
-export type RunResult = {
-  messages: Array<Record<string, unknown>>
+export type RunResult<TMessage = Record<string, unknown>> = {
+  messages: Array<TMessage>
 }
 
-export interface AgentRuntime {
-  stream(input: RunInput, opts?: RunOptions): AsyncIterable<UiEvent>
-  invoke(input: RunInput, opts?: RunOptions): Promise<RunResult>
+export interface AgentRuntime<TEvent = UiEvent, TResult = RunResult> {
+  stream(input: RunInput, opts?: RunOptions): AsyncIterable<TEvent>
+  invoke(input: RunInput, opts?: RunOptions): Promise<TResult>
   cancel(threadId: string): void
 }
 ```
@@ -156,7 +155,7 @@ export type RunScope = {
   depth: number
 }
 
-export type UiEvent =
+export type UiEvent<TMessage = Record<string, unknown>, TState = Record<string, unknown>> =
   | { type: 'run.started'; scope: RunScope; threadId: string }
   | { type: 'assistant.reasoning_delta'; scope: RunScope; messageId: string; delta: string }
   | { type: 'assistant.text_delta'; scope: RunScope; messageId: string; delta: string }
@@ -175,10 +174,8 @@ export type UiEvent =
       output: unknown
       metadata?: Record<string, unknown>
     }
-  | { type: 'subagent.started'; scope: RunScope; toolCallId: string; agentName: string }
-  | { type: 'subagent.completed'; scope: RunScope; toolCallId: string }
-  | { type: 'assistant.completed'; scope: RunScope; message: Record<string, unknown> }
-  | { type: 'run.completed'; scope: RunScope; finalState: Record<string, unknown> }
+  | { type: 'assistant.completed'; scope: RunScope; message: TMessage }
+  | { type: 'run.completed'; scope: RunScope; finalState: TState }
   | { type: 'run.failed'; scope: RunScope; error: { code: string; message: string } }
 ```
 
@@ -431,7 +428,6 @@ git commit -m "feat(agent): add harness runtime and v2 run endpoints"
 - Modify: `apps/agent/src/tools/file-read.ts`
 - Modify: `apps/agent/src/tools/shell.ts`
 - Modify: `apps/agent/src/tools/file-search.ts`
-- Modify: `apps/agent/src/utils/create-agent-tool.ts`
 
 - [ ] **Step 1: Introduce runtime-native tool handler signatures**
 
@@ -460,18 +456,7 @@ Keep the behavior equivalent to current metadata output:
 
 for file and search tools.
 
-- [ ] **Step 4: Update subagent tool flow to emit scoped subagent events**
-
-In `apps/agent/src/utils/create-agent-tool.ts`, ensure nested runs emit:
-
-```ts
-{ type: 'subagent.started', ... }
-{ type: 'subagent.completed', ... }
-```
-
-with `parentToolCallId` scope linkage.
-
-- [ ] **Step 5: Manual reliability verification (reasoning + tools always on)**
+- [ ] **Step 4: Manual reliability verification (reasoning + tools always on)**
 
 Run:
 
@@ -485,12 +470,12 @@ Run multiple prompts with Qwen/GLM through LM Studio/SwiftLM and verify:
 - tool calls are parsed from structured fields only
 - no tool-call parsing from reasoning text
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 Run:
 
 ```bash
-git add apps/agent/src/tools/file-write.ts apps/agent/src/tools/file-read.ts apps/agent/src/tools/shell.ts apps/agent/src/tools/file-search.ts apps/agent/src/utils/create-agent-tool.ts
+git add apps/agent/src/tools/file-write.ts apps/agent/src/tools/file-read.ts apps/agent/src/tools/shell.ts apps/agent/src/tools/file-search.ts
 git commit -m "refactor(agent): migrate core tools to runtime-native context"
 ```
 
@@ -521,8 +506,6 @@ with direct handling for:
 - `assistant.tool_call`
 - `tool.started`
 - `tool.completed`
-- `subagent.started`
-- `subagent.completed`
 
 - [ ] **Step 2: Wire `use-agent-stream` to v2 endpoints**
 
@@ -553,7 +536,7 @@ Verify:
 - message layout unchanged
 - reasoning panel behavior unchanged
 - tool progress rendering unchanged
-- nested/subagent activity grouped correctly under parent tool call
+- run state/progress updates remain correct throughout streaming
 
 - [ ] **Step 5: Commit**
 
@@ -676,7 +659,6 @@ Expected: phase-2 branch created from `agent-runtime-v2` head.
 - [ ] Reasoning and tool calls are both enabled and stream consistently.
 - [ ] Tool calls are read from structured tool-call fields only.
 - [ ] Unsupported structured tool providers fail with explicit compatibility error.
-- [ ] Subagent activity is represented via explicit scoped events.
 - [ ] Frontend visual behavior remains equivalent to pre-rewrite UI.
 - [ ] No new unit tests were introduced.
 
@@ -685,3 +667,4 @@ Expected: phase-2 branch created from `agent-runtime-v2` head.
 - Full parity for all LangGraph-specific checkpoint/state internals.
 - Deep memory compaction parity.
 - Full dynamic MCP parity and all advanced edge-case flows.
+- Subagent execution and subagent-scoped streaming/event modeling.

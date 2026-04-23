@@ -15,7 +15,7 @@ This design replaces LangChain/LangGraph runtime orchestration in `apps/agent/sr
 - Remove framework-coupled orchestration from the critical runtime path.
 - Preserve current product behavior and visual UX while improving internal architecture.
 - Fix failure mode where tool calls are mixed into reasoning streams and break parsing.
-- Make subagents first-class in runtime and UI stream semantics.
+- De-risk phase 1 by explicitly migrating subagents in phase 2.
 - Keep migration incremental and reversible.
 
 ## 3. Non-Goals
@@ -57,14 +57,14 @@ This design replaces LangChain/LangGraph runtime orchestration in `apps/agent/sr
 - `runtime/tool-executor.ts`: tool invocation + streaming + result normalization.
 - `runtime/model/openai-compatible.ts`: model adapter using OpenAI SDK with `baseURL` support.
 - `runtime/capabilities.ts`: provider/model tool-capability checks.
-- `runtime/subagents.ts`: subagent run lifecycle and scope propagation.
+- `runtime/subagents.ts` (phase 2): subagent run lifecycle and scope propagation.
 
 ### 6.2 Runtime Interfaces
 
 ```ts
-export interface AgentRuntime {
-  stream(input: RunInput, opts?: RunOptions): AsyncIterable<UiEvent>
-  invoke(input: RunInput, opts?: RunOptions): Promise<RunResult>
+export interface AgentRuntime<TEvent = UiEvent, TResult = RunResult> {
+  stream(input: RunInput, opts?: RunOptions): AsyncIterable<TEvent>
+  invoke(input: RunInput, opts?: RunOptions): Promise<TResult>
   getState(threadId: string): Promise<AgentState>
   updateState(threadId: string, patch: Partial<AgentState>): Promise<void>
 }
@@ -80,7 +80,7 @@ export type ToolContext = {
 
 ## 7. Event Protocol V2
 
-Phase 1 introduces a UI-native stream protocol:
+Phase 1 introduces a UI-native stream protocol (top-level runs only):
 
 ```ts
 type RunScope = {
@@ -104,8 +104,6 @@ type UiEvent =
       metadata?: Record<string, unknown>
     }
   | { type: 'assistant.completed'; scope: RunScope; message: Message }
-  | { type: 'subagent.started'; scope: RunScope; toolCallId: string; agentName: string }
-  | { type: 'subagent.completed'; scope: RunScope; toolCallId: string }
   | { type: 'run.completed'; scope: RunScope; finalState: AgentState }
   | { type: 'run.failed'; scope: RunScope; error: { code: string; message: string } }
 ```
@@ -114,7 +112,7 @@ type UiEvent =
 
 - Removes dependency on LangChain `StreamEvent` internals.
 - Removes reducer logic that reconstructs fragmented `tool_calls` arrays.
-- Makes subagent hierarchy explicit with `scope.parentToolCallId`.
+- Keeps the frontend reducer focused on direct top-level event handling.
 
 ## 8. Main Loop Behavior
 
@@ -171,7 +169,7 @@ Add explicit settings/diagnostics fields:
 
 This powers better debugging for LM Studio/SwiftLM model swaps.
 
-## 11. Subagent Design
+## 11. Subagent Design (Phase 2)
 
 - Subagent invocation starts a nested run scope (`depth + 1`, `parentToolCallId` set).
 - Nested events are streamed with explicit scope.
@@ -225,11 +223,11 @@ Phase 2:
 
 - Integration: end-to-end run with tool call + reasoning + tool result.
 - Integration: known-bad provider output emits explicit compatibility failure.
-- Frontend: manual verification of v2 event protocol behavior, including nested scopes.
+- Frontend: manual verification of v2 event protocol behavior for top-level runs.
 
 ### 15.2 Phase 2 Required
 
-- Integration/manual parity validation for memory compaction, dynamic MCP tools, and advanced state operations.
+- Integration/manual parity validation for memory compaction, dynamic MCP tools, advanced state operations, and subagent scope/event behavior.
 
 ## 16. Rollout Plan
 
@@ -249,12 +247,12 @@ Phase 1 is complete when:
 - Runs stream with v2 protocol and preserve current visual UX.
 - Reasoning and tool calls coexist consistently in one run.
 - Structured tool-call unsupported models fail fast with clear error.
-- Subagent events render cleanly without namespace inference logic.
 - Legacy reducer complexity is removed from active runtime path.
 
 Phase 2 is complete when:
 
 - Feature parity checklist with current LangGraph-based behavior is fully satisfied.
+- Subagent execution and scoped subagent streaming are migrated and stable.
 
 ## 18. Risks and Mitigations
 
@@ -262,8 +260,8 @@ Phase 2 is complete when:
   - Mitigation: capability probe + explicit diagnostics + strict error codes.
 - Risk: Dual protocol migration causes temporary complexity.
   - Mitigation: gate v2 behind feature flag during transition, then remove v1.
-- Risk: Subagent event fan-out increases stream volume.
-  - Mitigation: event coalescing strategy for high-frequency deltas.
+- Risk: Phase 2 subagent event fan-out increases stream volume.
+  - Mitigation: apply event coalescing strategy during phase 2 rollout.
 
 ## 19. Phase 1 Default Decisions
 
