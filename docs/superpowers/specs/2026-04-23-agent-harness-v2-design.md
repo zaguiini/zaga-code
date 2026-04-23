@@ -36,13 +36,14 @@ This design replaces LangChain/LangGraph runtime orchestration in `apps/agent/sr
 ### 5.1 Branches
 
 - `main`: production/stable behavior, no disruptive migration changes.
+- `agent-runtime-v2`: integration branch for the full LangGraph-to-harness migration.
 - `phase-1/harness-core`: new harness, new stream protocol, reliable tool-calling core.
 - `phase-2/parity`: extends phase 1 with full parity features.
 
 ### 5.2 Merge Strategy
 
-- Phase 1 merges only when functional acceptance criteria pass and visual regressions are absent.
-- Phase 2 rebases/merges on top of phase 1 and lands only after parity checklist is complete.
+- Phase 1 merges into `agent-runtime-v2` only when functional acceptance criteria pass and visual regressions are absent.
+- Phase 2 rebases/merges on top of phase 1 and lands in `agent-runtime-v2` only after parity checklist is complete.
 
 ## 6. Architecture Overview
 
@@ -234,8 +235,8 @@ Phase 2:
 3. Implement harness loop + v2 event stream endpoint.
 4. Add frontend v2 reducer/subscription path (same visuals).
 5. Run reliability tests on OpenAI + LM Studio + SwiftLM sample models.
-6. Merge phase 1 when acceptance criteria pass.
-7. Create `phase-2/parity` branch from phase 1.
+6. Merge phase 1 into `agent-runtime-v2` when acceptance criteria pass.
+7. Create `phase-2/parity` branch from `agent-runtime-v2`.
 8. Add parity features incrementally with validation gates.
 
 ## 17. Acceptance Criteria
