@@ -1,3 +1,4 @@
+import { inputSchemaToJsonSchema } from './tool-definition'
 import type OpenAI from 'openai'
 import type { RuntimeToolDefinition } from './tool-definition'
 import { fileEditTool } from '@/tools/file-edit'
@@ -26,7 +27,7 @@ export function toOpenAIToolDefinitions(
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.jsonSchema,
+      parameters: inputSchemaToJsonSchema(tool.inputSchema),
     },
   }))
 }

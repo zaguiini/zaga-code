@@ -36,16 +36,5 @@ export const fileReadTool: RuntimeToolDefinition<FileReadInput> = {
   description:
     'Read the contents of a file within the project directory. The path must be relative to the project root.',
   inputSchema: fileReadSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      path: {
-        type: 'string',
-        description: 'Relative path to the file to read, must be within the project directory',
-      },
-    },
-    required: ['path'],
-    additionalProperties: false,
-  },
   execute: async (input, ctx) => executeFileRead(input, ctx.projectPath),
 }

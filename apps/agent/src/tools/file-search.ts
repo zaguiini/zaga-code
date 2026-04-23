@@ -65,20 +65,5 @@ export const fileSearchTool: RuntimeToolDefinition<FileSearchInput> = {
   description:
     'Fuzzy search through file names and paths. Use this to locate files before reading or editing.',
   inputSchema: fileSearchSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'Search query to find files by name or path.',
-      },
-      limit: {
-        type: 'number',
-        description: 'Maximum number of results to return (default: 10)',
-      },
-    },
-    required: ['query'],
-    additionalProperties: false,
-  },
   execute: async (input, ctx) => executeFileSearch(input, ctx.projectPath),
 }

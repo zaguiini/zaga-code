@@ -97,16 +97,5 @@ export const webFetchTool: RuntimeToolDefinition<WebFetchInput> = {
   description:
     'Fetch a public URL and return a concise text extraction with status and content metadata.',
   inputSchema: webFetchSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      url: {
-        type: 'string',
-        description: 'Absolute HTTP(S) URL to fetch and summarize as text',
-      },
-    },
-    required: ['url'],
-    additionalProperties: false,
-  },
   execute: async input => executeWebFetch(input),
 }

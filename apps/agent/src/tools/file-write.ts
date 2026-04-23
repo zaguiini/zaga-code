@@ -28,17 +28,5 @@ export const fileWriteTool: RuntimeToolDefinition<FileWriteInput> = {
   description:
     'Write or create a file within the project directory. Automatically creates parent directories if needed. The path must be relative to the project root.',
   inputSchema: fileWriteSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      path: {
-        type: 'string',
-        description: 'Relative path to the file to write, must be within the project directory',
-      },
-      content: { type: 'string', description: 'Content to write to the file' },
-    },
-    required: ['path', 'content'],
-    additionalProperties: false,
-  },
   execute: async (input, ctx) => executeFileWrite(input, ctx.projectPath),
 }

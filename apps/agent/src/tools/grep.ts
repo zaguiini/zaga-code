@@ -67,18 +67,5 @@ export const grepTool: RuntimeToolDefinition<GrepInput> = {
   description:
     'Search file contents with a regex pattern. Returns filename:line:match strings and is capped at 50 matches.',
   inputSchema: grepSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      pattern: { type: 'string', description: 'Regular expression pattern to search for' },
-      glob: {
-        type: 'string',
-        description: 'File glob to limit search, e.g. "**/*.ts" or "src/**"',
-      },
-      case_insensitive: { type: 'boolean', description: 'Case-insensitive search when true' },
-    },
-    required: ['pattern'],
-    additionalProperties: false,
-  },
   execute: async (input, ctx) => executeGrep(input, ctx.projectPath),
 }

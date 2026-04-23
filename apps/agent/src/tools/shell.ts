@@ -79,17 +79,5 @@ export const shellTool: RuntimeToolDefinition<ShellInput, string> = {
   description:
     'Execute a shell command in the project directory. Captures stdout and stderr. Destructive commands require confirmed=true.',
   inputSchema: shellSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      command: { type: 'string', description: 'Shell command to execute' },
-      confirmed: {
-        type: 'boolean',
-        description: 'Set to true to confirm execution of a destructive command',
-      },
-    },
-    required: ['command'],
-    additionalProperties: false,
-  },
   execute: (input, ctx) => executeShell(input, ctx.projectPath),
 }

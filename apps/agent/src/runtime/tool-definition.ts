@@ -1,12 +1,5 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 import type { ToolContext } from './tool-context'
-
-export type JsonSchemaObject = {
-  type: 'object'
-  properties: Record<string, unknown>
-  required?: Array<string>
-  additionalProperties?: boolean
-}
 
 export type RuntimeToolExecute<TInput extends Record<string, unknown>, TOutput = unknown> = (
   input: TInput,
@@ -20,8 +13,12 @@ export type RuntimeToolDefinition<
   name: string
   description: string
   inputSchema: z.ZodType<TInput>
-  jsonSchema: JsonSchemaObject
   execute: RuntimeToolExecute<TInput, TOutput>
+}
+
+export function inputSchemaToJsonSchema(inputSchema: z.ZodType) {
+  const schema = z.toJSONSchema(inputSchema, { io: 'input' })
+  return schema
 }
 
 export function isAsyncGenerator(value: unknown): value is AsyncGenerator<unknown, unknown, void> {

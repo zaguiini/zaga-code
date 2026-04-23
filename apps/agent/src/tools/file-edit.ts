@@ -35,19 +35,5 @@ export const fileEditTool: RuntimeToolDefinition<FileEditInput> = {
   description:
     'Make a surgical edit to a file by replacing an exact string. Use this instead of file_write when modifying existing files. old_string must match exactly.',
   inputSchema: fileEditSchema,
-  jsonSchema: {
-    type: 'object',
-    properties: {
-      path: { type: 'string', description: 'Relative path to the file to edit' },
-      old_string: {
-        type: 'string',
-        description:
-          'Exact string to replace. Must match exactly, including whitespace and indentation.',
-      },
-      new_string: { type: 'string', description: 'Replacement string' },
-    },
-    required: ['path', 'old_string', 'new_string'],
-    additionalProperties: false,
-  },
   execute: async (input, ctx) => executeFileEdit(input, ctx.projectPath),
 }
