@@ -15,3 +15,5 @@ todos.json
 release
 *.tsbuildinfo
 .logs
+
+.worktrees/
