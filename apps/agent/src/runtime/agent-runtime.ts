@@ -1,10 +1,12 @@
 import type { UiEvent } from './events'
+import type { RuntimeMessage } from './state'
 
 export type RunInput = {
   threadId: string
   projectPath: string
   text: string
   images: Array<{ name: string; mimeType: string; url: string }>
+  messages: Array<RuntimeMessage>
 }
 
 export type RunOptions = {

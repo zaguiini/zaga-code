@@ -1,10 +1,8 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
-import { HumanMessage, filterMessages } from '@langchain/core/messages'
 import { procedure, router } from '../trpc'
-import type { AgentState } from '@/graphs/agent'
 import { db } from '@/db'
-import { toMessageUnion } from '@/utils/messages'
+import { ensureThreadState, getThreadState } from '@/runtime/state-store'
 import { listProjectFiles } from '@/utils/list-project-files'
 
 type ThreadRow = {
@@ -33,10 +31,20 @@ function getMessageContentParts(content: unknown): Array<MessageContentPart> {
   return Array.isArray(content) ? content : []
 }
 
-function getFirstMessageSummary(message: HumanMessage | undefined): string | undefined {
+function getMessageText(content: unknown): string {
+  if (typeof content === 'string') return content.trim()
+
+  return getMessageContentParts(content)
+    .filter(part => part.type === 'text' && typeof part.text === 'string')
+    .map(part => part.text ?? '')
+    .join('')
+    .trim()
+}
+
+function getFirstMessageSummary(message: { content: unknown } | undefined): string | undefined {
   if (!message) return undefined
 
-  const text = message.text.trim()
+  const text = getMessageText(message.content)
   if (text) return text
 
   const imageCount = getMessageContentParts(message.content).filter(
@@ -69,88 +77,55 @@ function buildFolderList(files: Array<string>): Array<string> {
 export const threadsRouter = router({
   delete: procedure.input(z.object({ threadId: z.string() })).mutation(({ input }) => {
     db.prepare('DELETE FROM threads WHERE thread_id = ?').run(input.threadId)
+    db.prepare('DELETE FROM thread_state WHERE thread_id = ?').run(input.threadId)
     return { ok: true }
   }),
 
-  create: procedure
-    .input(z.object({ projectPath: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const threadId = crypto.randomUUID()
-      db.prepare('INSERT INTO threads (thread_id) VALUES (?)').run(threadId)
+  create: procedure.input(z.object({ projectPath: z.string() })).mutation(({ input }) => {
+    const threadId = crypto.randomUUID()
+    db.prepare('INSERT INTO threads (thread_id) VALUES (?)').run(threadId)
+    ensureThreadState(threadId, input.projectPath)
 
-      await ctx.graph.updateState(
-        {
-          configurable: { thread_id: threadId },
-        },
-        {
-          projectPath: input.projectPath,
-        }
-      )
+    return { threadId }
+  }),
 
-      return { threadId }
-    }),
-
-  list: procedure.query(async ({ ctx }) => {
+  list: procedure.query(() => {
     const rows = db
       .prepare('SELECT thread_id, created_at FROM threads ORDER BY created_at DESC')
       .all() as Array<ThreadRow>
+
     return {
-      threads: await Promise.all(
-        rows.map(async r => {
-          const state = await ctx.graph.getState({
-            configurable: { thread_id: r.thread_id },
-          })
+      threads: rows.map(r => {
+        const state = getThreadState(r.thread_id)
+        const firstHumanMessage = state.messages.find(message => message.type === 'human')
 
-          const values: AgentState = state.values
-          const firstHumanMessage = values.messages.find(m => HumanMessage.isInstance(m))
-
-          return {
-            threadId: r.thread_id,
-            projectPath: values.projectPath,
-            createdAt: r.created_at,
-            firstMessage: getFirstMessageSummary(firstHumanMessage),
-          }
-        })
-      ),
+        return {
+          threadId: r.thread_id,
+          projectPath: state.projectPath,
+          createdAt: r.created_at,
+          firstMessage: getFirstMessageSummary(firstHumanMessage),
+        }
+      }),
     }
   }),
 
-  get: procedure.input(z.object({ threadId: z.string() })).query(async ({ input, ctx }) => {
+  get: procedure.input(z.object({ threadId: z.string() })).query(({ input }) => {
     const row = db.prepare('SELECT thread_id FROM threads WHERE thread_id = ?').get(input.threadId)
     if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' })
-    const state = await ctx.graph.getState({
-      configurable: { thread_id: input.threadId },
-    })
 
-    const values: AgentState = state.values
-
-    const filteredMessages = filterMessages(values.messages, {
-      excludeTypes: ['system'],
-    })
-
-    const messages = filteredMessages.map(toMessageUnion)
-
-    return {
-      ...values,
-      messages,
-    }
+    return getThreadState(input.threadId)
   }),
 
-  files: procedure.input(threadFilesInputSchema).query(async ({ input, ctx }) => {
-    const projectPath = input.projectPath
-      ? input.projectPath
-      : await (async () => {
-          const row = db
-            .prepare('SELECT thread_id FROM threads WHERE thread_id = ?')
-            .get(input.threadId) as ThreadRow | undefined
-          if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' })
+  files: procedure.input(threadFilesInputSchema).query(async ({ input }) => {
+    let projectPath = input.projectPath
+    if (!projectPath) {
+      const row = db
+        .prepare('SELECT thread_id FROM threads WHERE thread_id = ?')
+        .get(input.threadId) as ThreadRow | undefined
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' })
 
-          const state = await ctx.graph.getState({
-            configurable: { thread_id: input.threadId! },
-          })
-          const values: AgentState = state.values
-          return values.projectPath
-        })()
+      projectPath = getThreadState(input.threadId!).projectPath
+    }
 
     if (!projectPath) return { files: [], folders: [] }
 

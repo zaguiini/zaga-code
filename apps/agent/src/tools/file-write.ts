@@ -1,13 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
-import { tool } from 'langchain'
-import { getCurrentTaskInput } from '@langchain/langgraph'
-import type { AgentState } from '@/graphs/agent'
-import type { ToolContext } from '@/runtime/tool-context'
+import type { RuntimeToolDefinition } from '@/runtime/tool-definition'
 import { validatePath } from '@/utils/validate-path'
 
-const fileWriteSchema = z.object({
+export const fileWriteSchema = z.object({
   path: z
     .string()
     .describe('Relative path to the file to write, must be within the project directory'),
@@ -16,44 +13,32 @@ const fileWriteSchema = z.object({
 
 type FileWriteInput = z.infer<typeof fileWriteSchema>
 
-export async function fileWriteHandler(input: FileWriteInput, ctx: ToolContext) {
-  const validatedPath = validatePath(input.path, ctx.projectPath)
+async function executeFileWrite(input: FileWriteInput, projectPath: string) {
+  const validatedPath = validatePath(input.path, projectPath)
   const directory = dirname(validatedPath)
 
   await mkdir(directory, { recursive: true })
   await writeFile(validatedPath, input.content, 'utf-8')
 
-  return `Successfully wrote file: ${input.path}`
+  return { ok: true, path: input.path }
 }
 
-/**
- * Creates a LangGraph tool for writing/creating files with path validation.
- * Automatically creates parent directories if they don't exist.
- *
- * @param projectPath - The root path of the project directory
- * @returns A LangGraph tool that writes files within the project directory
- */
-export const fileWriteTool = tool(
-  async (input: FileWriteInput) => {
-    try {
-      const { projectPath } = getCurrentTaskInput<AgentState>()
-      return await fileWriteHandler(input, {
-        threadId: '',
-        projectPath,
-        toolCallId: '',
-        runScope: { runId: '', depth: 0 },
-      })
-    } catch (error) {
-      if (error instanceof Error) {
-        return `Error writing file: ${error.message}`
-      }
-      return `Error writing file: ${String(error)}`
-    }
+export const fileWriteTool: RuntimeToolDefinition<FileWriteInput> = {
+  name: 'file_write',
+  description:
+    'Write or create a file within the project directory. Automatically creates parent directories if needed. The path must be relative to the project root.',
+  inputSchema: fileWriteSchema,
+  jsonSchema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'Relative path to the file to write, must be within the project directory',
+      },
+      content: { type: 'string', description: 'Content to write to the file' },
+    },
+    required: ['path', 'content'],
+    additionalProperties: false,
   },
-  {
-    name: 'file_write',
-    description:
-      'Write or create a file within the project directory. Automatically creates parent directories if needed. The path must be relative to the project root.',
-    schema: fileWriteSchema,
-  }
-)
+  execute: async (input, ctx) => executeFileWrite(input, ctx.projectPath),
+}

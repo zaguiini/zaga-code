@@ -27,5 +27,12 @@ db.exec(`
   )
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS thread_state (
+    thread_id   TEXT PRIMARY KEY,
+    state_json  TEXT NOT NULL DEFAULT '{}'
+  )
+`)
+
 // Mark any runs that were still 'running' when the server last stopped as failed
 db.prepare("UPDATE runs SET status = 'failed' WHERE status = 'running'").run()

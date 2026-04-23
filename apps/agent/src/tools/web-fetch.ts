@@ -1,12 +1,14 @@
 import { z } from 'zod'
-import { tool } from '@langchain/core/tools'
-
-const webFetchSchema = z.object({
-  url: z.string().url().describe('Absolute HTTP(S) URL to fetch and summarize as text'),
-})
+import type { RuntimeToolDefinition } from '@/runtime/tool-definition'
 
 const MAX_OUTPUT_CHARS = 12_000
 const FETCH_TIMEOUT_MS = 15_000
+
+export const webFetchSchema = z.object({
+  url: z.string().url().describe('Absolute HTTP(S) URL to fetch and summarize as text'),
+})
+
+type WebFetchInput = z.infer<typeof webFetchSchema>
 
 function collapseWhitespace(input: string): string {
   return input.replace(/\s+/g, ' ').trim()
@@ -44,60 +46,67 @@ function extractTitle(html: string): string | null {
   return title.length > 0 ? title : null
 }
 
-export const webFetchTool = tool(
-  async ({ url }: z.infer<typeof webFetchSchema>) => {
-    let parsed: URL
+async function executeWebFetch(input: WebFetchInput) {
+  let parsed: URL
 
-    try {
-      parsed = new URL(url)
-    } catch {
-      return 'Invalid URL.'
-    }
-
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`
-    }
-
-    try {
-      const response = await fetch(parsed.toString(), {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: {
-          'user-agent': 'zaga-code-agent/web-fetch',
-          accept: 'text/html,text/plain,application/json,*/*;q=0.8',
-        },
-      })
-
-      const contentType = response.headers.get('content-type') ?? 'unknown'
-      const statusLine = `${response.status} ${response.statusText}`.trim()
-      const rawBody = await response.text()
-
-      const isHtml = contentType.toLowerCase().includes('text/html')
-      const title = isHtml ? extractTitle(rawBody) : null
-      const bodyText = isHtml ? sanitizeHtmlToText(rawBody) : collapseWhitespace(rawBody)
-      const truncatedBody = truncate(bodyText, MAX_OUTPUT_CHARS)
-
-      const summary = [
-        `URL: ${parsed.toString()}`,
-        `Status: ${statusLine}`,
-        `Content-Type: ${contentType}`,
-        ...(title ? [`Title: ${title}`] : []),
-        '',
-        truncatedBody || '[empty response body]',
-      ]
-
-      return summary.join('\n')
-    } catch (error) {
-      if (error instanceof Error) {
-        return `Error fetching URL: ${error.message}`
-      }
-      return `Error fetching URL: ${String(error)}`
-    }
-  },
-  {
-    name: 'web_fetch',
-    description:
-      'Fetch a public URL and return a concise text extraction with status and content metadata.',
-    schema: webFetchSchema,
+  try {
+    parsed = new URL(input.url)
+  } catch {
+    return 'Invalid URL.'
   }
-)
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`
+  }
+
+  try {
+    const response = await fetch(parsed.toString(), {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        'user-agent': 'zaga-code-agent/web-fetch',
+        accept: 'text/html,text/plain,application/json,*/*;q=0.8',
+      },
+    })
+
+    const contentType = response.headers.get('content-type') ?? 'unknown'
+    const statusLine = `${response.status} ${response.statusText}`.trim()
+    const rawBody = await response.text()
+
+    const isHtml = contentType.toLowerCase().includes('text/html')
+    const title = isHtml ? extractTitle(rawBody) : null
+    const bodyText = isHtml ? sanitizeHtmlToText(rawBody) : collapseWhitespace(rawBody)
+
+    return {
+      url: parsed.toString(),
+      status: statusLine,
+      contentType,
+      ...(title ? { title } : {}),
+      body: truncate(bodyText, MAX_OUTPUT_CHARS),
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      return `Error fetching URL: ${error.message}`
+    }
+    return `Error fetching URL: ${String(error)}`
+  }
+}
+
+export const webFetchTool: RuntimeToolDefinition<WebFetchInput> = {
+  name: 'web_fetch',
+  description:
+    'Fetch a public URL and return a concise text extraction with status and content metadata.',
+  inputSchema: webFetchSchema,
+  jsonSchema: {
+    type: 'object',
+    properties: {
+      url: {
+        type: 'string',
+        description: 'Absolute HTTP(S) URL to fetch and summarize as text',
+      },
+    },
+    required: ['url'],
+    additionalProperties: false,
+  },
+  execute: async input => executeWebFetch(input),
+}

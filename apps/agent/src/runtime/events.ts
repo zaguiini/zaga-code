@@ -1,3 +1,5 @@
+import type { RuntimeMessage, RuntimeState } from './state'
+
 export type RunScope = {
   runId: string
   parentToolCallId?: string
@@ -27,3 +29,5 @@ export type UiEvent<TMessage = Record<string, unknown>, TState = Record<string, 
   | { type: 'assistant.completed'; scope: RunScope; message: TMessage }
   | { type: 'run.completed'; scope: RunScope; finalState: TState }
   | { type: 'run.failed'; scope: RunScope; error: { code: string; message: string } }
+
+export type SerializedStreamEventV2 = UiEvent<RuntimeMessage, RuntimeState>

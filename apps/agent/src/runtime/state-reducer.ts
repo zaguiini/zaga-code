@@ -1,12 +1,12 @@
-import type { AgentState } from '@/graphs/agent'
+import type { RuntimeMessage, RuntimeState } from './state'
 
 export type RuntimeAction =
-  | { type: 'messages.append'; message: AgentState['messages'][number] }
+  | { type: 'messages.append'; message: RuntimeMessage }
   | { type: 'usedTokens.set'; value: number }
   | { type: 'configHash.set'; value: string }
   | { type: 'memoryCommandHandled.set'; value: boolean }
 
-export function runtimeStateReducer(state: AgentState, action: RuntimeAction): AgentState {
+export function runtimeStateReducer(state: RuntimeState, action: RuntimeAction): RuntimeState {
   switch (action.type) {
     case 'messages.append':
       return { ...state, messages: [...state.messages, action.message] }
