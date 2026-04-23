@@ -20,6 +20,15 @@
 
 Qwen models running on LM Studio often introduce tool calls within reasoning blocks, which breaks the parser and stops execution. I've tried fixing that within the harness through XML parsing but it doesn't seem to work. Switched to `zai-org/glm-4.7-flash` as the default model for this reason. Will revert back once it's fixed in LM Studio.
 
+## Harness v2 migration
+
+- Legacy stream path: `runs.start`, `runs.stream`, `runs.cancel` (LangGraph-backed).
+- New stream path (phase 1): `runs.startV2`, `runs.streamV2`, `runs.cancelV2` (harness runtime).
+- Branch flow:
+  - `phase-1/harness-core` contains the narrower-core migration work.
+  - `agent-runtime-v2` is the integration branch for phase merges.
+  - `main` remains the stable baseline during migration.
+
 ## Recipes
 
 ### Web Search
