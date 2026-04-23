@@ -2,15 +2,17 @@ import { createHTTPServer } from '@trpc/server/adapters/standalone'
 import { appRouter } from '@/server/router'
 import { checkpointer } from '@/checkpointer'
 import { createAgent } from '@/graphs/agent'
+import { HarnessRuntime } from '@/runtime/harness-runtime'
 
 export const AGENT_PORT = 2024
 
 export function startAgentServer(port: number) {
   const graph = createAgent({ checkpointer })
+  const runtime = new HarnessRuntime()
 
   const server = createHTTPServer({
     router: appRouter,
-    createContext: () => ({ graph }),
+    createContext: () => ({ graph, runtime }),
     middleware(req, res, next) {
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')

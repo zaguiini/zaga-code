@@ -5,6 +5,7 @@ import { procedure, router } from '../trpc'
 import type { Message } from '@langchain/langgraph-sdk'
 import type { StreamEvent } from '@langchain/core/types/stream'
 import type { Context } from '../trpc'
+import type { UiEvent } from '@/runtime/events'
 import { db } from '@/db'
 import { serializeMessages, toMessageUnion } from '@/utils/messages'
 // ── Serialized stream event types (consumed by the frontend via tRPC inference) ──
@@ -44,6 +45,8 @@ export type SerializedStreamEvent =
       event: 'on_chain_end'
       data: { output?: Record<string, unknown> }
     })
+
+export type SerializedStreamEventV2 = UiEvent
 
 // ── Serialization helpers ──
 
@@ -107,8 +110,8 @@ const runInputSchema = z.object({
   images: z.array(runImageSchema).default([]),
 })
 
-type RunBuffer = {
-  events: Array<SerializedStreamEvent>
+type RunBuffer<TEvent> = {
+  events: Array<TEvent>
   ac: AbortController
   isComplete: boolean
   subscribers: number
@@ -116,7 +119,7 @@ type RunBuffer = {
   nextEventPromise: () => Promise<void>
 }
 
-function createRunBuffer(ac: AbortController): RunBuffer {
+function createRunBuffer<TEvent>(ac: AbortController): RunBuffer<TEvent> {
   const waiters: Array<() => void> = []
   return {
     events: [],
@@ -133,14 +136,31 @@ function createRunBuffer(ac: AbortController): RunBuffer {
   }
 }
 
-const runBuffers = new Map<string, RunBuffer>()
+const runBuffers = new Map<string, RunBuffer<SerializedStreamEvent>>()
 const threadRunMap = new Map<string, string>()
+const runBuffersV2 = new Map<string, RunBuffer<SerializedStreamEventV2>>()
+const threadRunMapV2 = new Map<string, string>()
 
 /** Remove a run buffer if the run is finished and no one is listening. */
-function maybeCleanupBuffer(runId: string, threadId: string, buffer: RunBuffer) {
+function maybeCleanupBuffer(
+  runId: string,
+  threadId: string,
+  buffer: RunBuffer<SerializedStreamEvent>
+) {
   if (buffer.isComplete && buffer.subscribers === 0) {
     runBuffers.delete(runId)
     threadRunMap.delete(threadId)
+  }
+}
+
+function maybeCleanupBufferV2(
+  runId: string,
+  threadId: string,
+  buffer: RunBuffer<SerializedStreamEventV2>
+) {
+  if (buffer.isComplete && buffer.subscribers === 0) {
+    runBuffersV2.delete(runId)
+    threadRunMapV2.delete(threadId)
   }
 }
 
@@ -173,7 +193,7 @@ function startRun(
   )
 
   const ac = new AbortController()
-  const buffer = createRunBuffer(ac)
+  const buffer = createRunBuffer<SerializedStreamEvent>(ac)
   runBuffers.set(runId, buffer)
   threadRunMap.set(threadId, runId)
 
@@ -202,6 +222,58 @@ function startRun(
       buffer.isComplete = true
       buffer.notify()
       maybeCleanupBuffer(runId, threadId, buffer)
+    }
+  })()
+
+  return { runId }
+}
+
+function startRunV2(
+  ctx: Context,
+  input: { threadId: string; input: z.infer<typeof runInputSchema> }
+) {
+  if (!ctx.runtime) {
+    throw new Error('Runtime is not configured')
+  }
+
+  const { threadId } = input
+  const messageContent = buildHumanContent(input.input)
+  if (messageContent.length === 0) return null
+
+  const runId = crypto.randomUUID()
+  db.prepare('INSERT INTO runs (run_id, thread_id, status) VALUES (?, ?, ?)').run(
+    runId,
+    threadId,
+    'running'
+  )
+
+  const ac = new AbortController()
+  const buffer = createRunBuffer<SerializedStreamEventV2>(ac)
+  runBuffersV2.set(runId, buffer)
+  threadRunMapV2.set(threadId, runId)
+
+  void (async () => {
+    try {
+      const eventStream = ctx.runtime!.stream(
+        {
+          threadId,
+          projectPath: process.cwd(),
+          text: input.input.text,
+          images: input.input.images,
+        },
+        { signal: ac.signal }
+      )
+      for await (const event of eventStream) {
+        buffer.events.push(event)
+        buffer.notify()
+      }
+      db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('completed', runId)
+    } catch {
+      db.prepare('UPDATE runs SET status = ? WHERE run_id = ?').run('failed', runId)
+    } finally {
+      buffer.isComplete = true
+      buffer.notify()
+      maybeCleanupBufferV2(runId, threadId, buffer)
     }
   })()
 
@@ -251,7 +323,7 @@ export const runsRouter = router({
       const { threadId } = input
 
       let runId: string | undefined
-      let buffer: RunBuffer | undefined
+      let buffer: RunBuffer<SerializedStreamEvent> | undefined
       let startIdx = 0
 
       // 1. SSE reconnection: lastEventId contains "runId:idx", look up buffer directly
@@ -319,6 +391,106 @@ export const runsRouter = router({
     if (row) {
       runBuffers.get(row.run_id)?.ac.abort()
     }
+    return { ok: true }
+  }),
+
+  startV2: procedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        input: runInputSchema,
+      })
+    )
+    .mutation(({ input, ctx }) => {
+      const existingRunId = threadRunMapV2.get(input.threadId)
+      const existingBuffer = existingRunId ? runBuffersV2.get(existingRunId) : undefined
+      if (existingBuffer && !existingBuffer.isComplete && !existingBuffer.ac.signal.aborted) {
+        return { runId: existingRunId }
+      }
+
+      const started = startRunV2(ctx, input)
+      if (!started) {
+        return { runId: null }
+      }
+
+      return started
+    }),
+
+  streamV2: procedure
+    .input(
+      z.object({
+        threadId: z.string(),
+        runId: z.string().optional(),
+        lastEventId: z.string().nullish(),
+      })
+    )
+    .subscription(async function* ({ input }) {
+      const { threadId } = input
+
+      let runId: string | undefined
+      let buffer: RunBuffer<SerializedStreamEventV2> | undefined
+      let startIdx = 0
+
+      if (input.lastEventId) {
+        const colonIdx = input.lastEventId.lastIndexOf(':')
+        if (colonIdx !== -1) {
+          const resumeRunId = input.lastEventId.slice(0, colonIdx)
+          const resumeBuffer = runBuffersV2.get(resumeRunId)
+          if (resumeBuffer) {
+            runId = resumeRunId
+            buffer = resumeBuffer
+            startIdx = parseInt(input.lastEventId.slice(colonIdx + 1), 10) + 1
+          } else {
+            return
+          }
+        }
+      }
+
+      if (!buffer && input.runId) {
+        const requestedBuffer = runBuffersV2.get(input.runId)
+        if (requestedBuffer) {
+          runId = input.runId
+          buffer = requestedBuffer
+        }
+      }
+
+      if (!buffer) {
+        const activeRunId = threadRunMapV2.get(threadId)
+        const activeBuffer = activeRunId ? runBuffersV2.get(activeRunId) : undefined
+        if (activeBuffer && !activeBuffer.isComplete && !activeBuffer.ac.signal.aborted) {
+          runId = activeRunId!
+          buffer = activeBuffer
+        }
+      }
+
+      if (!buffer || !runId) return
+
+      buffer.subscribers++
+      try {
+        let idx = startIdx
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        while (true) {
+          const nextP = buffer.nextEventPromise()
+          while (idx < buffer.events.length) {
+            yield tracked(`${runId}:${idx}`, buffer.events[idx])
+            idx++
+          }
+          if (buffer.isComplete || buffer.ac.signal.aborted) break
+          await nextP
+        }
+      } finally {
+        buffer.subscribers--
+        maybeCleanupBufferV2(runId, threadId, buffer)
+      }
+    }),
+
+  cancelV2: procedure.input(z.object({ threadId: z.string() })).mutation(({ input, ctx }) => {
+    const runId = threadRunMapV2.get(input.threadId)
+    if (runId) {
+      runBuffersV2.get(runId)?.ac.abort()
+    }
+
+    ctx.runtime?.cancel(input.threadId)
     return { ok: true }
   }),
 })
