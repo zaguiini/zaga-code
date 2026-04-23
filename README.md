@@ -2,6 +2,7 @@
 
 ## TODO
 
+- [ ] Task management for more complex oeprations
 - [ ] Permission management (approval modes: read-only, ask before changes, allow all; save in global settings)
 - [ ] Skills (compact conversation, setup project, custom skills) with slash execution
 - [ ] Checkpoint restoration (from user message; either as fork to new chat or rewind the current chat, possible to edit message in both cases)
