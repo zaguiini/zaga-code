@@ -9,11 +9,6 @@
       "types": "./dist/setup.d.ts",
       "default": "./dist/setup.js"
     },
-    "./graphs/agent": {
-      "development": "./src/graphs/agent.ts",
-      "types": "./dist/graphs/agent.d.ts",
-      "default": "./dist/graphs/agent.js"
-    },
     "./server": {
       "development": "./src/server/index.ts",
       "types": "./dist/server/index.d.ts",

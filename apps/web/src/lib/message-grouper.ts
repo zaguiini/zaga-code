@@ -1,5 +1,5 @@
-import type { Message, ToolMessage } from '@langchain/langgraph-sdk'
 import type { Message as MessageType, ToolInvocationPart } from '@/components/ui/chat-message'
+import type { AgentState } from '@/lib/trpc'
 
 type ToolProgress = {
   toolCallId: string
@@ -19,6 +19,8 @@ type ContentPart = {
         url?: string
       }
 }
+
+type AgentMessage = AgentState['messages'][number]
 
 function getContentParts(content: string | Array<ContentPart>): Array<ContentPart> {
   return Array.isArray(content) ? content : []
@@ -49,35 +51,6 @@ function getAttachmentFallbackLabel(attachmentCount: number): string {
   return attachmentCount === 1 ? 'Attached image' : 'Attached images'
 }
 
-type CommandResult = {
-  kind: string
-  title: string
-  contentMarkdown: string
-  icon?: string
-  scope?: string
-}
-
-function getCommandResult(additionalKwargs: unknown): CommandResult | undefined {
-  if (!additionalKwargs || typeof additionalKwargs !== 'object') return undefined
-
-  const candidate = additionalKwargs as Record<string, unknown>
-  if (
-    typeof candidate.kind !== 'string' ||
-    typeof candidate.title !== 'string' ||
-    typeof candidate.contentMarkdown !== 'string'
-  ) {
-    return undefined
-  }
-
-  return {
-    kind: candidate.kind,
-    title: candidate.title,
-    contentMarkdown: candidate.contentMarkdown,
-    ...(typeof candidate.icon === 'string' ? { icon: candidate.icon } : {}),
-    ...(typeof candidate.scope === 'string' ? { scope: candidate.scope } : {}),
-  }
-}
-
 export function extractText(content: string | Array<ContentPart>): string {
   if (typeof content === 'string') return content.trim()
   return content
@@ -88,7 +61,7 @@ export function extractText(content: string | Array<ContentPart>): string {
 }
 
 export const messageGrouper = (
-  messages: Array<Message>,
+  messages: Array<AgentMessage>,
   toolProgress: Record<string, ToolProgress | undefined>
 ): Array<MessageType> => {
   // Build a map of tool results keyed by tool_call_id
@@ -97,7 +70,6 @@ export const messageGrouper = (
     if (msg.type === 'tool' && msg.tool_call_id) {
       toolResults.set(msg.tool_call_id, {
         content: extractText(msg.content),
-        metadata: (msg as ToolMessage & { metadata?: Record<string, unknown> }).metadata,
       })
     }
   }
@@ -130,9 +102,8 @@ export const messageGrouper = (
       // AI / assistant message
       const result: Array<MessageType> = []
 
-      const reasoningContent = msg.additional_kwargs?.reasoning_content as string | undefined
+      const reasoningContent = msg.reasoning
       if (reasoningContent?.trim()) {
-        const durationMs = msg.additional_kwargs?.reasoning_duration_ms as number | undefined
         result.push({
           id,
           role: 'assistant',
@@ -141,17 +112,13 @@ export const messageGrouper = (
             {
               type: 'reasoning',
               reasoning: reasoningContent,
-              durationMs,
-              done: durationMs !== undefined,
+              done: true,
             },
           ],
         })
       }
-
-      const commandResult = getCommandResult(msg.additional_kwargs)
       const messageContent = extractText(msg.content)
-
-      if (messageContent && !commandResult) {
+      if (messageContent) {
         result.push({
           id,
           role: 'assistant',
@@ -160,26 +127,12 @@ export const messageGrouper = (
         })
       }
 
-      if (commandResult) {
-        result.push({
-          id: `${id}-command-result`,
-          role: 'assistant',
-          content: commandResult.title,
-          parts: [
-            {
-              type: 'command-result',
-              commandResult,
-            },
-          ],
-        })
-      }
-
       const toolCalls = msg.tool_calls ?? []
       if (toolCalls.length > 0) {
         result.push(
           ...toolCalls.map(toolCall => {
             const parts: Array<ToolInvocationPart> = []
-            const toolResult = toolResults.get(toolCall.id!)
+            const toolResult = toolResults.get(toolCall.id)
 
             if (toolResult !== undefined) {
               parts.push({

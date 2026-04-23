@@ -29,7 +29,6 @@ export type RuntimeAiMessage = {
   reasoning?: string
   tool_calls?: Array<RuntimeToolCall>
   metadata?: Record<string, unknown>
-  additional_kwargs?: Record<string, unknown>
 }
 
 export type RuntimeToolMessage = {
