@@ -1,5 +1,13 @@
-import type { Message, ToolMessage, ToolProgress } from '@langchain/langgraph-sdk'
+import type { Message, ToolMessage } from '@langchain/langgraph-sdk'
 import type { Message as MessageType, ToolInvocationPart } from '@/components/ui/chat-message'
+
+type ToolProgress = {
+  toolCallId: string
+  name: string
+  state: 'running' | 'completed' | 'starting'
+  input: unknown
+  result?: Record<string, unknown>
+}
 
 type ContentPart = {
   type: string

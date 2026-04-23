@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useReducer, useRef, useState } from 'react'
-import { initialStreamState, streamReducer } from './stream-reducer'
-import type { StreamState } from './stream-reducer'
+import { initialStreamStateV2, streamReducerV2 } from './stream-reducer-v2'
+import type { StreamStateV2 } from './stream-reducer-v2'
 import { trpc } from '@/lib/trpc'
 
 type RunImageInput = {
@@ -14,7 +14,7 @@ type RunInput = {
   images: Array<RunImageInput>
 }
 
-export interface AgentStream extends StreamState {
+export interface AgentStream extends StreamStateV2 {
   isLoading: boolean
   submit: (input: RunInput) => void
   stop: () => void
@@ -22,16 +22,16 @@ export interface AgentStream extends StreamState {
 
 export function useAgentStream(
   threadId: string,
-  historicalState?: StreamState['values']
+  historicalState?: StreamStateV2['values']
 ): AgentStream {
   const threadsQuery = trpc.threads.list.useQuery()
   const runsQuery = trpc.runs.get.useQuery({ threadId })
   const utils = trpc.useUtils()
   const [isStarting, setIsStarting] = useState(false)
   const [pendingRunId, setPendingRunId] = useState<string | null>(null)
-  const [state, dispatch] = useReducer(streamReducer, initialStreamState)
-  const cancelMutation = trpc.runs.cancel.useMutation()
-  const startMutation = trpc.runs.start.useMutation()
+  const [state, dispatch] = useReducer(streamReducerV2, initialStreamStateV2)
+  const cancelMutation = trpc.runs.cancelV2.useMutation()
+  const startMutation = trpc.runs.startV2.useMutation()
   const cancelMutate = cancelMutation.mutate
   const prevThreadIdRef = useRef(threadId)
 
@@ -48,7 +48,7 @@ export function useAgentStream(
   const activeRunId = runsQuery.data?.activeRunId ?? null
   const subscribedRunId = pendingRunId ?? activeRunId
 
-  const stream = trpc.runs.stream.useSubscription(
+  const stream = trpc.runs.streamV2.useSubscription(
     { threadId, ...(subscribedRunId ? { runId: subscribedRunId } : {}) },
     {
       enabled: !!subscribedRunId,
