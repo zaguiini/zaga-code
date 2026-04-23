@@ -29,6 +29,7 @@ This design replaces LangChain/LangGraph runtime orchestration in `apps/agent/sr
 - Main branch remains stable; migration happens in dedicated branches.
 - Phase 1 uses a narrower core runtime first, then phase 2 restores full feature parity.
 - Phase 1 adopts a strict provider capability contract for structured tool calls.
+- Phase 1 supports OpenAI-compatible providers only; non-OpenAI adapters are deferred.
 - Frontend visuals remain the same; only protocol/reducer-level changes are allowed.
 
 ## 5. Branch Strategy
@@ -62,7 +63,15 @@ This design replaces LangChain/LangGraph runtime orchestration in `apps/agent/sr
 ### 6.2 Runtime Interfaces
 
 ```ts
-export interface AgentRuntime<TEvent = UiEvent, TResult = RunResult> {
+import type OpenAI from 'openai'
+import type { AgentState } from '@/graphs/agent'
+
+type OpenAIMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
+
+export interface AgentRuntime<
+  TEvent = UiEvent<OpenAIMessage, AgentState>,
+  TResult = RunResult<OpenAIMessage>,
+> {
   stream(input: RunInput, opts?: RunOptions): AsyncIterable<TEvent>
   invoke(input: RunInput, opts?: RunOptions): Promise<TResult>
   getState(threadId: string): Promise<AgentState>

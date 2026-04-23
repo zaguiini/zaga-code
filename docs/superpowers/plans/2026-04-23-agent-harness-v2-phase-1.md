@@ -15,6 +15,7 @@
 - No new unit tests in this rewrite.
 - Do not add or require Vitest/Jest unit tests in phase 1 tasks.
 - Verification is integration/manual only.
+- Phase 1 supports OpenAI-compatible providers only.
 
 ## File Structure (Phase 1)
 
@@ -119,7 +120,11 @@ Expected: one docs-only commit.
 Create `apps/agent/src/runtime/agent-runtime.ts`:
 
 ```ts
+import type OpenAI from 'openai'
 import type { UiEvent } from './events'
+import type { AgentState } from '@/graphs/agent'
+
+type OpenAIMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
 
 export type RunInput = {
   threadId: string
@@ -133,11 +138,14 @@ export type RunOptions = {
   maxSteps?: number
 }
 
-export type RunResult<TMessage = Record<string, unknown>> = {
+export type RunResult<TMessage = OpenAIMessage> = {
   messages: Array<TMessage>
 }
 
-export interface AgentRuntime<TEvent = UiEvent, TResult = RunResult> {
+export interface AgentRuntime<
+  TEvent = UiEvent<OpenAIMessage, AgentState>,
+  TResult = RunResult<OpenAIMessage>,
+> {
   stream(input: RunInput, opts?: RunOptions): AsyncIterable<TEvent>
   invoke(input: RunInput, opts?: RunOptions): Promise<TResult>
   cancel(threadId: string): void
@@ -149,13 +157,18 @@ export interface AgentRuntime<TEvent = UiEvent, TResult = RunResult> {
 Create `apps/agent/src/runtime/events.ts`:
 
 ```ts
+import type OpenAI from 'openai'
+import type { AgentState } from '@/graphs/agent'
+
+type OpenAIMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
+
 export type RunScope = {
   runId: string
   parentToolCallId?: string
   depth: number
 }
 
-export type UiEvent<TMessage = Record<string, unknown>, TState = Record<string, unknown>> =
+export type UiEvent<TMessage = OpenAIMessage, TState = AgentState> =
   | { type: 'run.started'; scope: RunScope; threadId: string }
   | { type: 'assistant.reasoning_delta'; scope: RunScope; messageId: string; delta: string }
   | { type: 'assistant.text_delta'; scope: RunScope; messageId: string; delta: string }
